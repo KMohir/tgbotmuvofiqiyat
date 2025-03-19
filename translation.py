@@ -36,6 +36,8 @@ translations={
         "Centris Towers haqida bilish":"Узнать про Centris Towers",
         "Centris Towers bilan bog'lanish":"Связь с Centris Towers",
         "Takliflarni yuborish":"Отправка предложений",
+        "Operatsiya bekor qilindi":"Операция отменена",
+        "Orqaga":"Назад",
     }
 
 }
