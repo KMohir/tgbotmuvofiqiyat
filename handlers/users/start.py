@@ -307,7 +307,7 @@ async def get_all_users_command(message: types.Message):
 
     # Создаем DataFrame для Excel
     df = pd.DataFrame(users_data, columns=[
-        'User ID', 'Til', 'Ism', 'Telefon', 'Manzil', 'Status', 'Xodimlar'
+        'User ID', 'Til', 'Ism', 'Telefon', 'Manzil', 'Status', 'Xodimlar', 'Datetime'
     ])
 
     # Заменяем None на "Belgilanmagan"

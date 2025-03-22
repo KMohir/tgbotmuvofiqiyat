@@ -13,14 +13,15 @@ def create_database(db_file):
                         userid   INTEGER NOT NULL,
                         question TEXT);""")
     cursor.execute("""CREATE TABLE IF NOT EXISTS users (
-                        id       INTEGER      PRIMARY KEY AUTOINCREMENT,
-                        user_id  INTEGER (11) UNIQUE,
-                        lang     TEXT         NOT NULL DEFAULT 'uz',
-                        name     TEXT,
-                        phone    TEXT,
-                        address  TEXT,
-                        status   TEXT,
-                        employees TEXT
+                        id        INTEGER      PRIMARY KEY AUTOINCREMENT,
+                        user_id   INTEGER (11) UNIQUE,
+                        lang      TEXT         NOT NULL DEFAULT 'uz',
+                        name      TEXT,
+                        phone     TEXT,
+                        address   TEXT,
+                        status    TEXT,
+                        employees TEXT,
+                        datetime  TIMESTAMP    DEFAULT CURRENT_TIMESTAMP
                     );""")
     conn.commit()
     conn.close()
@@ -116,7 +117,7 @@ class Database:
     def get_all_users_data(self):
         with self.conn:
             result = self.cursor.execute(
-                "SELECT user_id, lang, name, phone, address, status, employees FROM users"
+                "SELECT user_id, lang, name, phone, address, status, employees, datetime FROM users"
             ).fetchall()
             return result
 
