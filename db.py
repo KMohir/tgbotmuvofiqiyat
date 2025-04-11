@@ -1,125 +1,122 @@
 import sqlite3
+from datetime import datetime
 
-def create_database(db_file):
-    conn = sqlite3.connect(db_file)
+
+class Database:
+    def __init__(self, db_name):
+        self.conn = sqlite3.connect(db_name)
+        self.cursor = self.conn.cursor()
+        # Вызываем create_database при инициализации
+        create_database(db_name)
+
+    def user_exists(self, user_id):
+        result = self.cursor.execute("SELECT 1 FROM users WHERE user_id=?", (user_id,)).fetchone()
+        return result is not None
+
+    def update(self, lang, user_id, name, phone):
+        self.cursor.execute(
+            "INSERT OR REPLACE INTO users (user_id, lang, name, phone, datetime) VALUES (?, ?, ?, ?, ?)",
+            (user_id, lang, name, phone, datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+        )
+        self.conn.commit()
+
+    def get_lang(self, user_id):
+        result = self.cursor.execute("SELECT lang FROM users WHERE user_id=?", (user_id,)).fetchone()
+        if result is None:
+            return 'uz'  # Возвращаем язык по умолчанию, если пользователь не найден
+        return result[0]
+
+    def get_name(self, user_id):
+        result = self.cursor.execute("SELECT name FROM users WHERE user_id=?", (user_id,)).fetchone()
+        return result[0] if result else "Не указано"
+
+    def get_phone(self, user_id):
+        result = self.cursor.execute("SELECT phone FROM users WHERE user_id=?", (user_id,)).fetchone()
+        return result[0] if result else "Не указано"
+
+    def change_lang(self, user_id, lang):
+        self.cursor.execute("UPDATE users SET lang=? WHERE user_id=?", (lang, user_id))
+        self.conn.commit()
+
+    def get_registration_time(self, user_id):
+        result = self.cursor.execute("SELECT datetime FROM users WHERE user_id=?", (user_id,)).fetchone()
+        return result[0] if result else None
+
+    def get_all_users(self):
+        result = self.cursor.execute("SELECT user_id FROM users").fetchall()
+        return [row[0] for row in result]
+
+    def get_all_users_data(self):
+        result = self.cursor.execute("SELECT user_id, lang, name, phone, datetime FROM users").fetchall()
+        return result
+
+    def get_video_index(self):
+        result = self.cursor.execute("SELECT value FROM settings WHERE key='video_index'").fetchone()
+        if result is None:
+            self.cursor.execute("INSERT INTO settings (key, value) VALUES ('video_index', 0)")
+            self.conn.commit()
+            return 0
+        return int(result[0])
+
+    def update_video_index(self, index):
+        self.cursor.execute("UPDATE settings SET value=? WHERE key='video_index'", (index,))
+        self.conn.commit()
+
+    def add_questions(self, user_id, message_id):
+        self.cursor.execute(
+            "INSERT INTO support (user_id, message, datetime) VALUES (?, ?, ?)",
+            (user_id, str(message_id), datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+        )
+        self.conn.commit()
+
+    def get_id(self):
+        result = self.cursor.execute("SELECT id FROM support ORDER BY id DESC LIMIT 1").fetchone()
+        return result[0] if result else 1
+
+    def get_question(self, user_id):
+        result = self.cursor.execute("SELECT message FROM support WHERE user_id=?", (user_id,)).fetchone()
+        return int(result[0]) if result else None
+
+    def close(self):
+        self.conn.close()
+
+
+def create_database(db_name):
+    conn = sqlite3.connect(db_name)
     cursor = conn.cursor()
-    cursor.execute("""CREATE TABLE IF NOT EXISTS support (
-                    id        INTEGER PRIMARY KEY AUTOINCREMENT,
-                    questions TEXT    NOT NULL,
-                    answer    TEXT
-                    );""")
-    cursor.execute("""CREATE TABLE IF NOT EXISTS userquestions (
-                        id       INTEGER PRIMARY KEY AUTOINCREMENT,
-                        userid   INTEGER NOT NULL,
-                        question TEXT);""")
-    cursor.execute("""CREATE TABLE IF NOT EXISTS users (
-                        id        INTEGER      PRIMARY KEY AUTOINCREMENT,
-                        user_id   INTEGER (11) UNIQUE,
-                        lang      TEXT         NOT NULL DEFAULT 'uz',
-                        name      TEXT,
-                        phone     TEXT,
-                        address   TEXT,
-                        status    TEXT,
-                        employees TEXT,
-                        datetime  TIMESTAMP    DEFAULT CURRENT_TIMESTAMP
-                    );""")
+
+    # Создаём таблицу users
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS users (
+            user_id INTEGER PRIMARY KEY,
+            lang TEXT NOT NULL,
+            name TEXT,
+            phone TEXT,
+            datetime TEXT
+        )
+    ''')
+
+    # Создаём таблицу support с правильной структурой
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS support (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
+            message TEXT,
+            datetime TEXT
+        )
+    ''')
+
+    # Создаём таблицу settings для хранения индекса видео
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS settings (
+            key TEXT PRIMARY KEY,
+            value TEXT
+        )
+    ''')
+
     conn.commit()
     conn.close()
 
-class Database:
-    def __init__(self, db_file):
-        self.conn = sqlite3.connect(db_file)
-        self.cursor = self.conn.cursor()
 
-    def get_questions(self):
-        with self.conn:
-            result = self.cursor.execute("SELECT id, questions FROM support;").fetchall()
-            data = {}
-            for row in result:
-                questions = tuple(row[1].split(":"))
-                data[row[0]] = questions
-            return data
-
-    def add_questions(self, userid, question):
-        with self.conn:
-            return self.cursor.execute("INSERT INTO userquestions (userid, question) VALUES (?, ?)", (userid, question))
-
-    def get_question(self, answer_id):
-        with self.conn:
-            return self.cursor.execute("SELECT question FROM userquestions WHERE userid=?", (answer_id,)).fetchall()[-1][0]
-
-    def get_id(self):
-        with self.conn:
-            return self.cursor.execute("SELECT id FROM userquestions").fetchall()[-1][0]
-
-    def question(self, answer_id):
-        with self.conn:
-            return self.cursor.execute("SELECT question FROM userquestions WHERE id=?", (answer_id,)).fetchone()
-
-    def user_exists(self, user_id):
-        with self.conn:
-            result = self.cursor.execute("SELECT * FROM users WHERE user_id=?", (user_id,)).fetchall()
-            return bool(len(result))
-
-    def add_user(self, user_id, lang):
-        with self.conn:
-            return self.cursor.execute("INSERT INTO users (user_id, lang) VALUES (?, ?)", (user_id, lang))
-
-    def get_lang(self, user_id):
-        with self.conn:
-            return self.cursor.execute("SELECT lang FROM users WHERE user_id=?", (user_id,)).fetchone()[0]
-
-    def change_lang(self, user_id, language):
-        with self.conn:
-            return self.cursor.execute("UPDATE users SET lang = ? WHERE user_id=?", (language, user_id))
-
-    def update(self, lang, user_id, name, phone, address=None, status=None, employees=None):
-        with self.conn:
-            if self.user_exists(user_id):
-                return self.cursor.execute(
-                    "UPDATE users SET lang=?, name=?, phone=?, address=?, status=?, employees=? WHERE user_id=?",
-                    (lang, name, phone, address, status, employees, user_id)
-                )
-            else:
-                return self.cursor.execute(
-                    "INSERT INTO users (user_id, lang, name, phone, address, status, employees) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                    (user_id, lang, name, phone, address, status, employees)
-                )
-
-    def get_name(self, user_id):
-        with self.conn:
-            return self.cursor.execute("SELECT name FROM users WHERE user_id=?", (user_id,)).fetchone()[0]
-
-    def get_phone(self, user_id):
-        with self.conn:
-            return self.cursor.execute("SELECT phone FROM users WHERE user_id=?", (user_id,)).fetchone()[0]
-
-    def get_address(self, user_id):
-        with self.conn:
-            result = self.cursor.execute("SELECT address FROM users WHERE user_id=?", (user_id,)).fetchone()
-            return result[0] if result else None
-
-    def get_status(self, user_id):
-        with self.conn:
-            result = self.cursor.execute("SELECT status FROM users WHERE user_id=?", (user_id,)).fetchone()
-            return result[0] if result else None
-
-    def get_employees(self, user_id):
-        with self.conn:
-            result = self.cursor.execute("SELECT employees FROM users WHERE user_id=?", (user_id,)).fetchone()
-            return result[0] if result else None
-
-    def get_all_users(self):
-        with self.conn:
-            result = self.cursor.execute("SELECT user_id FROM users").fetchall()
-            return [row[0] for row in result]
-
-    def get_all_users_data(self):
-        with self.conn:
-            result = self.cursor.execute(
-                "SELECT user_id, lang, name, phone, address, status, employees, datetime FROM users"
-            ).fetchall()
-            return result
-
-# Создаем объект базы данных
-db = Database('databaseprotestim.db')
+# Создаём экземпляр Database
+db = Database("databaseprotestim.db")
