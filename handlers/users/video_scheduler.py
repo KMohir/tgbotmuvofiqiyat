@@ -29,17 +29,16 @@ VIDEO_LIST = [
 scheduler = AsyncIOScheduler(timezone="Asia/Tashkent")
 
 # Функция для отправки видео
-async def send_video_to_user(user_id, current_index):
+async def send_video_to_user(user_id, video_index):
     try:
-        if current_index >= len(VIDEO_LIST):
-            print(f"Ошибка: Индекс {current_index} превышает длину VIDEO_LIST ({len(VIDEO_LIST)})")
-            current_index = 0
-            db.update_video_index(user_id, current_index)
+        if video_index >= len(VIDEO_LIST):
+            print(f"Индекс {video_index} превышает длину VIDEO_LIST ({len(VIDEO_LIST)}), зацикливаем")
+            video_index = video_index % len(VIDEO_LIST)
 
-        video_url = VIDEO_LIST[current_index]
+        video_url = VIDEO_LIST[video_index]
         message_id = int(video_url.split("/")[-1])  # Извлекаем message_id из ссылки
 
-        print(f"Пересылка видео из канала {video_url} (message_id: {message_id}) пользователю {user_id} с индексом {current_index}")
+        print(f"Пересылка видео из канала {video_url} (message_id: {message_id}) пользователю {user_id} с индексом {video_index}")
         await bot.copy_message(
             chat_id=user_id,
             from_chat_id=-1002550852551,  # ID канала
@@ -49,9 +48,11 @@ async def send_video_to_user(user_id, current_index):
         )
         await asyncio.sleep(1)
 
-        next_index = (current_index + 1) % len(VIDEO_LIST)
-        db.update_video_index(user_id, next_index)
-        print(f"Видео пересыловано пользователю {user_id}, новый индекс: {next_index}")
+        print(f"Видео пересыловано пользователю {user_id}, индекс видео: {video_index}")
+
+        # Обновляем video_index в базе данных
+        db.update_video_index(user_id, video_index + 1)
+        print(f"Обновлён video_index для пользователя {user_id}: {video_index + 1}")
 
     except Exception as e:
         print(f"Не удалось переслать видео пользователю {user_id}: {e}")
@@ -108,12 +109,24 @@ async def check_and_send_videos():
             else:
                 print(f"last_sent для пользователя {user_id} пустое")
 
+            # Вычисляем, сколько дней прошло с момента регистрации
+            days_since_registration = time_diff.days
+            print(f"Дней с момента регистрации пользователя {user_id}: {days_since_registration}")
+
+            # Вычисляем индекс видео на основе даты регистрации
+            calculated_index = (days_since_registration - 1) % len(VIDEO_LIST)
+            print(f"Рассчитанный индекс по дате регистрации для пользователя {user_id}: {calculated_index}")
+
             # Получаем текущий video_index из базы данных
-            current_index = db.get_video_index(user_id)
-            print(f"Текущий video_index для пользователя {user_id}: {current_index}")
+            current_video_index = db.get_video_index(user_id)
+            print(f"Текущий video_index из базы данных для пользователя {user_id}: {current_video_index}")
+
+            # Выбираем максимальный индекс, чтобы учесть просмотренные видео
+            video_index_to_send = max(calculated_index, current_video_index)
+            print(f"Итоговый индекс для отправки пользователю {user_id}: {video_index_to_send}")
 
             # Отправляем видео
-            await send_video_to_user(user_id, current_index)
+            await send_video_to_user(user_id, video_index_to_send)
 
             # Обновляем дату последней отправки
             db.cursor.execute(
