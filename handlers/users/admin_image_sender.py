@@ -5,7 +5,6 @@ from aiogram.types import MediaGroup
 import asyncio
 from db import db
 from loader import dp, bot
-from translation import _
 
 # ID администратора
 ADMIN_ID = 5657091547
@@ -47,8 +46,25 @@ async def finish_image_collection(message: types.Message, state: FSMContext):
         await state.finish()
         return
 
+    # Переходим к состоянию ожидания описания
+    await message.answer("Rasmlar qabul qilindi. Endi rasmlar bilan birga jo'natiladigan opisaniyeni kiriting.")
+    await state.set_state("waiting_for_caption")
+    # Сохраняем изображения в состоянии
+    await state.update_data(images=images)
+
+@dp.message_handler(state="waiting_for_caption")
+async def process_caption(message: types.Message, state: FSMContext):
+    if message.from_user.id != ADMIN_ID:
+        await message.answer("Sizda bu buyruqni bajarish uchun ruxsat yo'q.")
+        await state.finish()
+        return
+
+    caption = message.text
+    data = await state.get_data()
+    images = data.get('images', [])
+
     total_images = len(images)
-    await message.answer(f"Jami {total_images} ta rasm qabul qilindi. Jo'natish boshlanadi...")
+    await message.answer(f"Jami {total_images} ta rasm qabul qilindi. Opisaniye: {caption}. Jo'natish boshlanadi...")
 
     users = db.get_all_users()
     print(f"Topilgan foydalanuvchilar: {len(users)}")
@@ -59,8 +75,6 @@ async def finish_image_collection(message: types.Message, state: FSMContext):
     sent_count = 0
     for user_id in users:
         try:
-            lang = db.get_lang(user_id)
-            caption = _("Administratoridan yangi rasmlar!", lang)
             for chunk in image_chunks:
                 media_group = MediaGroup()
                 for i, file_id in enumerate(chunk):

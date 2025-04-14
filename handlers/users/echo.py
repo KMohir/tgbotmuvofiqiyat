@@ -1,60 +1,54 @@
 from aiogram import types
 from aiogram.dispatcher import FSMContext
-from aiogram.types import ReplyKeyboardRemove
-from aiogram.dispatcher.filters.builtin import Command, Text
-
 from db import db
 from loader import dp
-from keyboards.default.reply import get_lang_for_button, change_lang
-from states.state import answer, language
-from translation import _
+from states.state import TimeSelection, RegistrationStates, answer, questions, language, ImageCollection
 
-# Обработчик для смены языка
-@dp.message_handler(Text(equals=["/change_language", "Tilni o'zgartirish", "Смена языка"]))
-async def change_language(message: types.Message):
-    if not db.user_exists(message.from_user.id):
-        await message.answer("Пожалуйста, зарегистрируйтесь с помощью команды /start.")
-        return
+# Список состояний, которые нужно исключить из обработки
+EXCLUDED_STATES = [
+    "TimeSelection:time",  # Указываем состояние напрямую как строку
+    RegistrationStates.name.state,
+    RegistrationStates.phone.state,
+    RegistrationStates.end.state,
+    RegistrationStates.number.state,
+    RegistrationStates.help.state,
+    RegistrationStates.contact.state,
+    RegistrationStates.waiting_for_parameters.state,
+    RegistrationStates.waiting_for_file.state,
+    RegistrationStates.address.state,
+    RegistrationStates.status.state,
+    RegistrationStates.employees.state,
+    RegistrationStates.custom_status.state,
+    answer.A1.state,
+    answer.A2.state,
+    questions.answer.state,
+    language.lang.state,
+    ImageCollection.waiting_for_images.state,
+]
 
-    lang = db.get_lang(message.from_user.id)
-    await message.answer(_('Tilni tanlang', lang), reply_markup=change_lang())
-    await language.lang.set()
-
-@dp.message_handler(state=language.lang)
-async def process_language_change(message: types.Message, state: FSMContext):
-    if message.text == "O'zbek tili":
-        db.change_lang(message.from_user.id, 'uz')
-        await message.answer("Til o'zgartirildi", reply_markup=get_lang_for_button(message))
-        await state.finish()
-    elif message.text == "Русский язык":
-        db.change_lang(message.from_user.id, 'ru')
-        await message.answer("Язык был обновлен", reply_markup=get_lang_for_button(message))
-        await state.finish()
-    else:
-        lang = db.get_lang(message.from_user.id)
-        await message.answer(_("Iltimos, quyidagi tugmalardan birini tanlang", lang), reply_markup=change_lang())
-        # Не завершаем состояние, чтобы пользователь мог выбрать язык
-
-# Эхо хендлер для текстовых сообщений без указанного состояния
-@dp.message_handler(state=None)
+@dp.message_handler(lambda message: message.text and not message.text.startswith('/'), state=None)
 async def bot_echo(message: types.Message):
     if not db.user_exists(message.from_user.id):
-        await message.answer("Пожалуйста, зарегистрируйтесь с помощью команды /start.")
+        await message.answer("Iltimos, /start buyrug'i bilan ro'yxatdan o'ting.")
         return
 
-    lang = db.get_lang(message.from_user.id)
-    await message.answer(_('Iltimos operator javobini kuting!', lang))
+    await message.answer("Iltimos operator javobini kuting!")
 
-# Эхо хендлер для всех сообщений с указанным состоянием
-@dp.message_handler(state="*", content_types=types.ContentTypes.ANY)
+@dp.message_handler(
+    lambda message: not message.text.startswith('/'),
+    state="*",
+    content_types=types.ContentTypes.ANY
+)
 async def bot_echo_all(message: types.Message, state: FSMContext):
     if not db.user_exists(message.from_user.id):
-        await message.answer("Пожалуйста, зарегистрируйтесь с помощью команды /start.")
+        await message.answer("Iltimos, /start buyrug'i bilan ro'yxatdan o'ting.")
         return
 
-    lang = db.get_lang(message.from_user.id)
     current_state = await state.get_state()
-    if current_state is None:
-        await message.answer(_('Iltimos operator javobini kuting!', lang))
-    else:
-        await message.answer(_('Pastdagi tugmani bosing', lang))
+    print(f"echo.py: Текущее состояние пользователя {message.from_user.id}: {current_state}")
+    print(f"echo.py: EXCLUDED_STATES: {EXCLUDED_STATES}")
+    if current_state in EXCLUDED_STATES:
+        print(f"echo.py: Сообщение от {message.from_user.id} пропущено, состояние: {current_state}")
+        return
+
+    await message.answer("Pastdagi tugmani bosing")

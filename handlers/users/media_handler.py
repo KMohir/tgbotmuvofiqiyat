@@ -9,8 +9,6 @@ from loader import dp
     types.ContentType.DOCUMENT
 ])
 async def block_user_media(message: types.Message):
-    lang = db.get_lang(message.from_user.id) if db.user_exists(message.from_user.id) else 'uz'
-    if lang == "uz":
-        await message.reply("Kechirasiz, bu botda media fayllarni yuklash taqiqlangan.")
-    elif lang == "ru":
-        await message.reply("Извините, загрузка медиафайлов в этом боте запрещена.")
+
+
+    await message.reply("Kechirasiz, bu botda media fayllarni yuklash taqiqlangan.")

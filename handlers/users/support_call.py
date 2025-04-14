@@ -6,37 +6,35 @@ from aiogram.types import ReplyKeyboardRemove
 from data.config import support_ids
 from db import db
 from keyboards.default.reply import get_lang_for_button
-from keyboards.inline.support import support_keyboard, support_callback, langMenu, cancel_support_callback
+from keyboards.inline.support import support_keyboard, support_callback, cancel_support_callback
 from loader import dp, bot
 from states.state import RegistrationStates
-from translation import _
+from aiogram import types
+from aiogram.dispatcher.filters import Text
+from loader import dp, bot
+from db import db
 
-
-@dp.message_handler(Text(equals=["/takliflar", "Отправка предложений", "Takliflarni yuborish"]))
+@dp.message_handler(Text(equals=["/takliflar", "Takliflarni yuborish"]))
 async def ask_support(message: types.Message, state: FSMContext):
     if not db.user_exists(message.from_user.id):
         await bot.send_message(
             message.from_user.id,
-            'Assalomu aleykum, Centris Towers yordamchi botiga hush kelibsiz!\nЗдравствуйте, добро пожаловать в бот поддержки Centris Towers!'
+            'Assalomu aleykum, Centris Towers yordamchi botiga hush kelibsiz!'
         )
-        await bot.send_message(
-            message.from_user.id,
-            'Tilni tanlang:\nВыберите язык:',
-            reply_markup=langMenu
-        )
-        await RegistrationStates.lang.set()
+        # Запрашиваем имя без выбора языка
+        await message.answer("Ismingizni kiriting")
+        await RegistrationStates.name.set()
         return
 
-    lang = db.get_lang(message.from_user.id)
     user_id = 5657091547  # ID оператора поддержки
 
     # Создаем клавиатуру с кнопкой "Назад"
     back_keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
-    back_button = types.KeyboardButton(_("Orqaga", lang))
+    back_button = types.KeyboardButton("Orqaga")
     back_keyboard.add(back_button)
 
     await message.answer(
-        _("Savolingizni yoki murojatingizni 1 ta habar orqali yuboring.", lang),
+        "Savolingizni yoki murojatingizni 1 ta habar orqali yuboring.",
         reply_markup=back_keyboard
     )
     await state.set_state("wait_for_support_message")
@@ -48,9 +46,8 @@ async def send_to_support(call: types.CallbackQuery, state: FSMContext, callback
     await call.answer()
     user_id = int(callback_data.get("user_id"))
 
-    lang = db.get_lang(call.from_user.id)
     await call.message.answer(
-        _("Savolingizni yoki murojatingizni 1 ta habar orqali yuboring.", lang),
+        "Savolingizni yoki murojatingizni 1 ta habar orqali yuboring.",
         reply_markup=ReplyKeyboardRemove()
     )
     await state.set_state("wait_for_support_message")
@@ -60,18 +57,17 @@ async def send_to_support(call: types.CallbackQuery, state: FSMContext, callback
 @dp.message_handler(state="wait_for_support_message", content_types=types.ContentTypes.ANY)
 async def get_support_message(message: types.Message, state: FSMContext):
     if not db.user_exists(message.from_user.id):
-        await message.answer("Пожалуйста, зарегистрируйтесь с помощью команды /start.")
+        await message.answer("Iltimos, /start buyrug'i bilan ro'yxatdan o'ting.")
         await state.reset_state()
         return
 
     data = await state.get_data()
     second_id = data.get("second_id")
-    lang = db.get_lang(message.from_user.id)
 
     # Проверяем, нажал ли пользователь "Назад"
-    if message.text in [_("Orqaga", lang), _("Назад", lang)]:
+    if message.text == "Orqaga":
         await message.answer(
-            _("Operatsiya bekor qilindi", lang),
+            "Operatsiya bekor qilindi",
             reply_markup=get_lang_for_button(message)
         )
         await state.reset_state()
@@ -79,7 +75,7 @@ async def get_support_message(message: types.Message, state: FSMContext):
 
     # Уведомляем пользователя, что сообщение отправлено
     await message.answer(
-        _('Savolingiz / Murojatingiz bizning operatorlarga yuborildi, yaqin orada sizga javob beramiz!', lang),
+        'Savolingiz / Murojatingiz bizning operatorlarga yuborildi, yaqin orada sizga javob beramiz!',
         reply_markup=ReplyKeyboardRemove()
     )
 
@@ -98,12 +94,12 @@ async def get_support_message(message: types.Message, state: FSMContext):
                 if message.text is None:  # Если это не текст (например, фото или видео)
                     await message.copy_to(
                         second_id,
-                        caption=f"Raqami: {a}\nI.SH.: {name}\nUsername: @{message.from_user.username}\nNomer: <code>{phone}</code>\nHabar: {message.caption or 'Без текста'}",
+                        caption=f"Raqami: {a}\nI.SH.: {name}\nUsername: @{message.from_user.username}\nNomer: <code>{phone}</code>\nHabar: {message.caption or 'Matnsiz'}",
                         reply_markup=keyboard
                     )
                     await message.copy_to(
                         -1002601209038,  # ID группы
-                        caption=f"Raqami: {a}\nI.SH.: {name}\nUsername: @{message.from_user.username}\nNomer: <code>{phone}</code>\nHabar: {message.caption or 'Без текста'}",
+                        caption=f"Raqami: {a}\nI.SH.: {name}\nUsername: @{message.from_user.username}\nNomer: <code>{phone}</code>\nHabar: {message.caption or 'Matnsiz'}",
                         reply_markup=keyboard
                     )
                 else:  # Если это текстовое сообщение
@@ -129,7 +125,7 @@ async def get_support_message(message: types.Message, state: FSMContext):
                     await message.copy_to(
                         second_id,
                         reply_to_message_id=reply,
-                        caption=message.caption or "Без текста"
+                        caption=message.caption or "Matnsiz"
                     )
                 else:
                     await bot.send_message(
@@ -140,10 +136,9 @@ async def get_support_message(message: types.Message, state: FSMContext):
             except Exception as e:
                 print(f"Error replying to support: {e}")
 
-            lang = db.get_lang(second_id)
             await bot.send_message(
                 second_id,
-                _("Yana savolingiz yoki murojatingiz bo'lsa, /taklif orqali berishingiz mumkin.", lang),
+                "Yana savolingiz yoki murojatingiz bo'lsa, /taklif orqali berishingiz mumkin.",
                 reply_markup=get_lang_for_button(message)
             )
 
@@ -160,30 +155,37 @@ async def exit_support(call: types.CallbackQuery, state: FSMContext, callback_da
         second_id = data_second.get("second_id")
         if int(second_id) == call.from_user.id:
             await second_state.reset_state()
-            await bot.send_message(user_id, "Пользователь завершил сеанс техподдержки")
+            await bot.send_message(user_id, "Foydalanuvchi texnik yordam seansini yakunladi")
 
     await call.message.answer("Centris Towers bu sizni bilimingzini sinash uchun qilingan platforma")
     await state.reset_state()
 
 
-@dp.message_handler(Text(equals=["/about", "Centris Towers haqida bilish", "Узнать про Centris Towers"]))
+
+
+@dp.message_handler(Text(equals=["/about", "Centris Towers haqida bilish"]))
 async def bot_help(message: types.Message):
     if not db.user_exists(message.from_user.id):
-        await message.answer("Пожалуйста, зарегистрируйтесь с помощью команды /start.")
+        await message.answer("Iltimos, /start buyrug'i bilan ro'yxatdan o'ting.")
         return
 
-    video_path = 'Centris.mp4'
-    lang = db.get_lang(message.from_user.id)
-    caption = _(
-        "Centris Tower - innovatsiya va zamonaviy uslub gullab-yashnaydigan yangi avlod biznes markazi\n\nMuvaffaqiyatli biznesingizning kaliti bo'ladigan hashamatli ish joyingizni kashf eting.",
-        lang
+    # Создаём inline-клавиатуру
+    markup = types.InlineKeyboardMarkup()
+    # Добавляем кнопку с типом url, которая ведёт на бота
+    markup.add(
+        types.InlineKeyboardButton(
+            text="Centris Towers botiga o'tish",
+            url="https://t.me/centris_towers_sells_bot"
+        )
     )
 
-    with open(video_path, 'rb') as video:
-        await bot.send_video(
-            chat_id=message.chat.id,
-            video=video,
-            caption=caption,  # Исправлено: caption теперь передаётся
-            supports_streaming=True,
-            reply_markup=get_lang_for_button(message)
-        )
+    # Текст сообщения
+    caption = (
+        "Centris Towers haqida ko'proq ma'lumot olish uchun quyidagi tugmani bosing:"
+    )
+
+    # Отправляем сообщение с inline-кнопкой
+    await message.answer(
+        caption,
+        reply_markup=markup
+    )

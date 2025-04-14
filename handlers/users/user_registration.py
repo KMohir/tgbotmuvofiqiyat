@@ -4,59 +4,41 @@ from aiogram.dispatcher.filters.builtin import CommandStart
 from aiogram.types import ParseMode, Message, ReplyKeyboardRemove
 from db import db
 from keyboards.default.reply import key, get_lang_for_button
-from keyboards.inline.support import langMenu
 from loader import dp, bot
 from states.state import RegistrationStates
-from translation import _
 
-# Глобальная переменная lang (можно перенести в состояние, если нужно)
-global lang
-
-# Функция для формирования описания видео при регистрации
-def get_video_caption(lang: str) -> str:
-    if lang == "uz":
-        caption = (
-            "Тема: Лобби в Centris Towers\n\n"
-            "Ибрагим Мамасаидов, основатель проекта \"Centris Towers\"\n\n"
-            "Centris Towers - инновационный бизнес-центр нового поколения, где процветают современный стиль и инновации\n\n"
-            "📞 Для связи: <a href=\"tel:+998501554444\">+998501554444</a>\n\n"
-            "<a href=\"https://t.me/centris1\">Связаться с менеджером</a>\n\n"
-            "(<a href=\"https://yandex.ru/maps/org/110775045050\">📍Адрес: г. Ташкент, ул. Нуронийлар, 2</a>)\n"
-            "🚀<a href=\"https://t.me/centris_towers\">Телеграм</a> • "
-            "📷<a href=\"https://www.instagram.com/centristowers_uz/\">Инстаграм</a> • "
-            "⏸<a href=\"https://www.youtube.com/@CentrisTowers\">You Tube</a>"
-        )
-    else:  # lang == "ru"
-        caption = (
-            "Тема: Лобби в Centris Towers\n\n"
-            "Ибрагим Мамасаидов, основатель проекта \"Centris Towers\"\n\n"
-            "Centris Towers - инновационный бизнес-центр нового поколения, где процветают современный стиль и инновации\n\n"
-            "📞 Для связи: <a href=\"tel:+998501554444\">+998501554444</a>\n\n"
-            "<a href=\"https://t.me/centris1\">Связаться с менеджером</a>\n\n"
-            "(<a href=\"https://yandex.ru/maps/org/110775045050\">📍Адрес: г. Ташкент, ул. Нуронийлар, 2</a>)\n"
-            "🚀<a href=\"https://t.me/centris_towers\">Телеграм</a> • "
-            "📷<a href=\"https://www.instagram.com/centristowers_uz/\">Инстаграм</a> • "
-            "⏸<a href=\"https://www.youtube.com/@CentrisTowers\">You Tube</a>"
-        )
+# Функция для формирования описания видео
+def get_video_caption() -> str:
+    caption = (
+        "✅1/15\n\n"
+        "Мавзу: Centris Towers’даги лобби\n\n"
+        "Иброҳим Мамасаидов \"Centris Towers\" лойиҳаси асосчиси\n\n"
+        "<a href=\"https://youtu.be/Dg4H7JhGRFI\">4К форматда кўриш</a>\n\n"
+        "Centris Towers - инновация ва замонавий услуб гуллаб-яшнайдиган янги авлод бизнес маркази\n\n"
+        "📞 Алоқа учун: <a href=\"tel:+998501554444\">+998501554444</a>\n\n"
+        "<a href=\"https://t.me/centris1\">Менежер билан боғланиш</a>\n\n"
+        "(<a href=\"https://yandex.ru/maps/org/110775045050\">📍Манзил: Тошкент шаҳри, Нуронийлар кўчаси 2</a>)\n"
+        "🚀<a href=\"https://t.me/centris_towers\">Телеграм</a> • "
+        "📷<a href=\"https://www.instagram.com/centristowers_uz/\">Инстаграм</a> • "
+        "⏸<a href=\"https://www.youtube.com/@CentrisTowers\">You Tube</a>"
+    )
     return caption
+
 
 @dp.message_handler(CommandStart())
 async def bot_start(message: types.Message):
     if not db.user_exists(message.from_user.id):
+        # Приветственное сообщение только на узбекском
         await bot.send_message(
             message.from_user.id,
-            'Assalomu aleykum, Centris Towers yordamchi botiga hush kelibsiz!\nЗдравствуйте, добро пожаловать в бот поддержки Centris Towers!'
+            'Assalomu aleykum, Centris Towers yordamchi botiga hush kelibsiz!'
         )
-        await bot.send_message(
-            message.from_user.id,
-            'Tilni tanlang:\nВыберите язык:',
-            reply_markup=langMenu
-        )
-        await RegistrationStates.lang.set()
+        # Запрашиваем имя без выбора языка
+        await message.answer("Ismingizni kiriting")
+        await RegistrationStates.name.set()
     else:
         try:
-            lang = db.get_lang(message.from_user.id)
-            caption = get_video_caption(lang)
+            caption = get_video_caption()
             video_path = 'Centris.mp4'
             with open(video_path, 'rb') as video:
                 await bot.send_video(
@@ -70,42 +52,29 @@ async def bot_start(message: types.Message):
                 )
         except Exception as exx:
             print(exx)
-            await bot.send_message(
-                message.from_user.id,
-                "Buyruqlar ro'yxati:\n/ask - Texnik yordamga habar yozish\n/change_language - Tilni o'zgartish\n/about - Centris Towers haqida bilish\n/get_registration_time - Узнать время регистрации",
-                reply_markup=get_lang_for_button(message)
-            )
+
 
 @dp.message_handler(state=RegistrationStates.name)
 async def register_name_handler(message: types.Message, state: FSMContext):
     name = message.text
     async with state.proxy() as data:
         data['name'] = name
-        lang = data.get('lang')
 
-    if lang == "uz":
-        await message.answer("Telefon raqamingizni kiriting", reply_markup=key(lang))
-    elif lang == "ru":
-        await message.answer("Введите свой номер телефона", reply_markup=key(lang))
+    # Запрашиваем телефон только на узбекском
+    await message.answer("Telefon raqamingizni kiriting", reply_markup=key())
     await RegistrationStates.phone.set()
 
 @dp.message_handler(state=RegistrationStates.phone, content_types=types.ContentType.TEXT)
 async def process_phone_text(message: Message, state: FSMContext):
     contact = message.text
-    async with state.proxy() as data:
-        lang = data.get('lang')
 
     if contact.startswith('+998') and len(contact) == 13:
         await save_user_data(message, state, contact)
     else:
-        if lang == "uz":
-            await message.answer(
-                "Telefon raqam noto'g'ri kiritildi, iltimos telefon raqamni +998XXXXXXXXX formatda kiriting yoki 'Kontakni yuborish' tugmasiga bosing.",
-                reply_markup=key(lang))
-        elif lang == "ru":
-            await message.answer(
-                "Номер телефона введен неверно, пожалуйста, введите номер в формате +998XXXXXXXXX или нажмите кнопку 'Отправить контакт'.",
-                reply_markup=key(lang))
+        await message.answer(
+            "Telefon raqam noto'g'ri kiritildi, iltimos telefon raqamni +998XXXXXXXXX formatda kiriting yoki 'Kontakni yuborish' tugmasiga bosing.",
+            reply_markup=key()
+        )
         await RegistrationStates.phone.set()
 
 @dp.message_handler(state=RegistrationStates.phone, content_types=types.ContentType.CONTACT)
@@ -115,15 +84,15 @@ async def process_phone_contact(message: Message, state: FSMContext):
 
 async def save_user_data(message: Message, state: FSMContext, contact: str):
     async with state.proxy() as data:
-        lang = data.get('lang')
         name = data.get('name')
 
-        db.update(lang, message.from_user.id, name, contact)
+        # Сохраняем данные пользователя без языка
+        db.update(message.from_user.id, name, contact)
 
-        await message.answer(_("Ro'yxatdan muvaffaqiyatli o'tdingiz!", lang), reply_markup=ReplyKeyboardRemove())
+        await message.answer("Ro'yxatdan muvaffaqiyatli o'tdingiz!", reply_markup=ReplyKeyboardRemove())
 
         video_path = 'video_1.mp4'
-        caption = get_video_caption(lang)
+        caption = get_video_caption()
         with open(video_path, 'rb') as video:
             await bot.send_video(
                 chat_id=message.chat.id,
