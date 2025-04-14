@@ -12,7 +12,7 @@ from keyboards.default.reply import key, get_lang_for_button
 @dp.message_handler(state=RegistrationStates.help)
 @dp.message_handler(Command("help"))
 async def bot_help(message: types.Message, state: FSMContext):
-    text = "Buyruqlar ro'yxati:\n/taklif - Texnik yordamga habar yozish\n/about - Bino sotip olish"
+    text = "Buyruqlar ro'yxati:\n/taklif - Texnik yordamga habar yozish\n/about - Bino bilan tanishish"
 
     await message.answer(text, reply_markup=ReplyKeyboardRemove())
     await state.finish()

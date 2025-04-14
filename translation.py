@@ -24,7 +24,7 @@ translations={
         "Telefon raqam noto'g'ri kiritildi, iltimos telefon raqamni +998XXXXXXXX formatda kiriting yoki 'Kontakni yuborish' tugmasiga bosing.":'Номер телефона вставлен неправильно, пожалуйста отправьте номер телефона в формате +998XXXXXXXXX или нажмите на кнопку "Отправить контакт"',
         "Ro'yxatdan muvaffaqiyatli o'tdingiz!":"Вы успешно прошли регистрацию!",
         "Buyruqlar ro'yxati bilan tanishish uchun /help ni bosing.":"Чтобы ознакомиться с командами нажмите на /help",
-        "Buyruqlar ro'yxati:\n/taklif - Texnik yordamga habar yozish\n/change_language - Tilni o'zgartish\n/about - Bino sotip olish":"Список команд:\n/ask - Написать в техническую поддержку\n/change_language - Изменить язык\n/about - Узнать про Centris Towers",
+        "Buyruqlar ro'yxati:\n/taklif - Texnik yordamga habar yozish\n/change_language - Tilni o'zgartish\n/about - Bino bilan tanishish":"Список команд:\n/ask - Написать в техническую поддержку\n/change_language - Изменить язык\n/about - Узнать про Centris Towers",
         "Savolingizni yoki murojatingizni 1 ta habar orqali yuboring.":"Отправьте свой вопрос или обращение 1-им сообщением",
         "Savolingiz / Murojatingiz bizning operatorlarga yuborildi, yaqin orada sizga javob beramiz!":"Ваш вопрос / обращение было отправлено нашим операторам, вам скоро ответят!",
         "Iltimos operator javobini kuting!":"Пожалуйста ожидайте ответа оператора!",

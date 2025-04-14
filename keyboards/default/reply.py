@@ -16,7 +16,7 @@ def get_lang_for_button(message):
                 KeyboardButton(text="Centris Towers bilan bog'lanish")
             ],
             [
-                KeyboardButton(text="Bino sotip olish")
+                KeyboardButton(text="Bino bilan tanishish")
             ],
         ],
         resize_keyboard=True

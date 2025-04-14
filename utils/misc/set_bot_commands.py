@@ -7,6 +7,6 @@ async def set_default_commands(dp):
         types.BotCommand("start", "Botni ishga tushurish"),
         types.BotCommand("time", "Yangiliklarni soat nechida olishni hohlaysiz?"),
         types.BotCommand("/videos", "FAQ ?"),
-        types.BotCommand("contact",'Bino sotip olish'),
-        types.BotCommand("about",'Bino sotip olish'),
+        types.BotCommand("contact","Bizni bilan bog'lanish"),
+        types.BotCommand("about",'Bino bilan tanishish'),
     ])
