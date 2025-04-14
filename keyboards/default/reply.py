@@ -10,13 +10,13 @@ def get_lang_for_button(message):
                 KeyboardButton(text="Yangiliklarni soat nechida olishni hohlaysiz?")
             ],
             [
-                KeyboardButton(text="Video kontentlar")
+                KeyboardButton(text="FAQ ?")
             ],
             [
                 KeyboardButton(text="Centris Towers bilan bog'lanish")
             ],
             [
-                KeyboardButton(text="Centris Towers haqida bilish")
+                KeyboardButton(text="Bino sotip olish")
             ],
         ],
         resize_keyboard=True

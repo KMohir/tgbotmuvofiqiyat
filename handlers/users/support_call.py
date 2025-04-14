@@ -163,7 +163,7 @@ async def exit_support(call: types.CallbackQuery, state: FSMContext, callback_da
 
 
 
-@dp.message_handler(Text(equals=["/about", "Centris Towers haqida bilish"]))
+@dp.message_handler(Text(equals=["/about", "Bino sotip olish"]))
 async def bot_help(message: types.Message):
     if not db.user_exists(message.from_user.id):
         await message.answer("Iltimos, /start buyrug'i bilan ro'yxatdan o'ting.")

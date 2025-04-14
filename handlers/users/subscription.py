@@ -3,7 +3,7 @@ from aiogram.dispatcher.filters import Text
 from loader import dp
 from db import db
 
-@dp.message_handler(Text(equals="Video kontentlar"))
+@dp.message_handler(Text(equals="FAQ ?"))
 async def unsubscribe(message: types.Message):
     user_id = message.from_user.id
     if not db.user_exists(user_id):

@@ -217,10 +217,10 @@ def get_lesson_keyboard():
     return markup
 
 @dp.message_handler(Command("videos"))
-@dp.message_handler(Text(equals="Video kontentlar"))
+@dp.message_handler(Text(equals="FAQ ?"))
 async def cmd_videos(message: types.Message):
     user_id = message.from_user.id
-    print(f"Команда /videos или 'Video kontentlar' вызвана пользователем {user_id}")
+    print(f"Команда /videos или 'FAQ ?' вызвана пользователем {user_id}")
 
     if not db.user_exists(user_id):
         print(f"Пользователь {user_id} не зарегистрирован")
