@@ -107,7 +107,7 @@ async def save_user_data(message: Message, state: FSMContext, contact: str):
             await message.answer("Video yuborishda xato yuz berdi. Iltimos, keyinroq urinib ko'ring.")
 
         # Задержка перед отправкой второго видео
-        time.sleep(20)
+
 
         # Копируем второе видео из канала с описанием
         try:
