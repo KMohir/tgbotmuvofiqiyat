@@ -87,6 +87,7 @@ async def process_time(message: types.Message, state: FSMContext):
         )
     except Exception as e:
         await message.answer("Vaqtni saqlashda xatolik yuz berdi. Iltimos, qayta urinib ko'ring.")
+        print(e)
         print(f"Ошибка при сохранении времени для пользователя {message.from_user.id}: {str(e)}")
         return
 
