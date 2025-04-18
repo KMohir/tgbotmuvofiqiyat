@@ -9,48 +9,67 @@ from loader import dp, bot
 # ID администратора
 ADMIN_ID = 5657091547
 
-@dp.message_handler(Command('send_image'), user_id=ADMIN_ID)
-async def send_image_command(message: types.Message, state: FSMContext):
+@dp.message_handler(Command('send_media'), user_id=ADMIN_ID)
+async def send_media_command(message: types.Message, state: FSMContext):
     await message.answer(
-        "Iltimos, barcha foydalanuvchilarga jo'natmoqchi bo'lgan rasmlarni yuboring. Tugatganingizdan so'ng /done buyrug'ini kiritin.")
-    await state.set_state("waiting_for_images")
-    await state.update_data(images=[])
+        "Iltimos, barcha foydalanuvchilarga jo'natmoqchi bo'lgan rasmlar yoki videolarni yuboring. "
+        "Tugatganingizdan so'ng /done buyrug'ini kiritin.")
+    await state.set_state("waiting_for_media")
+    await state.update_data(media=[])
 
-@dp.message_handler(content_types=types.ContentType.PHOTO, state="waiting_for_images")
-async def process_image(message: types.Message, state: FSMContext):
+@dp.message_handler(content_types=[types.ContentType.PHOTO, types.ContentType.VIDEO], state="waiting_for_media")
+async def process_media(message: types.Message, state: FSMContext):
     if message.from_user.id != ADMIN_ID:
         await message.answer("Sizda bu buyruqni bajarish uchun ruxsat yo'q.")
         await state.finish()
         return
 
     data = await state.get_data()
-    images = data.get('images', [])
-    photo = message.photo[-1]
-    images.append(photo.file_id)
-    await state.update_data(images=images)
-    await message.answer(
-        f"Rasm qo'shildi. Jami: {len(images)}. Yana yuboring yoki /done buyrug'i bilan yakunlang.")
+    media = data.get('media', [])
 
-@dp.message_handler(Command('done'), state="waiting_for_images")
-async def finish_image_collection(message: types.Message, state: FSMContext):
+    if message.photo:
+        file_id = message.photo[-1].file_id
+        media_type = 'photo'
+    elif message.video:
+        file_id = message.video.file_id
+        media_type = 'video'
+
+    media.append({'file_id': file_id, 'type': media_type})
+    await state.update_data(media=media)
+    await message.answer(
+        f"{media_type.capitalize()} qo'shildi. Jami: {len(media)}. Yana yuboring yoki /done buyrug'i bilan yakunlang.")
+
+@dp.message_handler(Command('done'), state="waiting_for_media")
+async def finish_media_collection(message: types.Message, state: FSMContext):
     if message.from_user.id != ADMIN_ID:
         await message.answer("Sizda bu buyruqni bajarish uchun ruxsat yo'q.")
         await state.finish()
         return
 
     data = await state.get_data()
-    images = data.get('images', [])
+    media = data.get('media', [])
 
-    if not images:
-        await message.answer("Siz birorta ham rasm yubormadingiz.")
+    if not media:
+        await message.answer("Siz birorta ham rasm yoki video yubormadingiz.")
         await state.finish()
         return
 
     # Переходим к состоянию ожидания описания
-    await message.answer("Rasmlar qabul qilindi. Endi rasmlar bilan birga jo'natiladigan opisaniyeni kiriting.")
+    await message.answer(
+        "Media fayllar qabul qilindi. Endi media bilan birga jo'natiladigan opisaniyeni kiriting. "
+        "Agar opisaniye kerak bo'lmasa, /skip buyrug'ini kiriting.")
     await state.set_state("waiting_for_caption")
-    # Сохраняем изображения в состоянии
-    await state.update_data(images=images)
+    # Сохраняем медиа в состоянии
+    await state.update_data(media=media)
+
+@dp.message_handler(Command('skip'), state="waiting_for_caption")
+async def skip_caption(message: types.Message, state: FSMContext):
+    if message.from_user.id != ADMIN_ID:
+        await message.answer("Sizda bu buyruqni bajarish uchun ruxsat yo'q.")
+        await state.finish()
+        return
+
+    await process_media_sending(message, state, caption="")
 
 @dp.message_handler(state="waiting_for_caption")
 async def process_caption(message: types.Message, state: FSMContext):
@@ -60,28 +79,37 @@ async def process_caption(message: types.Message, state: FSMContext):
         return
 
     caption = message.text
-    data = await state.get_data()
-    images = data.get('images', [])
+    await process_media_sending(message, state, caption)
 
-    total_images = len(images)
-    await message.answer(f"Jami {total_images} ta rasm qabul qilindi. Opisaniye: {caption}. Jo'natish boshlanadi...")
+async def process_media_sending(message: types.Message, state: FSMContext, caption: str):
+    data = await state.get_data()
+    media = data.get('media', [])
+
+    total_media = len(media)
+    await message.answer(f"Jami {total_media} ta media qabul qilindi. Opisaniye: {caption or 'yo‘q'}. Jo'natish boshlanadi...")
 
     users = db.get_all_users()
     print(f"Topilgan foydalanuvchilar: {len(users)}")
 
     chunk_size = 10
-    image_chunks = [images[i:i + chunk_size] for i in range(0, len(images), chunk_size)]
+    media_chunks = [media[i:i + chunk_size] for i in range(0, len(media), chunk_size)]
 
     sent_count = 0
     for user_id in users:
         try:
-            for chunk in image_chunks:
+            for chunk in media_chunks:
                 media_group = MediaGroup()
-                for i, file_id in enumerate(chunk):
-                    if i == 0:
-                        media_group.attach_photo(file_id, caption=caption)
-                    else:
-                        media_group.attach_photo(file_id)
+                for i, item in enumerate(chunk):
+                    if item['type'] == 'photo':
+                        if i == 0 and caption:
+                            media_group.attach_photo(item['file_id'], caption=caption)
+                        else:
+                            media_group.attach_photo(item['file_id'])
+                    elif item['type'] == 'video':
+                        if i == 0 and caption:
+                            media_group.attach_video(item['file_id'], caption=caption)
+                        else:
+                            media_group.attach_video(item['file_id'])
                 await bot.send_media_group(
                     chat_id=user_id,
                     media=media_group,
@@ -94,10 +122,10 @@ async def process_caption(message: types.Message, state: FSMContext):
             continue
 
     await message.answer(
-        f"{total_images} ta rasmdan media guruhlar {sent_count} foydalanuvchilarga muvaffaqiyatli yuborildi!")
+        f"{total_media} ta mediadan media guruhlar {sent_count} foydalanuvchilarga muvaffaqiyatli yuborildi!")
     await state.finish()
 
-@dp.message_handler(state="waiting_for_images")
+@dp.message_handler(state="waiting_for_media")
 async def invalid_input(message: types.Message, state: FSMContext):
-    await message.answer("Iltimos, rasm yuboring yoki /done buyrug'i bilan kirishni yakunlang.")
-    await state.set_state("waiting_for_images")
+    await message.answer("Iltimos, rasm yoki video yuboring yoki /done buyrug'i bilan kirishni yakunlang.")
+    await state.set_state("waiting_for_media")
