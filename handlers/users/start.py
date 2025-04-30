@@ -65,7 +65,7 @@ try:
                     await bot.copy_message(
                         chat_id=message.chat.id,
                         from_chat_id=-1002550852551,
-                        message_id=117,
+                        message_id=135,
                         caption='',
                         parse_mode="HTML",
                         reply_markup=get_lang_for_button(message),
@@ -142,7 +142,7 @@ try:
                     await bot.copy_message(
                         chat_id=message.chat.id,
                         from_chat_id=-1002550852551,
-                        message_id=117,
+                        message_id=135,
                         caption='',
                         parse_mode="HTML",
                         reply_markup=get_lang_for_button(message),
