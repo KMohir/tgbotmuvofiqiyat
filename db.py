@@ -2,6 +2,8 @@ import psycopg2
 from datetime import datetime
 import json
 import logging
+import os
+from dotenv import load_dotenv
 
 # Настройка логирования
 logging.basicConfig(
@@ -10,6 +12,9 @@ logging.basicConfig(
     filename='bot.log'
 )
 logger = logging.getLogger(__name__)
+
+# Загрузка переменных окружения из .env файла
+load_dotenv()
 
 class Database:
     def __init__(self, host, port, dbname, user, password):
@@ -282,11 +287,11 @@ class Database:
 
 try:
     db = Database(
-        host="localhost",
-        port="5432",
-        dbname="mydatabase",
-        user="postgres",
-        password="7777"
+        host=os.getenv("DB_HOST"),
+        port=os.getenv("DB_PORT"),
+        dbname=os.getenv("DB_NAME"),
+        user=os.getenv("DB_USER"),
+        password=os.getenv("DB_PASSWORD")
     )
 except Exception as e:
     logger.critical(f"Критическая ошибка при инициализации базы данных: {e}")
