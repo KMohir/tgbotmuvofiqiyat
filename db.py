@@ -42,7 +42,7 @@ class Database:
                     phone TEXT,
                     datetime TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     video_index INTEGER DEFAULT 0,
-                    preferred_time TEXT DEFAULT '09:00',
+                    preferred_time TEXT DEFAULT '07:00',
                     last_sent TIMESTAMP,
                     is_subscribed BOOLEAN DEFAULT TRUE,
                     viewed_videos JSONB DEFAULT '[]'::jsonb
@@ -80,7 +80,7 @@ class Database:
             logger.error(f"Ошибка при проверке существования пользователя {user_id}: {e}")
             return False
 
-    def add_user(self, user_id, name, phone, preferred_time="09:00"):
+    def add_user(self, user_id, name, phone, preferred_time="07:00"):
         try:
             self.cursor.execute('''
                 INSERT INTO users (user_id, name, phone, preferred_time)
@@ -92,7 +92,7 @@ class Database:
             logger.error(f"Ошибка при добавлении пользователя {user_id}: {e}")
             self.conn.rollback()
 
-    def update(self, user_id, name, phone, preferred_time="09:00"):
+    def update(self, user_id, name, phone, preferred_time="07:00"):
         try:
             self.cursor.execute('''
                 INSERT INTO users (user_id, name, phone, preferred_time)
@@ -197,10 +197,10 @@ class Database:
         try:
             self.cursor.execute("SELECT preferred_time FROM users WHERE user_id = %s", (user_id,))
             result = self.cursor.fetchone()
-            return result[0] if result else "09:00"
+            return result[0] if result else "07:00"
         except psycopg2.Error as e:
             logger.error(f"Ошибка при получении предпочтительного времени пользователя {user_id}: {e}")
-            return "09:00"
+            return "07:00"
 
     def set_preferred_time(self, user_id, time):
         try:
