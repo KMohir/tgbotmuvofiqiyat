@@ -73,6 +73,30 @@ try:
             logger.error(f"Ошибка при отправке видео пользователю {user_id}: {e}")
             return False
 
+    # Новая функция для отправки видео в группу
+    async def send_daily_video_to_group(group_id: int):
+        try:
+            # Определяем номер дня с начала эпохи (например, с 1 января 2024)
+            # Это нужно, чтобы каждый день отправлялось следующее видео по порядку
+            start_date = datetime(2024, 1, 1, tzinfo=pytz.timezone("Asia/Tashkent"))
+            today = datetime.now(pytz.timezone("Asia/Tashkent"))
+            days_since_start = (today - start_date).days
+            
+            # Получаем индекс видео, зацикливая по списку
+            video_index = days_since_start % len(VIDEO_LIST)
+            
+            logger.info(f"Отправка ежедневного видео в группу {group_id}. Индекс видео: {video_index}")
+
+            await bot.forward_message(
+                chat_id=group_id,
+                from_chat_id=-1002550852551,  # ID вашего канала
+                message_id=int(VIDEO_LIST[video_index].split('/')[-1])
+            )
+            logger.info(f"Видео {video_index} успешно отправлено в группу {group_id}")
+
+        except Exception as e:
+            logger.error(f"Ошибка при отправке видео в группу {group_id}: {e}")
+
     # Функция для отправки видео конкретному пользователю
     async def send_scheduled_video(user_id: int) -> None:
         try:
@@ -96,7 +120,8 @@ try:
             logger.info(f"Индекс видео для пользователя {user_id} обновлен до {next_index + 1}")
             
         except Exception as e:
-            logger.error(f"Ошибка в send_scheduled_video: {e}")
+            logger.error(f"Ошибка в handle_time_selection: {e}")
+            await message.answer("Kechirasiz, xatolik yuz berdi. Iltimos, keyinroq qayta urinib ko'ring.")
 
     # Добавляем клавиатуру для выбора времени
     def get_time_keyboard():
@@ -151,63 +176,71 @@ try:
     # Модифицируем функцию планирования задач
     def schedule_jobs_for_users():
         try:
-            logger.info("Начало планирования задач для пользователей")
+            logger.info("Начало планирования задач для пользователей и групп")
             
             # Удаляем все существующие задачи
             scheduler.remove_all_jobs()
             logger.info("Все существующие задачи удалены")
 
-            # Получаем всех подписанных пользователей
-            users = db.get_all_users()
-            logger.info(f"Найдено {len(users)} подписанных пользователей")
+            # Получаем всех подписчиков с их типом
+            recipients = db.get_all_subscribers_with_type()
+            logger.info(f"Найдено {len(recipients)} получателей (пользователи и группы)")
             
-            if not users:
-                logger.warning("Нет подписанных пользователей в базе данных")
+            if not recipients:
+                logger.warning("Нет подписчиков в базе данных, задачи не создаются")
                 return
 
-            for user_id in users:
-                try:
-                    logger.info(f"Обработка пользователя {user_id}")
-                    
-                    # Проверяем статус подписки
-                    if not db.get_subscription_status(user_id):
-                        logger.info(f"Пользователь {user_id} не подписан, пропускаем")
-                        continue
-                    
-                    # Проверяем, есть ли непросмотренные видео
-                    next_index = get_next_video_index(user_id)
-                    if next_index == -1:
-                        logger.info(f"Пользователь {user_id} уже просмотрел все видео, задача не создаётся")
-                        continue
+            for recipient_id, is_group in recipients:
+                if is_group:
+                    # --- ЛОГИКА ДЛЯ ГРУПП ---
+                    try:
+                        scheduler.add_job(
+                            send_daily_video_to_group,
+                            'cron',
+                            hour=7,
+                            minute=0,
+                            args=[recipient_id],
+                            id=f"send_video_group_{recipient_id}",
+                            replace_existing=True
+                        )
+                        logger.info(f"Задача для группы {recipient_id} запланирована на 07:00")
+                    except Exception as e:
+                        logger.error(f"Ошибка при планировании задачи для группы {recipient_id}: {e}")
+                else:
+                    # --- СТАРАЯ ЛОГИКА ДЛЯ ПОЛЬЗОВАТЕЛЕЙ ---
+                    user_id = recipient_id
+                    try:
+                        # Проверяем, есть ли у пользователя непросмотренные видео
+                        next_index = get_next_video_index(user_id)
+                        if next_index == -1:
+                            logger.info(f"Пользователь {user_id} уже просмотрел все видео, задача не создаётся")
+                            continue
 
-                    # Получаем предпочтительное время пользователя
-                    preferred_time = db.get_preferred_time(user_id)
-                    if not preferred_time:
-                        preferred_time = "09:00"  # Время по умолчанию
-                        db.set_preferred_time(user_id, preferred_time)
+                        # Получаем предпочтительное время пользователя
+                        preferred_time = db.get_preferred_time(user_id)
+                        if not preferred_time:
+                            preferred_time = "09:00"  # Время по умолчанию
+                            db.set_preferred_time(user_id, preferred_time)
 
-                    # Разбираем время на часы и минуты
-                    hours, minutes = map(int, preferred_time.split(':'))
-                    
-                    # Добавляем задачу для этого пользователя
-                    scheduler.add_job(
-                        send_scheduled_video,
-                        'cron',
-                        hour=hours,
-                        minute=minutes,
-                        args=[user_id],
-                        id=f"send_video_{user_id}",
-                        replace_existing=True
-                    )
-                    logger.info(f"Задача для пользователя {user_id} запланирована на {preferred_time}")
-
-                except Exception as e:
-                    logger.error(f"Ошибка при планировании задачи для пользователя {user_id}: {e}")
+                        hours, minutes = map(int, preferred_time.split(':'))
+                        
+                        scheduler.add_job(
+                            send_scheduled_video,
+                            'cron',
+                            hour=hours,
+                            minute=minutes,
+                            args=[user_id],
+                            id=f"send_video_{user_id}",
+                            replace_existing=True
+                        )
+                        logger.info(f"Задача для пользователя {user_id} запланирована на {preferred_time}")
+                    except Exception as e:
+                        logger.error(f"Ошибка при планировании задачи для пользователя {user_id}: {e}")
 
             # Проверяем, что задачи были созданы
             jobs = scheduler.get_jobs()
             logger.info(f"Итоговое количество активных задач: {len(jobs)}")
-            if len(jobs) == 0:
+            if not jobs:
                 logger.warning("Не было создано ни одной задачи")
 
         except Exception as e:

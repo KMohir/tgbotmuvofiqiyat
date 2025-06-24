@@ -45,7 +45,8 @@ class Database:
                     preferred_time TEXT DEFAULT '07:00',
                     last_sent TIMESTAMP,
                     is_subscribed BOOLEAN DEFAULT TRUE,
-                    viewed_videos JSONB DEFAULT '[]'::jsonb
+                    viewed_videos JSONB DEFAULT '[]'::jsonb,
+                    is_group BOOLEAN DEFAULT FALSE
                 )
             ''')
 
@@ -80,28 +81,29 @@ class Database:
             logger.error(f"Ошибка при проверке существования пользователя {user_id}: {e}")
             return False
 
-    def add_user(self, user_id, name, phone, preferred_time="07:00"):
+    def add_user(self, user_id, name, phone, preferred_time="07:00", is_group=False):
         try:
             self.cursor.execute('''
-                INSERT INTO users (user_id, name, phone, preferred_time)
-                VALUES (%s, %s, %s, %s)
-                ON CONFLICT (user_id) DO NOTHING
-            ''', (user_id, name, phone, preferred_time))
+                INSERT INTO users (user_id, name, phone, preferred_time, is_group)
+                VALUES (%s, %s, %s, %s, %s)
+                ON CONFLICT (user_id) DO UPDATE SET is_subscribed = TRUE
+            ''', (user_id, name, phone, preferred_time, is_group))
             self.conn.commit()
         except psycopg2.Error as e:
             logger.error(f"Ошибка при добавлении пользователя {user_id}: {e}")
             self.conn.rollback()
 
-    def update(self, user_id, name, phone, preferred_time="07:00"):
+    def update(self, user_id, name, phone, preferred_time="07:00", is_group=False):
         try:
             self.cursor.execute('''
-                INSERT INTO users (user_id, name, phone, preferred_time)
-                VALUES (%s, %s, %s, %s)
+                INSERT INTO users (user_id, name, phone, preferred_time, is_group)
+                VALUES (%s, %s, %s, %s, %s)
                 ON CONFLICT (user_id) DO UPDATE
                 SET name = EXCLUDED.name,
                     phone = EXCLUDED.phone,
-                    preferred_time = EXCLUDED.preferred_time
-            ''', (user_id, name, phone, preferred_time))
+                    preferred_time = EXCLUDED.preferred_time,
+                    is_group = EXCLUDED.is_group
+            ''', (user_id, name, phone, preferred_time, is_group))
             self.conn.commit()
             logger.info(f"Данные пользователя {user_id} успешно обновлены")
         except psycopg2.Error as e:
@@ -145,10 +147,18 @@ class Database:
 
     def get_all_users_data(self):
         try:
-            self.cursor.execute("SELECT user_id, name, phone, datetime, video_index, preferred_time FROM users")
+            self.cursor.execute("SELECT user_id, name, phone, datetime, video_index, preferred_time, is_group FROM users")
             return self.cursor.fetchall()
         except psycopg2.Error as e:
             logger.error(f"Ошибка при получении данных пользователей: {e}")
+            return []
+
+    def get_all_subscribers_with_type(self):
+        try:
+            self.cursor.execute("SELECT user_id, is_group FROM users WHERE is_subscribed = TRUE")
+            return self.cursor.fetchall()
+        except psycopg2.Error as e:
+            logger.error(f"Ошибка при получении подписчиков с типом: {e}")
             return []
 
     def get_video_index(self, user_id):
@@ -287,11 +297,11 @@ class Database:
 
 try:
     db = Database(
-        host=os.getenv("DB_HOST"),
-        port=os.getenv("DB_PORT"),
+        host=os.getenv("DB_HOST", "localhost"),
+        port=int(os.getenv("DB_PORT", 5432)),
         dbname=os.getenv("DB_NAME"),
         user=os.getenv("DB_USER"),
-        password=os.getenv("DB_PASSWORD")
+        password=os.getenv("DB_PASS")
     )
 except Exception as e:
     logger.critical(f"Критическая ошибка при инициализации базы данных: {e}")

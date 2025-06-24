@@ -29,7 +29,7 @@ try:
         ImageCollection.waiting_for_images.state,
     ]
 
-    @dp.message_handler(lambda message: message.text and not message.text.startswith('/'), state=None)
+    @dp.message_handler(lambda message: message.text and not message.text.startswith('/'), state=None, chat_type=types.ChatType.PRIVATE)
     async def bot_echo(message: types.Message):
         if not db.user_exists(message.from_user.id):
             await message.answer("Iltimos, /start buyrug'i bilan ro'yxatdan o'ting.")
@@ -40,7 +40,8 @@ try:
     @dp.message_handler(
         lambda message: not message.text.startswith('/'),
         state="*",
-        content_types=types.ContentTypes.ANY
+        content_types=types.ContentTypes.ANY,
+        chat_type=types.ChatType.PRIVATE
     )
     async def bot_echo_all(message: types.Message, state: FSMContext):
         if not db.user_exists(message.from_user.id):
