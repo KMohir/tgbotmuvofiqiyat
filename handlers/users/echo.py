@@ -64,4 +64,4 @@ except Exception as exx:
 
     # Форматировать дату и время
     formatted_date_time = now.strftime("%Y-%m-%d %H:%M:%S")
-    print('echo ',  f"{time }formatted_date_time",f"error {exx}" )
+    print('echo ',  f"{time}formatted_date_time",f"error {exx}" )
