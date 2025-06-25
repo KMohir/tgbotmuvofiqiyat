@@ -45,7 +45,7 @@ try:
 
         try:
             df = pd.DataFrame(users_data, columns=[
-                'User ID', 'Ism', 'Telefon', 'Datetime', 'Video Index', 'Preferred Time'
+                'User ID', 'Ism', 'Telefon', 'Datetime', 'Video Index', 'Preferred Time', 'is_group'
             ])
 
 

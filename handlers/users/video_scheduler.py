@@ -194,16 +194,24 @@ try:
                 if is_group:
                     # --- ЛОГИКА ДЛЯ ГРУПП ---
                     try:
+                        # Получаем предпочтительное время для группы
+                        preferred_time = db.get_preferred_time(recipient_id)
+                        if not preferred_time:
+                            preferred_time = "07:00"  # Время по умолчанию
+                            db.set_preferred_time(recipient_id, preferred_time)
+
+                        hours, minutes = map(int, preferred_time.split(':'))
+                        
                         scheduler.add_job(
                             send_daily_video_to_group,
                             'cron',
-                            hour=7,
-                            minute=0,
+                            hour=hours,
+                            minute=minutes,
                             args=[recipient_id],
                             id=f"send_video_group_{recipient_id}",
                             replace_existing=True
                         )
-                        logger.info(f"Задача для группы {recipient_id} запланирована на 07:00")
+                        logger.info(f"Задача для группы {recipient_id} запланирована на {preferred_time}")
                     except Exception as e:
                         logger.error(f"Ошибка при планировании задачи для группы {recipient_id}: {e}")
                 else:

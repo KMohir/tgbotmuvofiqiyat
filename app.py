@@ -21,8 +21,7 @@ async def on_startup(dispatcher):
     await on_startup_notify(dispatcher)
     await set_default_commands(dispatcher)
 
-    # Запускаем планировщик
-    asyncio.create_task(video_scheduler())
+    # Запускаем планировщик (video_scheduler() удалён)
 
     # Устанавливаем команды бота
     try:

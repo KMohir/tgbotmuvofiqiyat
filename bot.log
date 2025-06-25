@@ -6940,3 +6940,688 @@ connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection re
 2025-04-30 09:27:22,703 - __main__ - INFO - РЎРµСЃСЃРёСЏ Р±РѕС‚Р° СѓСЃРїРµС€РЅРѕ Р·Р°РєСЂС‹С‚Р°
 2025-04-30 09:27:22,703 - aiogram.dispatcher.dispatcher - INFO - Stop polling...
 2025-04-30 09:27:22,703 - aiogram - WARNING - Goodbye!
+2025-06-25 11:30:11,697 - data.config - CRITICAL - Ошибка при загрузке BOT_TOKEN: Environment variable "BOT_TOKEN" not set
+2025-06-25 11:30:39,295 - loader - INFO - Бот успешно инициализирован
+2025-06-25 11:30:39,981 - __main__ - INFO - Запуск бота...
+2025-06-25 11:30:42,111 - __main__ - ERROR - Ошибка при остановке планировщика: 'NoneType' object has no attribute 'call_soon_threadsafe'
+2025-06-25 11:30:42,112 - __main__ - INFO - Соединение с базой данных успешно закрыто
+2025-06-25 11:30:42,112 - __main__ - INFO - Сессия бота успешно закрыта
+2025-06-25 11:30:42,112 - aiogram - WARNING - Goodbye!
+2025-06-25 11:30:42,112 - __main__ - CRITICAL - Критическая ошибка при запуске бота: Unauthorized
+2025-06-25 11:32:58,143 - loader - INFO - Бот успешно инициализирован
+2025-06-25 11:32:58,437 - __main__ - INFO - Запуск бота...
+2025-06-25 11:32:58,738 - aiogram - INFO - Bot: Centris bot 2 [@Centris_bot_2_bot]
+2025-06-25 11:32:58,929 - aiogram - WARNING - Updates were skipped successfully.
+2025-06-25 11:32:59,284 - __main__ - ERROR - Ошибка при остановке планировщика: 'NoneType' object has no attribute 'call_soon_threadsafe'
+2025-06-25 11:32:59,285 - __main__ - INFO - Соединение с базой данных успешно закрыто
+2025-06-25 11:32:59,285 - __main__ - INFO - Сессия бота успешно закрыта
+2025-06-25 11:32:59,285 - aiogram - WARNING - Goodbye!
+2025-06-25 11:32:59,285 - __main__ - CRITICAL - Критическая ошибка при запуске бота: name 'video_scheduler' is not defined
+2025-06-25 11:35:26,770 - loader - INFO - Бот успешно инициализирован
+2025-06-25 11:35:27,077 - __main__ - INFO - Запуск бота...
+2025-06-25 11:35:27,464 - aiogram - INFO - Bot: Centris bot 2 [@Centris_bot_2_bot]
+2025-06-25 11:35:27,672 - aiogram - WARNING - Updates were skipped successfully.
+2025-06-25 11:35:28,029 - __main__ - INFO - Команды бота успешно установлены
+2025-06-25 11:35:28,147 - __main__ - INFO - Администраторы успешно уведомлены
+2025-06-25 11:35:28,147 - __main__ - INFO - Начало инициализации планировщика
+2025-06-25 11:35:28,148 - handlers.users.video_scheduler - INFO - Начало инициализации планировщика
+2025-06-25 11:35:28,148 - handlers.users.video_scheduler - INFO - Начало планирования задач для пользователей и групп
+2025-06-25 11:35:28,148 - handlers.users.video_scheduler - INFO - Все существующие задачи удалены
+2025-06-25 11:35:28,148 - handlers.users.video_scheduler - INFO - Найдено 0 получателей (пользователи и группы)
+2025-06-25 11:35:28,148 - handlers.users.video_scheduler - WARNING - Нет подписчиков в базе данных, задачи не создаются
+2025-06-25 11:35:28,149 - apscheduler.scheduler - INFO - Scheduler started
+2025-06-25 11:35:28,149 - handlers.users.video_scheduler - INFO - Планировщик успешно инициализирован и запущен
+2025-06-25 11:35:28,149 - handlers.users.video_scheduler - INFO - Задача обновления планировщика запущена в фоновом режиме
+2025-06-25 11:35:28,149 - handlers.users.video_scheduler - INFO - Количество активных задач после инициализации: 0
+2025-06-25 11:35:28,149 - handlers.users.video_scheduler - WARNING - Нет активных задач в планировщике
+2025-06-25 11:35:28,149 - __main__ - INFO - Планировщик успешно инициализирован
+2025-06-25 11:35:28,149 - __main__ - INFO - Планировщик запущен
+2025-06-25 11:35:28,149 - __main__ - INFO - Количество активных задач: 0
+2025-06-25 11:35:28,149 - handlers.users.video_scheduler - INFO - Начало обновления задач планировщика
+2025-06-25 11:35:28,150 - handlers.users.video_scheduler - INFO - Начало планирования задач для пользователей и групп
+2025-06-25 11:35:28,150 - handlers.users.video_scheduler - INFO - Все существующие задачи удалены
+2025-06-25 11:35:28,150 - handlers.users.video_scheduler - INFO - Найдено 0 получателей (пользователи и группы)
+2025-06-25 11:35:28,150 - handlers.users.video_scheduler - WARNING - Нет подписчиков в базе данных, задачи не создаются
+2025-06-25 11:35:28,150 - handlers.users.video_scheduler - INFO - Задачи планировщика обновлены
+2025-06-25 11:35:28,150 - aiogram.dispatcher.dispatcher - INFO - Start polling.
+2025-06-25 11:35:40,896 - db - INFO - Данные пользователя 5657091547 успешно обновлены
+2025-06-25 11:35:41,077 - handlers.users.start - ERROR - Ошибка при отправке видео после регистрации 5657091547: Message to copy not found
+2025-06-25 11:36:24,540 - __main__ - INFO - Планировщик успешно остановлен
+2025-06-25 11:36:24,541 - __main__ - INFO - Соединение с базой данных успешно закрыто
+2025-06-25 11:36:24,541 - apscheduler.scheduler - INFO - Scheduler has been shut down
+2025-06-25 11:36:24,541 - __main__ - INFO - Сессия бота успешно закрыта
+2025-06-25 11:36:24,541 - aiogram.dispatcher.dispatcher - INFO - Stop polling...
+2025-06-25 11:36:24,542 - aiogram - WARNING - Goodbye!
+2025-06-25 11:36:51,454 - loader - INFO - Бот успешно инициализирован
+2025-06-25 11:36:51,776 - __main__ - INFO - Запуск бота...
+2025-06-25 11:36:52,100 - aiogram - INFO - Bot: Centris Towers [@CentrisTowersbot]
+2025-06-25 11:36:52,300 - aiogram - WARNING - Updates were skipped successfully.
+2025-06-25 11:36:52,710 - __main__ - INFO - Команды бота успешно установлены
+2025-06-25 11:36:52,831 - __main__ - INFO - Администраторы успешно уведомлены
+2025-06-25 11:36:52,831 - __main__ - INFO - Начало инициализации планировщика
+2025-06-25 11:36:52,831 - handlers.users.video_scheduler - INFO - Начало инициализации планировщика
+2025-06-25 11:36:52,831 - handlers.users.video_scheduler - INFO - Начало планирования задач для пользователей и групп
+2025-06-25 11:36:52,831 - handlers.users.video_scheduler - INFO - Все существующие задачи удалены
+2025-06-25 11:36:52,831 - handlers.users.video_scheduler - INFO - Найдено 1 получателей (пользователи и группы)
+2025-06-25 11:36:52,836 - apscheduler.scheduler - INFO - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2025-06-25 11:36:52,836 - handlers.users.video_scheduler - INFO - Задача для пользователя 5657091547 запланирована на 07:00
+2025-06-25 11:36:52,836 - handlers.users.video_scheduler - INFO - Итоговое количество активных задач: 1
+2025-06-25 11:36:52,837 - apscheduler.scheduler - INFO - Added job "send_scheduled_video" to job store "default"
+2025-06-25 11:36:52,837 - apscheduler.scheduler - INFO - Scheduler started
+2025-06-25 11:36:52,837 - handlers.users.video_scheduler - INFO - Планировщик успешно инициализирован и запущен
+2025-06-25 11:36:52,837 - handlers.users.video_scheduler - INFO - Задача обновления планировщика запущена в фоновом режиме
+2025-06-25 11:36:52,837 - handlers.users.video_scheduler - INFO - Количество активных задач после инициализации: 1
+2025-06-25 11:36:52,837 - __main__ - INFO - Планировщик успешно инициализирован
+2025-06-25 11:36:52,837 - __main__ - INFO - Планировщик запущен
+2025-06-25 11:36:52,837 - __main__ - INFO - Количество активных задач: 1
+2025-06-25 11:36:52,837 - __main__ - INFO - Задача: send_video_5657091547, следующее выполнение: 2025-06-26 07:00:00+05:00
+2025-06-25 11:36:52,837 - handlers.users.video_scheduler - INFO - Начало обновления задач планировщика
+2025-06-25 11:36:52,838 - handlers.users.video_scheduler - INFO - Начало планирования задач для пользователей и групп
+2025-06-25 11:36:52,838 - handlers.users.video_scheduler - INFO - Все существующие задачи удалены
+2025-06-25 11:36:52,838 - handlers.users.video_scheduler - INFO - Найдено 1 получателей (пользователи и группы)
+2025-06-25 11:36:52,838 - apscheduler.scheduler - INFO - Added job "send_scheduled_video" to job store "default"
+2025-06-25 11:36:52,838 - handlers.users.video_scheduler - INFO - Задача для пользователя 5657091547 запланирована на 07:00
+2025-06-25 11:36:52,838 - handlers.users.video_scheduler - INFO - Итоговое количество активных задач: 1
+2025-06-25 11:36:52,838 - handlers.users.video_scheduler - INFO - Задачи планировщика обновлены
+2025-06-25 11:36:52,839 - aiogram.dispatcher.dispatcher - INFO - Start polling.
+2025-06-25 11:37:38,654 - __main__ - INFO - Планировщик успешно остановлен
+2025-06-25 11:37:38,654 - __main__ - INFO - Соединение с базой данных успешно закрыто
+2025-06-25 11:37:38,655 - apscheduler.scheduler - INFO - Scheduler has been shut down
+2025-06-25 11:37:38,655 - __main__ - INFO - Сессия бота успешно закрыта
+2025-06-25 11:37:38,655 - aiogram.dispatcher.dispatcher - INFO - Stop polling...
+2025-06-25 11:37:38,656 - aiogram - WARNING - Goodbye!
+2025-06-25 11:38:57,604 - loader - INFO - Бот успешно инициализирован
+2025-06-25 11:38:57,900 - __main__ - INFO - Запуск бота...
+2025-06-25 11:38:58,292 - aiogram - INFO - Bot: Centris Towers [@CentrisTowersbot]
+2025-06-25 11:38:58,486 - aiogram - WARNING - Updates were skipped successfully.
+2025-06-25 11:38:58,837 - __main__ - INFO - Команды бота успешно установлены
+2025-06-25 11:38:59,076 - __main__ - INFO - Администраторы успешно уведомлены
+2025-06-25 11:38:59,076 - __main__ - INFO - Начало инициализации планировщика
+2025-06-25 11:38:59,076 - handlers.users.video_scheduler - INFO - Начало инициализации планировщика
+2025-06-25 11:38:59,076 - handlers.users.video_scheduler - INFO - Начало планирования задач для пользователей и групп
+2025-06-25 11:38:59,076 - handlers.users.video_scheduler - INFO - Все существующие задачи удалены
+2025-06-25 11:38:59,077 - handlers.users.video_scheduler - INFO - Найдено 1 получателей (пользователи и группы)
+2025-06-25 11:38:59,080 - apscheduler.scheduler - INFO - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2025-06-25 11:38:59,080 - handlers.users.video_scheduler - INFO - Задача для пользователя 5657091547 запланирована на 07:00
+2025-06-25 11:38:59,080 - handlers.users.video_scheduler - INFO - Итоговое количество активных задач: 1
+2025-06-25 11:38:59,081 - apscheduler.scheduler - INFO - Added job "send_scheduled_video" to job store "default"
+2025-06-25 11:38:59,081 - apscheduler.scheduler - INFO - Scheduler started
+2025-06-25 11:38:59,081 - handlers.users.video_scheduler - INFO - Планировщик успешно инициализирован и запущен
+2025-06-25 11:38:59,081 - handlers.users.video_scheduler - INFO - Задача обновления планировщика запущена в фоновом режиме
+2025-06-25 11:38:59,081 - handlers.users.video_scheduler - INFO - Количество активных задач после инициализации: 1
+2025-06-25 11:38:59,081 - __main__ - INFO - Планировщик успешно инициализирован
+2025-06-25 11:38:59,081 - __main__ - INFO - Планировщик запущен
+2025-06-25 11:38:59,081 - __main__ - INFO - Количество активных задач: 1
+2025-06-25 11:38:59,081 - __main__ - INFO - Задача: send_video_5657091547, следующее выполнение: 2025-06-26 07:00:00+05:00
+2025-06-25 11:38:59,081 - handlers.users.video_scheduler - INFO - Начало обновления задач планировщика
+2025-06-25 11:38:59,081 - handlers.users.video_scheduler - INFO - Начало планирования задач для пользователей и групп
+2025-06-25 11:38:59,081 - handlers.users.video_scheduler - INFO - Все существующие задачи удалены
+2025-06-25 11:38:59,081 - handlers.users.video_scheduler - INFO - Найдено 1 получателей (пользователи и группы)
+2025-06-25 11:38:59,082 - apscheduler.scheduler - INFO - Added job "send_scheduled_video" to job store "default"
+2025-06-25 11:38:59,082 - handlers.users.video_scheduler - INFO - Задача для пользователя 5657091547 запланирована на 07:00
+2025-06-25 11:38:59,082 - handlers.users.video_scheduler - INFO - Итоговое количество активных задач: 1
+2025-06-25 11:38:59,082 - handlers.users.video_scheduler - INFO - Задачи планировщика обновлены
+2025-06-25 11:38:59,082 - aiogram.dispatcher.dispatcher - INFO - Start polling.
+2025-06-25 11:39:51,111 - root - INFO - Бот добавлен в группу 'test bot' (ID: -1002223935003). Группа добавлена/обновлена в базе.
+2025-06-25 11:39:59,212 - root - INFO - Бот добавлен в группу 'test bot' (ID: -1002223935003). Группа добавлена/обновлена в базе.
+2025-06-25 11:40:21,648 - __main__ - INFO - Планировщик успешно остановлен
+2025-06-25 11:40:21,649 - __main__ - INFO - Соединение с базой данных успешно закрыто
+2025-06-25 11:40:21,649 - apscheduler.scheduler - INFO - Scheduler has been shut down
+2025-06-25 11:40:21,650 - __main__ - INFO - Сессия бота успешно закрыта
+2025-06-25 11:40:21,650 - aiogram.dispatcher.dispatcher - INFO - Stop polling...
+2025-06-25 11:40:21,650 - aiogram - WARNING - Goodbye!
+2025-06-25 11:43:36,919 - loader - INFO - Бот успешно инициализирован
+2025-06-25 11:43:37,308 - __main__ - INFO - Запуск бота...
+2025-06-25 11:43:37,633 - aiogram - INFO - Bot: Centris Towers [@CentrisTowersbot]
+2025-06-25 11:43:37,845 - aiogram - WARNING - Updates were skipped successfully.
+2025-06-25 11:43:38,357 - __main__ - INFO - Команды бота успешно установлены
+2025-06-25 11:43:38,479 - __main__ - INFO - Администраторы успешно уведомлены
+2025-06-25 11:43:38,479 - __main__ - INFO - Начало инициализации планировщика
+2025-06-25 11:43:38,480 - handlers.users.video_scheduler - INFO - Начало инициализации планировщика
+2025-06-25 11:43:38,480 - handlers.users.video_scheduler - INFO - Начало планирования задач для пользователей и групп
+2025-06-25 11:43:38,480 - handlers.users.video_scheduler - INFO - Все существующие задачи удалены
+2025-06-25 11:43:38,480 - handlers.users.video_scheduler - INFO - Найдено 2 получателей (пользователи и группы)
+2025-06-25 11:43:38,483 - apscheduler.scheduler - INFO - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2025-06-25 11:43:38,483 - handlers.users.video_scheduler - INFO - Задача для группы -1002223935003 запланирована на 07:00
+2025-06-25 11:43:38,483 - apscheduler.scheduler - INFO - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2025-06-25 11:43:38,483 - handlers.users.video_scheduler - INFO - Задача для пользователя 5657091547 запланирована на 07:00
+2025-06-25 11:43:38,483 - handlers.users.video_scheduler - INFO - Итоговое количество активных задач: 2
+2025-06-25 11:43:38,484 - apscheduler.scheduler - INFO - Added job "send_daily_video_to_group" to job store "default"
+2025-06-25 11:43:38,484 - apscheduler.scheduler - INFO - Added job "send_scheduled_video" to job store "default"
+2025-06-25 11:43:38,484 - apscheduler.scheduler - INFO - Scheduler started
+2025-06-25 11:43:38,484 - handlers.users.video_scheduler - INFO - Планировщик успешно инициализирован и запущен
+2025-06-25 11:43:38,484 - handlers.users.video_scheduler - INFO - Задача обновления планировщика запущена в фоновом режиме
+2025-06-25 11:43:38,484 - handlers.users.video_scheduler - INFO - Количество активных задач после инициализации: 2
+2025-06-25 11:43:38,484 - __main__ - INFO - Планировщик успешно инициализирован
+2025-06-25 11:43:38,485 - __main__ - INFO - Планировщик запущен
+2025-06-25 11:43:38,485 - __main__ - INFO - Количество активных задач: 2
+2025-06-25 11:43:38,485 - __main__ - INFO - Задача: send_video_5657091547, следующее выполнение: 2025-06-26 07:00:00+05:00
+2025-06-25 11:43:38,485 - __main__ - INFO - Задача: send_video_group_-1002223935003, следующее выполнение: 2025-06-26 07:00:00+05:00
+2025-06-25 11:43:38,485 - handlers.users.video_scheduler - INFO - Начало обновления задач планировщика
+2025-06-25 11:43:38,485 - handlers.users.video_scheduler - INFO - Начало планирования задач для пользователей и групп
+2025-06-25 11:43:38,485 - handlers.users.video_scheduler - INFO - Все существующие задачи удалены
+2025-06-25 11:43:38,485 - handlers.users.video_scheduler - INFO - Найдено 2 получателей (пользователи и группы)
+2025-06-25 11:43:38,485 - apscheduler.scheduler - INFO - Added job "send_daily_video_to_group" to job store "default"
+2025-06-25 11:43:38,485 - handlers.users.video_scheduler - INFO - Задача для группы -1002223935003 запланирована на 07:00
+2025-06-25 11:43:38,486 - apscheduler.scheduler - INFO - Added job "send_scheduled_video" to job store "default"
+2025-06-25 11:43:38,486 - handlers.users.video_scheduler - INFO - Задача для пользователя 5657091547 запланирована на 07:00
+2025-06-25 11:43:38,486 - handlers.users.video_scheduler - INFO - Итоговое количество активных задач: 2
+2025-06-25 11:43:38,486 - handlers.users.video_scheduler - INFO - Задачи планировщика обновлены
+2025-06-25 11:43:38,486 - aiogram.dispatcher.dispatcher - INFO - Start polling.
+2025-06-25 11:43:56,761 - root - INFO - Бот добавлен в группу 'test bot' (ID: -1002223935003). Группа добавлена/обновлена в базе.
+2025-06-25 11:44:05,710 - root - INFO - Бот добавлен в группу 'test bot' (ID: -1002223935003). Группа добавлена/обновлена в базе.
+2025-06-25 11:47:12,486 - __main__ - INFO - Планировщик успешно остановлен
+2025-06-25 11:47:12,486 - __main__ - INFO - Соединение с базой данных успешно закрыто
+2025-06-25 11:47:12,487 - apscheduler.scheduler - INFO - Scheduler has been shut down
+2025-06-25 11:47:12,487 - __main__ - INFO - Сессия бота успешно закрыта
+2025-06-25 11:47:12,487 - aiogram.dispatcher.dispatcher - INFO - Stop polling...
+2025-06-25 11:47:12,487 - aiogram - WARNING - Goodbye!
+2025-06-25 11:47:52,209 - loader - INFO - Бот успешно инициализирован
+2025-06-25 11:47:52,601 - __main__ - INFO - Запуск бота...
+2025-06-25 11:47:52,933 - aiogram - INFO - Bot: Centris Towers [@CentrisTowersbot]
+2025-06-25 11:47:53,138 - aiogram - WARNING - Updates were skipped successfully.
+2025-06-25 11:47:53,548 - __main__ - INFO - Команды бота успешно установлены
+2025-06-25 11:47:53,680 - __main__ - INFO - Администраторы успешно уведомлены
+2025-06-25 11:47:53,680 - __main__ - INFO - Начало инициализации планировщика
+2025-06-25 11:47:53,680 - handlers.users.video_scheduler - INFO - Начало инициализации планировщика
+2025-06-25 11:47:53,681 - handlers.users.video_scheduler - INFO - Начало планирования задач для пользователей и групп
+2025-06-25 11:47:53,681 - handlers.users.video_scheduler - INFO - Все существующие задачи удалены
+2025-06-25 11:47:53,681 - handlers.users.video_scheduler - INFO - Найдено 2 получателей (пользователи и группы)
+2025-06-25 11:47:53,684 - apscheduler.scheduler - INFO - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2025-06-25 11:47:53,684 - handlers.users.video_scheduler - INFO - Задача для группы -1002223935003 запланирована на 07:00
+2025-06-25 11:47:53,684 - apscheduler.scheduler - INFO - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2025-06-25 11:47:53,684 - handlers.users.video_scheduler - INFO - Задача для пользователя 5657091547 запланирована на 07:00
+2025-06-25 11:47:53,684 - handlers.users.video_scheduler - INFO - Итоговое количество активных задач: 2
+2025-06-25 11:47:53,685 - apscheduler.scheduler - INFO - Added job "send_daily_video_to_group" to job store "default"
+2025-06-25 11:47:53,685 - apscheduler.scheduler - INFO - Added job "send_scheduled_video" to job store "default"
+2025-06-25 11:47:53,685 - apscheduler.scheduler - INFO - Scheduler started
+2025-06-25 11:47:53,686 - handlers.users.video_scheduler - INFO - Планировщик успешно инициализирован и запущен
+2025-06-25 11:47:53,686 - handlers.users.video_scheduler - INFO - Задача обновления планировщика запущена в фоновом режиме
+2025-06-25 11:47:53,686 - handlers.users.video_scheduler - INFO - Количество активных задач после инициализации: 2
+2025-06-25 11:47:53,686 - __main__ - INFO - Планировщик успешно инициализирован
+2025-06-25 11:47:53,686 - __main__ - INFO - Планировщик запущен
+2025-06-25 11:47:53,686 - __main__ - INFO - Количество активных задач: 2
+2025-06-25 11:47:53,686 - __main__ - INFO - Задача: send_video_5657091547, следующее выполнение: 2025-06-26 07:00:00+05:00
+2025-06-25 11:47:53,686 - __main__ - INFO - Задача: send_video_group_-1002223935003, следующее выполнение: 2025-06-26 07:00:00+05:00
+2025-06-25 11:47:53,686 - handlers.users.video_scheduler - INFO - Начало обновления задач планировщика
+2025-06-25 11:47:53,686 - handlers.users.video_scheduler - INFO - Начало планирования задач для пользователей и групп
+2025-06-25 11:47:53,686 - handlers.users.video_scheduler - INFO - Все существующие задачи удалены
+2025-06-25 11:47:53,686 - handlers.users.video_scheduler - INFO - Найдено 2 получателей (пользователи и группы)
+2025-06-25 11:47:53,686 - apscheduler.scheduler - INFO - Added job "send_daily_video_to_group" to job store "default"
+2025-06-25 11:47:53,686 - handlers.users.video_scheduler - INFO - Задача для группы -1002223935003 запланирована на 07:00
+2025-06-25 11:47:53,686 - apscheduler.scheduler - INFO - Added job "send_scheduled_video" to job store "default"
+2025-06-25 11:47:53,687 - handlers.users.video_scheduler - INFO - Задача для пользователя 5657091547 запланирована на 07:00
+2025-06-25 11:47:53,687 - handlers.users.video_scheduler - INFO - Итоговое количество активных задач: 2
+2025-06-25 11:47:53,687 - handlers.users.video_scheduler - INFO - Задачи планировщика обновлены
+2025-06-25 11:47:53,687 - aiogram.dispatcher.dispatcher - INFO - Start polling.
+2025-06-25 11:48:30,944 - __main__ - INFO - Планировщик успешно остановлен
+2025-06-25 11:48:30,945 - __main__ - INFO - Соединение с базой данных успешно закрыто
+2025-06-25 11:48:30,945 - apscheduler.scheduler - INFO - Scheduler has been shut down
+2025-06-25 11:48:30,946 - __main__ - INFO - Сессия бота успешно закрыта
+2025-06-25 11:48:30,946 - aiogram.dispatcher.dispatcher - INFO - Stop polling...
+2025-06-25 11:48:30,946 - aiogram - WARNING - Goodbye!
+2025-06-25 11:52:01,700 - loader - INFO - Бот успешно инициализирован
+2025-06-25 11:52:02,139 - __main__ - INFO - Запуск бота...
+2025-06-25 11:52:02,488 - aiogram - INFO - Bot: Centris Towers [@CentrisTowersbot]
+2025-06-25 11:52:02,697 - aiogram - WARNING - Updates were skipped successfully.
+2025-06-25 11:52:03,202 - __main__ - INFO - Команды бота успешно установлены
+2025-06-25 11:52:03,375 - __main__ - INFO - Администраторы успешно уведомлены
+2025-06-25 11:52:03,375 - __main__ - INFO - Начало инициализации планировщика
+2025-06-25 11:52:03,375 - handlers.users.video_scheduler - INFO - Начало инициализации планировщика
+2025-06-25 11:52:03,375 - handlers.users.video_scheduler - INFO - Начало планирования задач для пользователей и групп
+2025-06-25 11:52:03,375 - handlers.users.video_scheduler - INFO - Все существующие задачи удалены
+2025-06-25 11:52:03,375 - handlers.users.video_scheduler - INFO - Найдено 2 получателей (пользователи и группы)
+2025-06-25 11:52:03,378 - apscheduler.scheduler - INFO - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2025-06-25 11:52:03,378 - handlers.users.video_scheduler - INFO - Задача для группы -1002223935003 запланирована на 07:00
+2025-06-25 11:52:03,378 - apscheduler.scheduler - INFO - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2025-06-25 11:52:03,378 - handlers.users.video_scheduler - INFO - Задача для пользователя 5657091547 запланирована на 07:00
+2025-06-25 11:52:03,378 - handlers.users.video_scheduler - INFO - Итоговое количество активных задач: 2
+2025-06-25 11:52:03,379 - apscheduler.scheduler - INFO - Added job "send_daily_video_to_group" to job store "default"
+2025-06-25 11:52:03,379 - apscheduler.scheduler - INFO - Added job "send_scheduled_video" to job store "default"
+2025-06-25 11:52:03,379 - apscheduler.scheduler - INFO - Scheduler started
+2025-06-25 11:52:03,379 - handlers.users.video_scheduler - INFO - Планировщик успешно инициализирован и запущен
+2025-06-25 11:52:03,379 - handlers.users.video_scheduler - INFO - Задача обновления планировщика запущена в фоновом режиме
+2025-06-25 11:52:03,379 - handlers.users.video_scheduler - INFO - Количество активных задач после инициализации: 2
+2025-06-25 11:52:03,379 - __main__ - INFO - Планировщик успешно инициализирован
+2025-06-25 11:52:03,379 - __main__ - INFO - Планировщик запущен
+2025-06-25 11:52:03,379 - __main__ - INFO - Количество активных задач: 2
+2025-06-25 11:52:03,379 - __main__ - INFO - Задача: send_video_5657091547, следующее выполнение: 2025-06-26 07:00:00+05:00
+2025-06-25 11:52:03,379 - __main__ - INFO - Задача: send_video_group_-1002223935003, следующее выполнение: 2025-06-26 07:00:00+05:00
+2025-06-25 11:52:03,379 - handlers.users.video_scheduler - INFO - Начало обновления задач планировщика
+2025-06-25 11:52:03,379 - handlers.users.video_scheduler - INFO - Начало планирования задач для пользователей и групп
+2025-06-25 11:52:03,380 - handlers.users.video_scheduler - INFO - Все существующие задачи удалены
+2025-06-25 11:52:03,380 - handlers.users.video_scheduler - INFO - Найдено 2 получателей (пользователи и группы)
+2025-06-25 11:52:03,380 - apscheduler.scheduler - INFO - Added job "send_daily_video_to_group" to job store "default"
+2025-06-25 11:52:03,380 - handlers.users.video_scheduler - INFO - Задача для группы -1002223935003 запланирована на 07:00
+2025-06-25 11:52:03,380 - apscheduler.scheduler - INFO - Added job "send_scheduled_video" to job store "default"
+2025-06-25 11:52:03,380 - handlers.users.video_scheduler - INFO - Задача для пользователя 5657091547 запланирована на 07:00
+2025-06-25 11:52:03,380 - handlers.users.video_scheduler - INFO - Итоговое количество активных задач: 2
+2025-06-25 11:52:03,380 - handlers.users.video_scheduler - INFO - Задачи планировщика обновлены
+2025-06-25 11:52:03,381 - aiogram.dispatcher.dispatcher - INFO - Start polling.
+2025-06-25 11:57:03,376 - handlers.users.video_scheduler - INFO - Начало обновления задач планировщика
+2025-06-25 11:57:03,376 - handlers.users.video_scheduler - INFO - Начало планирования задач для пользователей и групп
+2025-06-25 11:57:03,376 - handlers.users.video_scheduler - INFO - Все существующие задачи удалены
+2025-06-25 11:57:03,376 - handlers.users.video_scheduler - INFO - Найдено 2 получателей (пользователи и группы)
+2025-06-25 11:57:03,377 - apscheduler.scheduler - INFO - Added job "send_daily_video_to_group" to job store "default"
+2025-06-25 11:57:03,377 - handlers.users.video_scheduler - INFO - Задача для группы -1002223935003 запланирована на 07:00
+2025-06-25 11:57:03,377 - apscheduler.scheduler - INFO - Added job "send_scheduled_video" to job store "default"
+2025-06-25 11:57:03,377 - handlers.users.video_scheduler - INFO - Задача для пользователя 5657091547 запланирована на 18:00
+2025-06-25 11:57:03,377 - handlers.users.video_scheduler - INFO - Итоговое количество активных задач: 2
+2025-06-25 11:57:03,377 - handlers.users.video_scheduler - INFO - Задачи планировщика обновлены
+2025-06-25 11:58:25,651 - __main__ - INFO - Планировщик успешно остановлен
+2025-06-25 11:58:25,651 - __main__ - INFO - Соединение с базой данных успешно закрыто
+2025-06-25 11:58:25,652 - apscheduler.scheduler - INFO - Scheduler has been shut down
+2025-06-25 11:58:25,652 - __main__ - INFO - Сессия бота успешно закрыта
+2025-06-25 11:58:25,652 - aiogram.dispatcher.dispatcher - INFO - Stop polling...
+2025-06-25 11:58:25,652 - aiogram - WARNING - Goodbye!
+2025-06-25 11:58:57,706 - loader - INFO - Бот успешно инициализирован
+2025-06-25 11:58:58,051 - __main__ - INFO - Запуск бота...
+2025-06-25 11:58:58,371 - aiogram - INFO - Bot: Centris Towers [@CentrisTowersbot]
+2025-06-25 11:58:58,567 - aiogram - WARNING - Updates were skipped successfully.
+2025-06-25 11:58:58,987 - __main__ - INFO - Команды бота успешно установлены
+2025-06-25 11:58:59,131 - __main__ - INFO - Администраторы успешно уведомлены
+2025-06-25 11:58:59,131 - __main__ - INFO - Начало инициализации планировщика
+2025-06-25 11:58:59,131 - handlers.users.video_scheduler - INFO - Начало инициализации планировщика
+2025-06-25 11:58:59,131 - handlers.users.video_scheduler - INFO - Начало планирования задач для пользователей и групп
+2025-06-25 11:58:59,131 - handlers.users.video_scheduler - INFO - Все существующие задачи удалены
+2025-06-25 11:58:59,132 - handlers.users.video_scheduler - INFO - Найдено 2 получателей (пользователи и группы)
+2025-06-25 11:58:59,135 - apscheduler.scheduler - INFO - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2025-06-25 11:58:59,135 - handlers.users.video_scheduler - INFO - Задача для группы -1002223935003 запланирована на 07:00
+2025-06-25 11:58:59,135 - apscheduler.scheduler - INFO - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2025-06-25 11:58:59,135 - handlers.users.video_scheduler - INFO - Задача для пользователя 5657091547 запланирована на 18:00
+2025-06-25 11:58:59,135 - handlers.users.video_scheduler - INFO - Итоговое количество активных задач: 2
+2025-06-25 11:58:59,136 - apscheduler.scheduler - INFO - Added job "send_daily_video_to_group" to job store "default"
+2025-06-25 11:58:59,136 - apscheduler.scheduler - INFO - Added job "send_scheduled_video" to job store "default"
+2025-06-25 11:58:59,136 - apscheduler.scheduler - INFO - Scheduler started
+2025-06-25 11:58:59,136 - handlers.users.video_scheduler - INFO - Планировщик успешно инициализирован и запущен
+2025-06-25 11:58:59,136 - handlers.users.video_scheduler - INFO - Задача обновления планировщика запущена в фоновом режиме
+2025-06-25 11:58:59,136 - handlers.users.video_scheduler - INFO - Количество активных задач после инициализации: 2
+2025-06-25 11:58:59,136 - __main__ - INFO - Планировщик успешно инициализирован
+2025-06-25 11:58:59,136 - __main__ - INFO - Планировщик запущен
+2025-06-25 11:58:59,137 - __main__ - INFO - Количество активных задач: 2
+2025-06-25 11:58:59,137 - __main__ - INFO - Задача: send_video_5657091547, следующее выполнение: 2025-06-25 18:00:00+05:00
+2025-06-25 11:58:59,137 - __main__ - INFO - Задача: send_video_group_-1002223935003, следующее выполнение: 2025-06-26 07:00:00+05:00
+2025-06-25 11:58:59,137 - handlers.users.video_scheduler - INFO - Начало обновления задач планировщика
+2025-06-25 11:58:59,137 - handlers.users.video_scheduler - INFO - Начало планирования задач для пользователей и групп
+2025-06-25 11:58:59,137 - handlers.users.video_scheduler - INFO - Все существующие задачи удалены
+2025-06-25 11:58:59,137 - handlers.users.video_scheduler - INFO - Найдено 2 получателей (пользователи и группы)
+2025-06-25 11:58:59,137 - apscheduler.scheduler - INFO - Added job "send_daily_video_to_group" to job store "default"
+2025-06-25 11:58:59,137 - handlers.users.video_scheduler - INFO - Задача для группы -1002223935003 запланирована на 07:00
+2025-06-25 11:58:59,138 - apscheduler.scheduler - INFO - Added job "send_scheduled_video" to job store "default"
+2025-06-25 11:58:59,138 - handlers.users.video_scheduler - INFO - Задача для пользователя 5657091547 запланирована на 18:00
+2025-06-25 11:58:59,138 - handlers.users.video_scheduler - INFO - Итоговое количество активных задач: 2
+2025-06-25 11:58:59,138 - handlers.users.video_scheduler - INFO - Задачи планировщика обновлены
+2025-06-25 11:58:59,138 - aiogram.dispatcher.dispatcher - INFO - Start polling.
+2025-06-25 11:59:12,199 - handlers.users.video_scheduler - INFO - Начало планирования задач для пользователей и групп
+2025-06-25 11:59:12,199 - handlers.users.video_scheduler - INFO - Все существующие задачи удалены
+2025-06-25 11:59:12,199 - handlers.users.video_scheduler - INFO - Найдено 2 получателей (пользователи и группы)
+2025-06-25 11:59:12,199 - apscheduler.scheduler - INFO - Added job "send_daily_video_to_group" to job store "default"
+2025-06-25 11:59:12,199 - handlers.users.video_scheduler - INFO - Задача для группы -1002223935003 запланирована на 07:00
+2025-06-25 11:59:12,200 - apscheduler.scheduler - INFO - Added job "send_scheduled_video" to job store "default"
+2025-06-25 11:59:12,200 - handlers.users.video_scheduler - INFO - Задача для пользователя 5657091547 запланирована на 18:00
+2025-06-25 11:59:12,200 - handlers.users.video_scheduler - INFO - Итоговое количество активных задач: 2
+2025-06-25 11:59:12,200 - handlers.users.video_scheduler - INFO - Планировщик обновлен для пользователя 7964581311 с новым временем 09:00
+2025-06-25 12:01:25,754 - __main__ - INFO - Планировщик успешно остановлен
+2025-06-25 12:01:25,754 - __main__ - INFO - Соединение с базой данных успешно закрыто
+2025-06-25 12:01:25,755 - apscheduler.scheduler - INFO - Scheduler has been shut down
+2025-06-25 12:01:25,755 - __main__ - INFO - Сессия бота успешно закрыта
+2025-06-25 12:01:25,755 - aiogram.dispatcher.dispatcher - INFO - Stop polling...
+2025-06-25 12:01:25,755 - aiogram - WARNING - Goodbye!
+2025-06-25 12:08:50,448 - loader - INFO - Бот успешно инициализирован
+2025-06-25 12:08:50,774 - __main__ - INFO - Запуск бота...
+2025-06-25 12:08:51,129 - aiogram - INFO - Bot: Centris Towers [@CentrisTowersbot]
+2025-06-25 12:08:51,384 - aiogram - WARNING - Updates were skipped successfully.
+2025-06-25 12:08:51,942 - __main__ - INFO - Команды бота успешно установлены
+2025-06-25 12:08:52,138 - __main__ - INFO - Администраторы успешно уведомлены
+2025-06-25 12:08:52,138 - __main__ - INFO - Начало инициализации планировщика
+2025-06-25 12:08:52,138 - handlers.users.video_scheduler - INFO - Начало инициализации планировщика
+2025-06-25 12:08:52,138 - handlers.users.video_scheduler - INFO - Начало планирования задач для пользователей и групп
+2025-06-25 12:08:52,138 - handlers.users.video_scheduler - INFO - Все существующие задачи удалены
+2025-06-25 12:08:52,139 - handlers.users.video_scheduler - INFO - Найдено 2 получателей (пользователи и группы)
+2025-06-25 12:08:52,142 - apscheduler.scheduler - INFO - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2025-06-25 12:08:52,142 - handlers.users.video_scheduler - INFO - Задача для группы -1002223935003 запланирована на 07:00
+2025-06-25 12:08:52,142 - apscheduler.scheduler - INFO - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2025-06-25 12:08:52,142 - handlers.users.video_scheduler - INFO - Задача для пользователя 5657091547 запланирована на 12:00
+2025-06-25 12:08:52,143 - handlers.users.video_scheduler - INFO - Итоговое количество активных задач: 2
+2025-06-25 12:08:52,143 - apscheduler.scheduler - INFO - Added job "send_daily_video_to_group" to job store "default"
+2025-06-25 12:08:52,143 - apscheduler.scheduler - INFO - Added job "send_scheduled_video" to job store "default"
+2025-06-25 12:08:52,143 - apscheduler.scheduler - INFO - Scheduler started
+2025-06-25 12:08:52,143 - handlers.users.video_scheduler - INFO - Планировщик успешно инициализирован и запущен
+2025-06-25 12:08:52,144 - handlers.users.video_scheduler - INFO - Задача обновления планировщика запущена в фоновом режиме
+2025-06-25 12:08:52,144 - handlers.users.video_scheduler - INFO - Количество активных задач после инициализации: 2
+2025-06-25 12:08:52,144 - __main__ - INFO - Планировщик успешно инициализирован
+2025-06-25 12:08:52,144 - __main__ - INFO - Планировщик запущен
+2025-06-25 12:08:52,144 - __main__ - INFO - Количество активных задач: 2
+2025-06-25 12:08:52,144 - __main__ - INFO - Задача: send_video_group_-1002223935003, следующее выполнение: 2025-06-26 07:00:00+05:00
+2025-06-25 12:08:52,144 - __main__ - INFO - Задача: send_video_5657091547, следующее выполнение: 2025-06-26 12:00:00+05:00
+2025-06-25 12:08:52,144 - handlers.users.video_scheduler - INFO - Начало обновления задач планировщика
+2025-06-25 12:08:52,144 - handlers.users.video_scheduler - INFO - Начало планирования задач для пользователей и групп
+2025-06-25 12:08:52,144 - handlers.users.video_scheduler - INFO - Все существующие задачи удалены
+2025-06-25 12:08:52,144 - handlers.users.video_scheduler - INFO - Найдено 2 получателей (пользователи и группы)
+2025-06-25 12:08:52,144 - apscheduler.scheduler - INFO - Added job "send_daily_video_to_group" to job store "default"
+2025-06-25 12:08:52,144 - handlers.users.video_scheduler - INFO - Задача для группы -1002223935003 запланирована на 07:00
+2025-06-25 12:08:52,145 - apscheduler.scheduler - INFO - Added job "send_scheduled_video" to job store "default"
+2025-06-25 12:08:52,145 - handlers.users.video_scheduler - INFO - Задача для пользователя 5657091547 запланирована на 12:00
+2025-06-25 12:08:52,145 - handlers.users.video_scheduler - INFO - Итоговое количество активных задач: 2
+2025-06-25 12:08:52,145 - handlers.users.video_scheduler - INFO - Задачи планировщика обновлены
+2025-06-25 12:08:52,145 - aiogram.dispatcher.dispatcher - INFO - Start polling.
+2025-06-25 12:09:35,248 - __main__ - INFO - Планировщик успешно остановлен
+2025-06-25 12:09:35,248 - __main__ - INFO - Соединение с базой данных успешно закрыто
+2025-06-25 12:09:35,249 - apscheduler.scheduler - INFO - Scheduler has been shut down
+2025-06-25 12:09:35,249 - __main__ - INFO - Сессия бота успешно закрыта
+2025-06-25 12:09:35,249 - aiogram.dispatcher.dispatcher - INFO - Stop polling...
+2025-06-25 12:09:35,249 - aiogram - WARNING - Goodbye!
+2025-06-25 12:11:36,206 - loader - INFO - Бот успешно инициализирован
+2025-06-25 12:11:36,557 - __main__ - INFO - Запуск бота...
+2025-06-25 12:11:36,854 - aiogram - INFO - Bot: Centris Towers [@CentrisTowersbot]
+2025-06-25 12:11:37,057 - aiogram - WARNING - Updates were skipped successfully.
+2025-06-25 12:11:37,548 - __main__ - INFO - Команды бота успешно установлены
+2025-06-25 12:11:37,730 - __main__ - INFO - Администраторы успешно уведомлены
+2025-06-25 12:11:37,730 - __main__ - INFO - Начало инициализации планировщика
+2025-06-25 12:11:37,730 - handlers.users.video_scheduler - INFO - Начало инициализации планировщика
+2025-06-25 12:11:37,730 - handlers.users.video_scheduler - INFO - Начало планирования задач для пользователей и групп
+2025-06-25 12:11:37,730 - handlers.users.video_scheduler - INFO - Все существующие задачи удалены
+2025-06-25 12:11:37,730 - handlers.users.video_scheduler - INFO - Найдено 2 получателей (пользователи и группы)
+2025-06-25 12:11:37,733 - apscheduler.scheduler - INFO - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2025-06-25 12:11:37,733 - handlers.users.video_scheduler - INFO - Задача для группы -1002223935003 запланирована на 07:00
+2025-06-25 12:11:37,734 - apscheduler.scheduler - INFO - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2025-06-25 12:11:37,734 - handlers.users.video_scheduler - INFO - Задача для пользователя 5657091547 запланирована на 12:00
+2025-06-25 12:11:37,734 - handlers.users.video_scheduler - INFO - Итоговое количество активных задач: 2
+2025-06-25 12:11:37,734 - apscheduler.scheduler - INFO - Added job "send_daily_video_to_group" to job store "default"
+2025-06-25 12:11:37,734 - apscheduler.scheduler - INFO - Added job "send_scheduled_video" to job store "default"
+2025-06-25 12:11:37,734 - apscheduler.scheduler - INFO - Scheduler started
+2025-06-25 12:11:37,735 - handlers.users.video_scheduler - INFO - Планировщик успешно инициализирован и запущен
+2025-06-25 12:11:37,735 - handlers.users.video_scheduler - INFO - Задача обновления планировщика запущена в фоновом режиме
+2025-06-25 12:11:37,735 - handlers.users.video_scheduler - INFO - Количество активных задач после инициализации: 2
+2025-06-25 12:11:37,735 - __main__ - INFO - Планировщик успешно инициализирован
+2025-06-25 12:11:37,735 - __main__ - INFO - Планировщик запущен
+2025-06-25 12:11:37,735 - __main__ - INFO - Количество активных задач: 2
+2025-06-25 12:11:37,735 - __main__ - INFO - Задача: send_video_group_-1002223935003, следующее выполнение: 2025-06-26 07:00:00+05:00
+2025-06-25 12:11:37,735 - __main__ - INFO - Задача: send_video_5657091547, следующее выполнение: 2025-06-26 12:00:00+05:00
+2025-06-25 12:11:37,735 - handlers.users.video_scheduler - INFO - Начало обновления задач планировщика
+2025-06-25 12:11:37,735 - handlers.users.video_scheduler - INFO - Начало планирования задач для пользователей и групп
+2025-06-25 12:11:37,735 - handlers.users.video_scheduler - INFO - Все существующие задачи удалены
+2025-06-25 12:11:37,735 - handlers.users.video_scheduler - INFO - Найдено 2 получателей (пользователи и группы)
+2025-06-25 12:11:37,735 - apscheduler.scheduler - INFO - Added job "send_daily_video_to_group" to job store "default"
+2025-06-25 12:11:37,735 - handlers.users.video_scheduler - INFO - Задача для группы -1002223935003 запланирована на 07:00
+2025-06-25 12:11:37,736 - apscheduler.scheduler - INFO - Added job "send_scheduled_video" to job store "default"
+2025-06-25 12:11:37,736 - handlers.users.video_scheduler - INFO - Задача для пользователя 5657091547 запланирована на 12:00
+2025-06-25 12:11:37,736 - handlers.users.video_scheduler - INFO - Итоговое количество активных задач: 2
+2025-06-25 12:11:37,736 - handlers.users.video_scheduler - INFO - Задачи планировщика обновлены
+2025-06-25 12:11:37,736 - aiogram.dispatcher.dispatcher - INFO - Start polling.
+2025-06-25 12:16:37,742 - handlers.users.video_scheduler - INFO - Начало обновления задач планировщика
+2025-06-25 12:16:37,742 - handlers.users.video_scheduler - INFO - Начало планирования задач для пользователей и групп
+2025-06-25 12:16:37,742 - handlers.users.video_scheduler - INFO - Все существующие задачи удалены
+2025-06-25 12:16:37,742 - handlers.users.video_scheduler - INFO - Найдено 2 получателей (пользователи и группы)
+2025-06-25 12:16:37,743 - apscheduler.scheduler - INFO - Added job "send_daily_video_to_group" to job store "default"
+2025-06-25 12:16:37,743 - handlers.users.video_scheduler - INFO - Задача для группы -1002223935003 запланирована на 07:00
+2025-06-25 12:16:37,743 - apscheduler.scheduler - INFO - Added job "send_scheduled_video" to job store "default"
+2025-06-25 12:16:37,743 - handlers.users.video_scheduler - INFO - Задача для пользователя 5657091547 запланирована на 15:00
+2025-06-25 12:16:37,743 - handlers.users.video_scheduler - INFO - Итоговое количество активных задач: 2
+2025-06-25 12:16:37,743 - handlers.users.video_scheduler - INFO - Задачи планировщика обновлены
+2025-06-25 12:20:54,509 - __main__ - INFO - Планировщик успешно остановлен
+2025-06-25 12:20:54,509 - __main__ - INFO - Соединение с базой данных успешно закрыто
+2025-06-25 12:20:54,510 - apscheduler.scheduler - INFO - Scheduler has been shut down
+2025-06-25 12:20:54,510 - __main__ - INFO - Сессия бота успешно закрыта
+2025-06-25 12:20:54,510 - aiogram.dispatcher.dispatcher - INFO - Stop polling...
+2025-06-25 12:20:54,511 - aiogram - WARNING - Goodbye!
+2025-06-25 12:22:18,648 - loader - INFO - Бот успешно инициализирован
+2025-06-25 12:22:18,948 - __main__ - INFO - Запуск бота...
+2025-06-25 12:22:19,283 - aiogram - INFO - Bot: Centris Towers [@CentrisTowersbot]
+2025-06-25 12:22:19,506 - aiogram - WARNING - Updates were skipped successfully.
+2025-06-25 12:22:19,911 - __main__ - INFO - Команды бота успешно установлены
+2025-06-25 12:22:20,029 - __main__ - INFO - Администраторы успешно уведомлены
+2025-06-25 12:22:20,029 - __main__ - INFO - Начало инициализации планировщика
+2025-06-25 12:22:20,030 - handlers.users.video_scheduler - INFO - Начало инициализации планировщика
+2025-06-25 12:22:20,030 - handlers.users.video_scheduler - INFO - Начало планирования задач для пользователей и групп
+2025-06-25 12:22:20,030 - handlers.users.video_scheduler - INFO - Все существующие задачи удалены
+2025-06-25 12:22:20,030 - handlers.users.video_scheduler - INFO - Найдено 2 получателей (пользователи и группы)
+2025-06-25 12:22:20,033 - apscheduler.scheduler - INFO - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2025-06-25 12:22:20,033 - handlers.users.video_scheduler - INFO - Задача для группы -1002223935003 запланирована на 07:00
+2025-06-25 12:22:20,033 - apscheduler.scheduler - INFO - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2025-06-25 12:22:20,033 - handlers.users.video_scheduler - INFO - Задача для пользователя 5657091547 запланирована на 15:00
+2025-06-25 12:22:20,033 - handlers.users.video_scheduler - INFO - Итоговое количество активных задач: 2
+2025-06-25 12:22:20,034 - apscheduler.scheduler - INFO - Added job "send_daily_video_to_group" to job store "default"
+2025-06-25 12:22:20,034 - apscheduler.scheduler - INFO - Added job "send_scheduled_video" to job store "default"
+2025-06-25 12:22:20,034 - apscheduler.scheduler - INFO - Scheduler started
+2025-06-25 12:22:20,034 - handlers.users.video_scheduler - INFO - Планировщик успешно инициализирован и запущен
+2025-06-25 12:22:20,034 - handlers.users.video_scheduler - INFO - Задача обновления планировщика запущена в фоновом режиме
+2025-06-25 12:22:20,034 - handlers.users.video_scheduler - INFO - Количество активных задач после инициализации: 2
+2025-06-25 12:22:20,034 - __main__ - INFO - Планировщик успешно инициализирован
+2025-06-25 12:22:20,034 - __main__ - INFO - Планировщик запущен
+2025-06-25 12:22:20,034 - __main__ - INFO - Количество активных задач: 2
+2025-06-25 12:22:20,034 - __main__ - INFO - Задача: send_video_5657091547, следующее выполнение: 2025-06-25 15:00:00+05:00
+2025-06-25 12:22:20,034 - __main__ - INFO - Задача: send_video_group_-1002223935003, следующее выполнение: 2025-06-26 07:00:00+05:00
+2025-06-25 12:22:20,034 - handlers.users.video_scheduler - INFO - Начало обновления задач планировщика
+2025-06-25 12:22:20,035 - handlers.users.video_scheduler - INFO - Начало планирования задач для пользователей и групп
+2025-06-25 12:22:20,035 - handlers.users.video_scheduler - INFO - Все существующие задачи удалены
+2025-06-25 12:22:20,035 - handlers.users.video_scheduler - INFO - Найдено 2 получателей (пользователи и группы)
+2025-06-25 12:22:20,035 - apscheduler.scheduler - INFO - Added job "send_daily_video_to_group" to job store "default"
+2025-06-25 12:22:20,035 - handlers.users.video_scheduler - INFO - Задача для группы -1002223935003 запланирована на 07:00
+2025-06-25 12:22:20,035 - apscheduler.scheduler - INFO - Added job "send_scheduled_video" to job store "default"
+2025-06-25 12:22:20,035 - handlers.users.video_scheduler - INFO - Задача для пользователя 5657091547 запланирована на 15:00
+2025-06-25 12:22:20,035 - handlers.users.video_scheduler - INFO - Итоговое количество активных задач: 2
+2025-06-25 12:22:20,035 - handlers.users.video_scheduler - INFO - Задачи планировщика обновлены
+2025-06-25 12:22:20,036 - aiogram.dispatcher.dispatcher - INFO - Start polling.
+2025-06-25 12:27:20,044 - handlers.users.video_scheduler - INFO - Начало обновления задач планировщика
+2025-06-25 12:27:20,045 - handlers.users.video_scheduler - INFO - Начало планирования задач для пользователей и групп
+2025-06-25 12:27:20,045 - handlers.users.video_scheduler - INFO - Все существующие задачи удалены
+2025-06-25 12:27:20,045 - handlers.users.video_scheduler - INFO - Найдено 2 получателей (пользователи и группы)
+2025-06-25 12:27:20,046 - apscheduler.scheduler - INFO - Added job "send_daily_video_to_group" to job store "default"
+2025-06-25 12:27:20,047 - handlers.users.video_scheduler - INFO - Задача для группы -1002223935003 запланирована на 07:00
+2025-06-25 12:27:20,048 - apscheduler.scheduler - INFO - Added job "send_scheduled_video" to job store "default"
+2025-06-25 12:27:20,048 - handlers.users.video_scheduler - INFO - Задача для пользователя 5657091547 запланирована на 15:00
+2025-06-25 12:27:20,048 - handlers.users.video_scheduler - INFO - Итоговое количество активных задач: 2
+2025-06-25 12:27:20,048 - handlers.users.video_scheduler - INFO - Задачи планировщика обновлены
+2025-06-25 12:28:20,860 - __main__ - INFO - Планировщик успешно остановлен
+2025-06-25 12:28:20,861 - __main__ - INFO - Соединение с базой данных успешно закрыто
+2025-06-25 12:28:20,861 - apscheduler.scheduler - INFO - Scheduler has been shut down
+2025-06-25 12:28:20,861 - __main__ - INFO - Сессия бота успешно закрыта
+2025-06-25 12:28:20,861 - aiogram.dispatcher.dispatcher - INFO - Stop polling...
+2025-06-25 12:28:20,862 - aiogram - WARNING - Goodbye!
+2025-06-25 12:28:22,378 - loader - INFO - Бот успешно инициализирован
+2025-06-25 12:28:22,680 - __main__ - INFO - Запуск бота...
+2025-06-25 12:28:23,049 - aiogram - INFO - Bot: Centris Towers [@CentrisTowersbot]
+2025-06-25 12:28:23,245 - aiogram - WARNING - Updates were skipped successfully.
+2025-06-25 12:28:23,874 - __main__ - INFO - Команды бота успешно установлены
+2025-06-25 12:28:24,051 - __main__ - INFO - Администраторы успешно уведомлены
+2025-06-25 12:28:24,051 - __main__ - INFO - Начало инициализации планировщика
+2025-06-25 12:28:24,051 - handlers.users.video_scheduler - INFO - Начало инициализации планировщика
+2025-06-25 12:28:24,051 - handlers.users.video_scheduler - INFO - Начало планирования задач для пользователей и групп
+2025-06-25 12:28:24,051 - handlers.users.video_scheduler - INFO - Все существующие задачи удалены
+2025-06-25 12:28:24,051 - handlers.users.video_scheduler - INFO - Найдено 2 получателей (пользователи и группы)
+2025-06-25 12:28:24,054 - apscheduler.scheduler - INFO - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2025-06-25 12:28:24,054 - handlers.users.video_scheduler - INFO - Задача для группы -1002223935003 запланирована на 07:00
+2025-06-25 12:28:24,055 - apscheduler.scheduler - INFO - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2025-06-25 12:28:24,055 - handlers.users.video_scheduler - INFO - Задача для пользователя 5657091547 запланирована на 15:00
+2025-06-25 12:28:24,055 - handlers.users.video_scheduler - INFO - Итоговое количество активных задач: 2
+2025-06-25 12:28:24,055 - apscheduler.scheduler - INFO - Added job "send_daily_video_to_group" to job store "default"
+2025-06-25 12:28:24,056 - apscheduler.scheduler - INFO - Added job "send_scheduled_video" to job store "default"
+2025-06-25 12:28:24,056 - apscheduler.scheduler - INFO - Scheduler started
+2025-06-25 12:28:24,056 - handlers.users.video_scheduler - INFO - Планировщик успешно инициализирован и запущен
+2025-06-25 12:28:24,056 - handlers.users.video_scheduler - INFO - Задача обновления планировщика запущена в фоновом режиме
+2025-06-25 12:28:24,056 - handlers.users.video_scheduler - INFO - Количество активных задач после инициализации: 2
+2025-06-25 12:28:24,056 - __main__ - INFO - Планировщик успешно инициализирован
+2025-06-25 12:28:24,056 - __main__ - INFO - Планировщик запущен
+2025-06-25 12:28:24,056 - __main__ - INFO - Количество активных задач: 2
+2025-06-25 12:28:24,056 - __main__ - INFO - Задача: send_video_5657091547, следующее выполнение: 2025-06-25 15:00:00+05:00
+2025-06-25 12:28:24,056 - __main__ - INFO - Задача: send_video_group_-1002223935003, следующее выполнение: 2025-06-26 07:00:00+05:00
+2025-06-25 12:28:24,056 - handlers.users.video_scheduler - INFO - Начало обновления задач планировщика
+2025-06-25 12:28:24,056 - handlers.users.video_scheduler - INFO - Начало планирования задач для пользователей и групп
+2025-06-25 12:28:24,056 - handlers.users.video_scheduler - INFO - Все существующие задачи удалены
+2025-06-25 12:28:24,056 - handlers.users.video_scheduler - INFO - Найдено 2 получателей (пользователи и группы)
+2025-06-25 12:28:24,057 - apscheduler.scheduler - INFO - Added job "send_daily_video_to_group" to job store "default"
+2025-06-25 12:28:24,057 - handlers.users.video_scheduler - INFO - Задача для группы -1002223935003 запланирована на 07:00
+2025-06-25 12:28:24,057 - apscheduler.scheduler - INFO - Added job "send_scheduled_video" to job store "default"
+2025-06-25 12:28:24,057 - handlers.users.video_scheduler - INFO - Задача для пользователя 5657091547 запланирована на 15:00
+2025-06-25 12:28:24,057 - handlers.users.video_scheduler - INFO - Итоговое количество активных задач: 2
+2025-06-25 12:28:24,057 - handlers.users.video_scheduler - INFO - Задачи планировщика обновлены
+2025-06-25 12:28:24,057 - aiogram.dispatcher.dispatcher - INFO - Start polling.
+2025-06-25 12:28:39,434 - handlers.users.video_scheduler - INFO - Начало планирования задач для пользователей и групп
+2025-06-25 12:28:39,435 - handlers.users.video_scheduler - INFO - Все существующие задачи удалены
+2025-06-25 12:28:39,435 - handlers.users.video_scheduler - INFO - Найдено 2 получателей (пользователи и группы)
+2025-06-25 12:28:39,435 - apscheduler.scheduler - INFO - Added job "send_daily_video_to_group" to job store "default"
+2025-06-25 12:28:39,435 - handlers.users.video_scheduler - INFO - Задача для группы -1002223935003 запланирована на 07:00
+2025-06-25 12:28:39,436 - apscheduler.scheduler - INFO - Added job "send_scheduled_video" to job store "default"
+2025-06-25 12:28:39,436 - handlers.users.video_scheduler - INFO - Задача для пользователя 5657091547 запланирована на 15:00
+2025-06-25 12:28:39,436 - handlers.users.video_scheduler - INFO - Итоговое количество активных задач: 2
+2025-06-25 12:33:15,721 - __main__ - INFO - Планировщик успешно остановлен
+2025-06-25 12:33:15,721 - __main__ - INFO - Соединение с базой данных успешно закрыто
+2025-06-25 12:33:15,722 - apscheduler.scheduler - INFO - Scheduler has been shut down
+2025-06-25 12:33:15,722 - __main__ - INFO - Сессия бота успешно закрыта
+2025-06-25 12:33:15,722 - aiogram.dispatcher.dispatcher - INFO - Stop polling...
+2025-06-25 12:33:15,723 - aiogram - WARNING - Goodbye!
+2025-06-25 12:33:49,153 - loader - INFO - Бот успешно инициализирован
+2025-06-25 12:33:49,520 - __main__ - INFO - Запуск бота...
+2025-06-25 12:33:49,942 - aiogram - INFO - Bot: Centris Towers [@CentrisTowersbot]
+2025-06-25 12:33:50,156 - aiogram - WARNING - Updates were skipped successfully.
+2025-06-25 12:33:50,612 - __main__ - INFO - Команды бота успешно установлены
+2025-06-25 12:33:50,730 - __main__ - INFO - Администраторы успешно уведомлены
+2025-06-25 12:33:50,730 - __main__ - INFO - Начало инициализации планировщика
+2025-06-25 12:33:50,730 - handlers.users.video_scheduler - INFO - Начало инициализации планировщика
+2025-06-25 12:33:50,730 - handlers.users.video_scheduler - INFO - Начало планирования задач для пользователей и групп
+2025-06-25 12:33:50,730 - handlers.users.video_scheduler - INFO - Все существующие задачи удалены
+2025-06-25 12:33:50,730 - handlers.users.video_scheduler - INFO - Найдено 2 получателей (пользователи и группы)
+2025-06-25 12:33:50,733 - apscheduler.scheduler - INFO - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2025-06-25 12:33:50,733 - handlers.users.video_scheduler - INFO - Задача для группы -1002223935003 запланирована на 12:29
+2025-06-25 12:33:50,733 - apscheduler.scheduler - INFO - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2025-06-25 12:33:50,733 - handlers.users.video_scheduler - INFO - Задача для пользователя 5657091547 запланирована на 15:00
+2025-06-25 12:33:50,733 - handlers.users.video_scheduler - INFO - Итоговое количество активных задач: 2
+2025-06-25 12:33:50,734 - apscheduler.scheduler - INFO - Added job "send_daily_video_to_group" to job store "default"
+2025-06-25 12:33:50,734 - apscheduler.scheduler - INFO - Added job "send_scheduled_video" to job store "default"
+2025-06-25 12:33:50,734 - apscheduler.scheduler - INFO - Scheduler started
+2025-06-25 12:33:50,734 - handlers.users.video_scheduler - INFO - Планировщик успешно инициализирован и запущен
+2025-06-25 12:33:50,734 - handlers.users.video_scheduler - INFO - Задача обновления планировщика запущена в фоновом режиме
+2025-06-25 12:33:50,734 - handlers.users.video_scheduler - INFO - Количество активных задач после инициализации: 2
+2025-06-25 12:33:50,734 - __main__ - INFO - Планировщик успешно инициализирован
+2025-06-25 12:33:50,734 - __main__ - INFO - Планировщик запущен
+2025-06-25 12:33:50,734 - __main__ - INFO - Количество активных задач: 2
+2025-06-25 12:33:50,734 - __main__ - INFO - Задача: send_video_5657091547, следующее выполнение: 2025-06-25 15:00:00+05:00
+2025-06-25 12:33:50,734 - __main__ - INFO - Задача: send_video_group_-1002223935003, следующее выполнение: 2025-06-26 12:29:00+05:00
+2025-06-25 12:33:50,734 - handlers.users.video_scheduler - INFO - Начало обновления задач планировщика
+2025-06-25 12:33:50,734 - handlers.users.video_scheduler - INFO - Начало планирования задач для пользователей и групп
+2025-06-25 12:33:50,734 - handlers.users.video_scheduler - INFO - Все существующие задачи удалены
+2025-06-25 12:33:50,735 - handlers.users.video_scheduler - INFO - Найдено 2 получателей (пользователи и группы)
+2025-06-25 12:33:50,735 - apscheduler.scheduler - INFO - Added job "send_daily_video_to_group" to job store "default"
+2025-06-25 12:33:50,735 - handlers.users.video_scheduler - INFO - Задача для группы -1002223935003 запланирована на 12:29
+2025-06-25 12:33:50,736 - apscheduler.scheduler - INFO - Added job "send_scheduled_video" to job store "default"
+2025-06-25 12:33:50,736 - handlers.users.video_scheduler - INFO - Задача для пользователя 5657091547 запланирована на 15:00
+2025-06-25 12:33:50,736 - handlers.users.video_scheduler - INFO - Итоговое количество активных задач: 2
+2025-06-25 12:33:50,736 - handlers.users.video_scheduler - INFO - Задачи планировщика обновлены
+2025-06-25 12:33:50,736 - aiogram.dispatcher.dispatcher - INFO - Start polling.
+2025-06-25 12:34:06,635 - handlers.users.video_scheduler - INFO - Начало планирования задач для пользователей и групп
+2025-06-25 12:34:06,635 - handlers.users.video_scheduler - INFO - Все существующие задачи удалены
+2025-06-25 12:34:06,635 - handlers.users.video_scheduler - INFO - Найдено 2 получателей (пользователи и группы)
+2025-06-25 12:34:06,635 - apscheduler.scheduler - INFO - Added job "send_daily_video_to_group" to job store "default"
+2025-06-25 12:34:06,636 - handlers.users.video_scheduler - INFO - Задача для группы -1002223935003 запланирована на 12:35
+2025-06-25 12:34:06,636 - apscheduler.scheduler - INFO - Added job "send_scheduled_video" to job store "default"
+2025-06-25 12:34:06,636 - handlers.users.video_scheduler - INFO - Задача для пользователя 5657091547 запланирована на 15:00
+2025-06-25 12:34:06,636 - handlers.users.video_scheduler - INFO - Итоговое количество активных задач: 2
+2025-06-25 12:35:00,010 - apscheduler.executors.default - INFO - Running job "send_daily_video_to_group (trigger: cron[hour='12', minute='35'], next run at: 2025-06-26 12:35:00 +05)" (scheduled at 2025-06-25 12:35:00+05:00)
+2025-06-25 12:35:00,011 - handlers.users.video_scheduler - INFO - Отправка ежедневного видео в группу -1002223935003. Индекс видео: 1
+2025-06-25 12:35:00,593 - handlers.users.video_scheduler - INFO - Видео 1 успешно отправлено в группу -1002223935003
+2025-06-25 12:35:00,593 - apscheduler.executors.default - INFO - Job "send_daily_video_to_group (trigger: cron[hour='12', minute='35'], next run at: 2025-06-26 12:35:00 +05)" executed successfully
+2025-06-25 12:38:50,731 - handlers.users.video_scheduler - INFO - Начало обновления задач планировщика
+2025-06-25 12:38:50,731 - handlers.users.video_scheduler - INFO - Начало планирования задач для пользователей и групп
+2025-06-25 12:38:50,731 - handlers.users.video_scheduler - INFO - Все существующие задачи удалены
+2025-06-25 12:38:50,731 - handlers.users.video_scheduler - INFO - Найдено 2 получателей (пользователи и группы)
+2025-06-25 12:38:50,732 - apscheduler.scheduler - INFO - Added job "send_daily_video_to_group" to job store "default"
+2025-06-25 12:38:50,732 - handlers.users.video_scheduler - INFO - Задача для группы -1002223935003 запланирована на 12:35
+2025-06-25 12:38:50,733 - apscheduler.scheduler - INFO - Added job "send_scheduled_video" to job store "default"
+2025-06-25 12:38:50,733 - handlers.users.video_scheduler - INFO - Задача для пользователя 5657091547 запланирована на 15:00
+2025-06-25 12:38:50,733 - handlers.users.video_scheduler - INFO - Итоговое количество активных задач: 2
+2025-06-25 12:38:50,733 - handlers.users.video_scheduler - INFO - Задачи планировщика обновлены
+2025-06-25 12:41:05,459 - __main__ - INFO - Планировщик успешно остановлен
+2025-06-25 12:41:05,459 - __main__ - INFO - Соединение с базой данных успешно закрыто
+2025-06-25 12:41:05,460 - apscheduler.scheduler - INFO - Scheduler has been shut down
+2025-06-25 12:41:05,460 - __main__ - INFO - Сессия бота успешно закрыта
+2025-06-25 12:41:05,460 - aiogram.dispatcher.dispatcher - INFO - Stop polling...
+2025-06-25 12:41:05,460 - aiogram - WARNING - Goodbye!
+2025-06-25 12:41:08,547 - loader - INFO - Бот успешно инициализирован
+2025-06-25 12:41:08,547 - loader - INFO - Р‘РѕС‚ СѓСЃРїРµС€РЅРѕ РёРЅРёС†РёР°Р»РёР·РёСЂРѕРІР°РЅ
+2025-06-25 12:41:08,929 - __main__ - INFO - Запуск бота...
+2025-06-25 12:41:08,929 - __main__ - INFO - Р—Р°РїСѓСЃРє Р±РѕС‚Р°...
+2025-06-25 12:41:09,357 - aiogram - INFO - Bot: Centris Towers [@CentrisTowersbot]
+2025-06-25 12:41:09,357 - aiogram - INFO - Bot: Centris Towers [@CentrisTowersbot]
+2025-06-25 12:41:09,551 - aiogram - WARNING - Updates were skipped successfully.
+2025-06-25 12:41:09,551 - aiogram - WARNING - Updates were skipped successfully.
+2025-06-25 12:41:09,940 - __main__ - INFO - Команды бота успешно установлены
+2025-06-25 12:41:09,940 - __main__ - INFO - РљРѕРјР°РЅРґС‹ Р±РѕС‚Р° СѓСЃРїРµС€РЅРѕ СѓСЃС‚Р°РЅРѕРІР»РµРЅС‹
+2025-06-25 12:41:10,073 - __main__ - INFO - Администраторы успешно уведомлены
+2025-06-25 12:41:10,073 - __main__ - INFO - РђРґРјРёРЅРёСЃС‚СЂР°С‚РѕСЂС‹ СѓСЃРїРµС€РЅРѕ СѓРІРµРґРѕРјР»РµРЅС‹
+2025-06-25 12:41:10,074 - __main__ - INFO - Начало инициализации планировщика
+2025-06-25 12:41:10,074 - __main__ - INFO - РќР°С‡Р°Р»Рѕ РёРЅРёС†РёР°Р»РёР·Р°С†РёРё РїР»Р°РЅРёСЂРѕРІС‰РёРєР°
+2025-06-25 12:41:10,074 - handlers.users.video_scheduler - INFO - Начало инициализации планировщика
+2025-06-25 12:41:10,074 - handlers.users.video_scheduler - INFO - РќР°С‡Р°Р»Рѕ РёРЅРёС†РёР°Р»РёР·Р°С†РёРё РїР»Р°РЅРёСЂРѕРІС‰РёРєР°
+2025-06-25 12:41:10,074 - handlers.users.video_scheduler - INFO - Начало планирования задач для пользователей и групп
+2025-06-25 12:41:10,074 - handlers.users.video_scheduler - INFO - РќР°С‡Р°Р»Рѕ РїР»Р°РЅРёСЂРѕРІР°РЅРёСЏ Р·Р°РґР°С‡ РґР»СЏ РїРѕР»СЊР·РѕРІР°С‚РµР»РµР№ Рё РіСЂСѓРїРї
+2025-06-25 12:41:10,074 - handlers.users.video_scheduler - INFO - Все существующие задачи удалены
+2025-06-25 12:41:10,074 - handlers.users.video_scheduler - INFO - Р’СЃРµ СЃСѓС‰РµСЃС‚РІСѓСЋС‰РёРµ Р·Р°РґР°С‡Рё СѓРґР°Р»РµРЅС‹
+2025-06-25 12:41:10,075 - handlers.users.video_scheduler - INFO - Найдено 2 получателей (пользователи и группы)
+2025-06-25 12:41:10,075 - handlers.users.video_scheduler - INFO - РќР°Р№РґРµРЅРѕ 2 РїРѕР»СѓС‡Р°С‚РµР»РµР№ (РїРѕР»СЊР·РѕРІР°С‚РµР»Рё Рё РіСЂСѓРїРїС‹)
+2025-06-25 12:41:10,078 - apscheduler.scheduler - INFO - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2025-06-25 12:41:10,078 - apscheduler.scheduler - INFO - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2025-06-25 12:41:10,078 - handlers.users.video_scheduler - INFO - Задача для группы -1002223935003 запланирована на 12:35
+2025-06-25 12:41:10,078 - handlers.users.video_scheduler - INFO - Р—Р°РґР°С‡Р° РґР»СЏ РіСЂСѓРїРїС‹ -1002223935003 Р·Р°РїР»Р°РЅРёСЂРѕРІР°РЅР° РЅР° 12:35
+2025-06-25 12:41:10,079 - apscheduler.scheduler - INFO - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2025-06-25 12:41:10,079 - apscheduler.scheduler - INFO - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2025-06-25 12:41:10,079 - handlers.users.video_scheduler - INFO - Задача для пользователя 5657091547 запланирована на 15:00
+2025-06-25 12:41:10,079 - handlers.users.video_scheduler - INFO - Р—Р°РґР°С‡Р° РґР»СЏ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ 5657091547 Р·Р°РїР»Р°РЅРёСЂРѕРІР°РЅР° РЅР° 15:00
+2025-06-25 12:41:10,079 - handlers.users.video_scheduler - INFO - Итоговое количество активных задач: 2
+2025-06-25 12:41:10,079 - handlers.users.video_scheduler - INFO - РС‚РѕРіРѕРІРѕРµ РєРѕР»РёС‡РµСЃС‚РІРѕ Р°РєС‚РёРІРЅС‹С… Р·Р°РґР°С‡: 2
+2025-06-25 12:41:10,080 - apscheduler.scheduler - INFO - Added job "send_daily_video_to_group" to job store "default"
+2025-06-25 12:41:10,080 - apscheduler.scheduler - INFO - Added job "send_daily_video_to_group" to job store "default"
+2025-06-25 12:41:10,080 - apscheduler.scheduler - INFO - Added job "send_scheduled_video" to job store "default"
+2025-06-25 12:41:10,080 - apscheduler.scheduler - INFO - Added job "send_scheduled_video" to job store "default"
+2025-06-25 12:41:10,080 - apscheduler.scheduler - INFO - Scheduler started
+2025-06-25 12:41:10,080 - apscheduler.scheduler - INFO - Scheduler started
+2025-06-25 12:41:10,080 - handlers.users.video_scheduler - INFO - Планировщик успешно инициализирован и запущен
+2025-06-25 12:41:10,080 - handlers.users.video_scheduler - INFO - РџР»Р°РЅРёСЂРѕРІС‰РёРє СѓСЃРїРµС€РЅРѕ РёРЅРёС†РёР°Р»РёР·РёСЂРѕРІР°РЅ Рё Р·Р°РїСѓС‰РµРЅ
+2025-06-25 12:41:10,081 - handlers.users.video_scheduler - INFO - Задача обновления планировщика запущена в фоновом режиме
+2025-06-25 12:41:10,081 - handlers.users.video_scheduler - INFO - Р—Р°РґР°С‡Р° РѕР±РЅРѕРІР»РµРЅРёСЏ РїР»Р°РЅРёСЂРѕРІС‰РёРєР° Р·Р°РїСѓС‰РµРЅР° РІ С„РѕРЅРѕРІРѕРј СЂРµР¶РёРјРµ
+2025-06-25 12:41:10,081 - handlers.users.video_scheduler - INFO - Количество активных задач после инициализации: 2
+2025-06-25 12:41:10,081 - handlers.users.video_scheduler - INFO - РљРѕР»РёС‡РµСЃС‚РІРѕ Р°РєС‚РёРІРЅС‹С… Р·Р°РґР°С‡ РїРѕСЃР»Рµ РёРЅРёС†РёР°Р»РёР·Р°С†РёРё: 2
+2025-06-25 12:41:10,081 - __main__ - INFO - Планировщик успешно инициализирован
+2025-06-25 12:41:10,081 - __main__ - INFO - РџР»Р°РЅРёСЂРѕРІС‰РёРє СѓСЃРїРµС€РЅРѕ РёРЅРёС†РёР°Р»РёР·РёСЂРѕРІР°РЅ
+2025-06-25 12:41:10,081 - __main__ - INFO - Планировщик запущен
+2025-06-25 12:41:10,081 - __main__ - INFO - РџР»Р°РЅРёСЂРѕРІС‰РёРє Р·Р°РїСѓС‰РµРЅ
+2025-06-25 12:41:10,081 - __main__ - INFO - Количество активных задач: 2
+2025-06-25 12:41:10,081 - __main__ - INFO - РљРѕР»РёС‡РµСЃС‚РІРѕ Р°РєС‚РёРІРЅС‹С… Р·Р°РґР°С‡: 2
+2025-06-25 12:41:10,082 - __main__ - INFO - Задача: send_video_5657091547, следующее выполнение: 2025-06-25 15:00:00+05:00
+2025-06-25 12:41:10,082 - __main__ - INFO - Р—Р°РґР°С‡Р°: send_video_5657091547, СЃР»РµРґСѓСЋС‰РµРµ РІС‹РїРѕР»РЅРµРЅРёРµ: 2025-06-25 15:00:00+05:00
+2025-06-25 12:41:10,082 - __main__ - INFO - Задача: send_video_group_-1002223935003, следующее выполнение: 2025-06-26 12:35:00+05:00
+2025-06-25 12:41:10,082 - __main__ - INFO - Р—Р°РґР°С‡Р°: send_video_group_-1002223935003, СЃР»РµРґСѓСЋС‰РµРµ РІС‹РїРѕР»РЅРµРЅРёРµ: 2025-06-26 12:35:00+05:00
+2025-06-25 12:41:10,082 - handlers.users.video_scheduler - INFO - Начало обновления задач планировщика
+2025-06-25 12:41:10,082 - handlers.users.video_scheduler - INFO - РќР°С‡Р°Р»Рѕ РѕР±РЅРѕРІР»РµРЅРёСЏ Р·Р°РґР°С‡ РїР»Р°РЅРёСЂРѕРІС‰РёРєР°
+2025-06-25 12:41:10,082 - handlers.users.video_scheduler - INFO - Начало планирования задач для пользователей и групп
+2025-06-25 12:41:10,082 - handlers.users.video_scheduler - INFO - РќР°С‡Р°Р»Рѕ РїР»Р°РЅРёСЂРѕРІР°РЅРёСЏ Р·Р°РґР°С‡ РґР»СЏ РїРѕР»СЊР·РѕРІР°С‚РµР»РµР№ Рё РіСЂСѓРїРї
+2025-06-25 12:41:10,082 - handlers.users.video_scheduler - INFO - Все существующие задачи удалены
+2025-06-25 12:41:10,082 - handlers.users.video_scheduler - INFO - Р’СЃРµ СЃСѓС‰РµСЃС‚РІСѓСЋС‰РёРµ Р·Р°РґР°С‡Рё СѓРґР°Р»РµРЅС‹
+2025-06-25 12:41:10,083 - handlers.users.video_scheduler - INFO - Найдено 2 получателей (пользователи и группы)
+2025-06-25 12:41:10,083 - handlers.users.video_scheduler - INFO - РќР°Р№РґРµРЅРѕ 2 РїРѕР»СѓС‡Р°С‚РµР»РµР№ (РїРѕР»СЊР·РѕРІР°С‚РµР»Рё Рё РіСЂСѓРїРїС‹)
+2025-06-25 12:41:10,083 - apscheduler.scheduler - INFO - Added job "send_daily_video_to_group" to job store "default"
+2025-06-25 12:41:10,083 - apscheduler.scheduler - INFO - Added job "send_daily_video_to_group" to job store "default"
+2025-06-25 12:41:10,084 - handlers.users.video_scheduler - INFO - Задача для группы -1002223935003 запланирована на 12:35
+2025-06-25 12:41:10,084 - handlers.users.video_scheduler - INFO - Р—Р°РґР°С‡Р° РґР»СЏ РіСЂСѓРїРїС‹ -1002223935003 Р·Р°РїР»Р°РЅРёСЂРѕРІР°РЅР° РЅР° 12:35
+2025-06-25 12:41:10,084 - apscheduler.scheduler - INFO - Added job "send_scheduled_video" to job store "default"
+2025-06-25 12:41:10,084 - apscheduler.scheduler - INFO - Added job "send_scheduled_video" to job store "default"
+2025-06-25 12:41:10,084 - handlers.users.video_scheduler - INFO - Задача для пользователя 5657091547 запланирована на 15:00
+2025-06-25 12:41:10,084 - handlers.users.video_scheduler - INFO - Р—Р°РґР°С‡Р° РґР»СЏ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ 5657091547 Р·Р°РїР»Р°РЅРёСЂРѕРІР°РЅР° РЅР° 15:00
+2025-06-25 12:41:10,085 - handlers.users.video_scheduler - INFO - Итоговое количество активных задач: 2
+2025-06-25 12:41:10,085 - handlers.users.video_scheduler - INFO - РС‚РѕРіРѕРІРѕРµ РєРѕР»РёС‡РµСЃС‚РІРѕ Р°РєС‚РёРІРЅС‹С… Р·Р°РґР°С‡: 2
+2025-06-25 12:41:10,085 - handlers.users.video_scheduler - INFO - Задачи планировщика обновлены
+2025-06-25 12:41:10,085 - handlers.users.video_scheduler - INFO - Р—Р°РґР°С‡Рё РїР»Р°РЅРёСЂРѕРІС‰РёРєР° РѕР±РЅРѕРІР»РµРЅС‹
+2025-06-25 12:41:10,085 - aiogram.dispatcher.dispatcher - INFO - Start polling.
+2025-06-25 12:41:10,085 - aiogram.dispatcher.dispatcher - INFO - Start polling.
+2025-06-25 12:41:20,029 - __main__ - INFO - Планировщик успешно остановлен
+2025-06-25 12:41:20,029 - __main__ - INFO - РџР»Р°РЅРёСЂРѕРІС‰РёРє СѓСЃРїРµС€РЅРѕ РѕСЃС‚Р°РЅРѕРІР»РµРЅ
+2025-06-25 12:41:20,030 - __main__ - INFO - Соединение с базой данных успешно закрыто
+2025-06-25 12:41:20,030 - __main__ - INFO - РЎРѕРµРґРёРЅРµРЅРёРµ СЃ Р±Р°Р·РѕР№ РґР°РЅРЅС‹С… СѓСЃРїРµС€РЅРѕ Р·Р°РєСЂС‹С‚Рѕ
+2025-06-25 12:41:20,031 - apscheduler.scheduler - INFO - Scheduler has been shut down
+2025-06-25 12:41:20,031 - apscheduler.scheduler - INFO - Scheduler has been shut down
+2025-06-25 12:41:20,031 - __main__ - INFO - Сессия бота успешно закрыта
+2025-06-25 12:41:20,031 - __main__ - INFO - РЎРµСЃСЃРёСЏ Р±РѕС‚Р° СѓСЃРїРµС€РЅРѕ Р·Р°РєСЂС‹С‚Р°
+2025-06-25 12:41:20,031 - aiogram.dispatcher.dispatcher - INFO - Stop polling...
+2025-06-25 12:41:20,031 - aiogram.dispatcher.dispatcher - INFO - Stop polling...
+2025-06-25 12:41:20,031 - aiogram - WARNING - Goodbye!
+2025-06-25 12:41:20,031 - aiogram - WARNING - Goodbye!

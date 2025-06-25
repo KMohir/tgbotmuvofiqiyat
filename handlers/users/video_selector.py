@@ -5,6 +5,7 @@ try:
     from db import db
     from keyboards.default.reply import key, get_lang_for_button
     from datetime import datetime
+    from handlers.users.video_scheduler import schedule_jobs_for_users
 
     # Список ссылок на сообщения в канале
     VIDEO_LIST = [
@@ -248,17 +249,16 @@ try:
     @dp.message_handler(Command("videos"))
     @dp.message_handler(Text(equals="FAQ ?"))
     async def cmd_videos(message: types.Message):
-        user_id = message.from_user.id
-
-        if not db.user_exists(user_id):
-            await message.answer("Iltimos, /start buyrug'i bilan ro'yxatdan o'ting.")
-            return
-
-        is_subscribed = db.get_subscription_status(user_id)
-        if not is_subscribed:
-            await message.answer("Siz obunadan chiqgansiz. Qayta obuna bo'lish uchun /start ni bosing.")
-            return
-
+        # Только для лички требуем регистрацию
+        if message.chat.type == types.ChatType.PRIVATE:
+            user_id = message.from_user.id
+            if not db.user_exists(user_id):
+                await message.answer("Iltimos, /start buyrug'i bilan ro'yxatdan o'ting.")
+                return
+            is_subscribed = db.get_subscription_status(user_id)
+            if not is_subscribed:
+                await message.answer("Siz obunadan chiqgansiz. Qayta obuna bo'lish uchun /start ni bosing.")
+                return
         await message.answer(
             "Iltimos, qaysi darsni ko'rmoqchi ekanligingizni tanlang:",
             reply_markup=get_lesson_keyboard()
@@ -284,52 +284,35 @@ try:
 
     @dp.message_handler(lambda message: any(message.text.startswith(f"{i}.") for i in range(1, 16)))
     async def send_selected_lesson(message: types.Message):
-        user_id = message.from_user.id
-        print(f"Пользователь {user_id} выбрал урок: {message.text}")
-
-        if not db.user_exists(user_id):
-            print(f"Пользователь {user_id} не зарегистрирован")
-            await message.answer("Iltimos, /start buyrug'i bilan ro'yxatdan o'ting.")
-            return
-
+        # Только для лички требуем регистрацию
+        if message.chat.type == types.ChatType.PRIVATE:
+            user_id = message.from_user.id
+            if not db.user_exists(user_id):
+                await message.answer("Iltimos, /start buyrug'i bilan ro'yxatdan o'ting.")
+                return
         try:
             lesson_number = int(message.text.split(".")[0])
             video_index = lesson_number - 1
-
             if video_index < 0 or video_index >= len(VIDEO_LIST):
                 await message.answer("Bunday dars mavjud emas! Iltimos, mavjud darslardan birini tanlang.")
-                print(f"Ошибка: урок {lesson_number} вне диапазона")
                 return
-
-            # Извлекаем message_id из ссылки
             video_url = VIDEO_LIST[video_index]
             message_id = int(video_url.split("/")[-1])
-
-            # Копируем видео из канала без указания источника
-            print(f"Копирование видео из канала {video_url} пользователю {user_id} (dars #{lesson_number})")
+            # Отправляем видео в тот же чат, откуда пришёл запрос
             await bot.copy_message(
-                chat_id=user_id,
-                from_chat_id=-1002550852551,  # ID канала
+                chat_id=message.chat.id,
+                from_chat_id=-1002550852551,
                 message_id=message_id,
                 protect_content=True,
-                reply_markup=get_lesson_keyboard()  # Показываем клавиатуру с уроками
+                reply_markup=get_lesson_keyboard()
             )
-            print(f"Dars #{lesson_number} скопирован пользователю {user_id}")
-
-            # Отмечаем видео как просмотренное
-            db.mark_video_as_viewed(user_id, video_index)
-            print(f"Видео {video_index} отмечено как просмотренное для пользователя {user_id}")
-
-            # Обновляем video_index в базе данных
-
-
-
+            # Отмечаем просмотр только для лички
+            if message.chat.type == types.ChatType.PRIVATE:
+                db.mark_video_as_viewed(message.from_user.id, video_index)
         except (ValueError, IndexError) as e:
             await message.answer("Xato! Iltimos, darsni to'g'ri tanlang.")
-            print(f"Ошибка при выборе урока для пользователя {user_id}: {e}")
         except Exception as e:
             await message.answer("Video yuborishda xato yuz berdi. Iltimos, keyinroq urinib ko'ring.")
-            print(f"Ошибка при копировании видео для пользователя {user_id}: {e}")
 
 
     @dp.message_handler(chat_type=types.ChatType.PRIVATE)
@@ -337,6 +320,37 @@ try:
         user_id = message.from_user.id
         print(f"Получено сообщение от {user_id}: {message.text}")
         await message.answer("Izvinite, men bu buyruqni tushunmayapman. Iltimos, /start dan foydalaning.")
+
+
+    @dp.message_handler(commands=['set_time'])
+    async def set_time_command(message: types.Message):
+        args = message.get_args()
+        if not args or not args.strip():
+            await message.reply("Пожалуйста, укажите время в формате HH:MM, например: /set_time 09:00")
+            return
+
+        new_time = args.strip()
+        try:
+            hour, minute = map(int, new_time.split(":"))
+            assert 0 <= hour < 24 and 0 <= minute < 60
+        except Exception:
+            await message.reply("Неверный формат времени. Пример: /set_time 09:00")
+            return
+
+        # Для групп
+        if message.chat.type in [types.ChatType.GROUP, types.ChatType.SUPERGROUP]:
+            if not db.user_exists(message.chat.id):
+                db.add_user(message.chat.id, message.chat.title or "Группа", None, preferred_time=new_time, is_group=True)
+            db.set_preferred_time(message.chat.id, new_time)
+            await message.reply(f"Время рассылки для этой группы установлено на {new_time}")
+            schedule_jobs_for_users()
+        else:
+            # Для лички
+            if not db.user_exists(message.from_user.id):
+                db.add_user(message.from_user.id, "Не указано", "Не указано", preferred_time=new_time)
+            db.set_preferred_time(message.from_user.id, new_time)
+            await message.reply(f"Время рассылки для вас установлено на {new_time}")
+            schedule_jobs_for_users()
 
 except Exception as exx:
     from datetime import datetime
