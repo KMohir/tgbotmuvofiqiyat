@@ -29,16 +29,19 @@ try:
         ImageCollection.waiting_for_images.state,
     ]
 
-    @dp.message_handler(lambda message: message.text and not message.text.startswith('/'), state=None, chat_type=types.ChatType.PRIVATE)
+    @dp.message_handler(lambda message: message.text and not message.text.startswith('/') and message.text not in [
+        "Centris towers", "Golden lake", "1-sezon", "2-sezon", "3-sezon"
+    ], state=None, chat_type=types.ChatType.PRIVATE)
     async def bot_echo(message: types.Message):
         if not db.user_exists(message.from_user.id):
             await message.answer("Iltimos, /start buyrug'i bilan ro'yxatdan o'ting.")
             return
-
         await message.answer("Iltimos operator javobini kuting!")
 
     @dp.message_handler(
-        lambda message: not message.text.startswith('/'),
+        lambda message: not message.text.startswith('/') and message.text not in [
+            "Centris towers", "Golden lake", "1-sezon", "2-sezon", "3-sezon"
+        ],
         state="*",
         content_types=types.ContentTypes.ANY,
         chat_type=types.ChatType.PRIVATE
@@ -47,13 +50,9 @@ try:
         if not db.user_exists(message.from_user.id):
             await message.answer("Iltimos, /start buyrug'i bilan ro'yxatdan o'ting.")
             return
-
         current_state = await state.get_state()
-
         if current_state in EXCLUDED_STATES:
-
             return
-
         await message.answer("Pastdagi tugmani bosing")
 
 except Exception as exx:

@@ -7,10 +7,11 @@ def get_lang_for_button(message):
     button = ReplyKeyboardMarkup(
         keyboard=[
             [
-                KeyboardButton(text="Yangiliklarni soat nechida olishni hohlaysiz?")
+                KeyboardButton(text="Centris towers"),
+
             ],
             [
-                KeyboardButton(text="FAQ ?")
+                KeyboardButton(text="Golden lake")
             ],
             [
                 KeyboardButton(text="Centris Towers bilan bog'lanish")
@@ -34,3 +35,7 @@ def key():
         resize_keyboard=True
     )
     return keyboardcontakt
+
+
+main_menu_keyboard = ReplyKeyboardMarkup(resize_keyboard=True)
+main_menu_keyboard.add(KeyboardButton("Centris towers"), KeyboardButton("Golden lake"))

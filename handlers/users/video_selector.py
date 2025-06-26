@@ -5,194 +5,66 @@ try:
     from db import db
     from keyboards.default.reply import key, get_lang_for_button
     from datetime import datetime
-    from handlers.users.video_scheduler import schedule_jobs_for_users
-
-    # Список ссылок на сообщения в канале
-    VIDEO_LIST = [
-        'https://t.me/c/2550852551/120',
-        'https://t.me/c/2550852551/121',
-        'https://t.me/c/2550852551/122',
-        'https://t.me/c/2550852551/123',
-        'https://t.me/c/2550852551/124',
-        'https://t.me/c/2550852551/125',
-        'https://t.me/c/2550852551/126',
-        'https://t.me/c/2550852551/127',
-        'https://t.me/c/2550852551/128',
-        'https://t.me/c/2550852551/129',
-        'https://t.me/c/2550852551/130',
-        'https://t.me/c/2550852551/131',
-        'https://t.me/c/2550852551/132',
-        'https://t.me/c/2550852551/133',
-        'https://t.me/c/2550852551/134'
-    ]
+    from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
+    from handlers.users.video_lists import VIDEO_LIST_1, VIDEO_LIST_2, VIDEO_LIST_3, CAPTION_LIST_1, CAPTION_LIST_2, CAPTION_LIST_3
+    from aiogram.dispatcher import FSMContext
+    from aiogram.dispatcher.filters.state import State, StatesGroup
 
     # Список описаний для извлечения названий уроков (только для кнопок)
-    CAPTION_LIST = [
-        "✅1/15\n\n"
-        "Мавзу: Centris Towers'daги лобби\n\n"
-        "Иброҳим Мамасаидов \"Centris Towers\" лойиҳаси асосчиси\n\n"
-        "Centris Towers - инновация ва замонавий услуб гуллаб-яшнайдиган янги авлод бизнес маркази\n\n"
-        "📞 Алоқа учун: <a href=\"tel:+998501554444\">+998501554444</a>\n\n"
-        "<a href=\"https://t.me/centris1\">Менежер билан боғланиш</a>\n\n"
-        "(<a href=\"https://yandex.ru/maps/org/110775045050\">📍Манзил: Тошкент шаҳри, Нуронийлар кўчаси 2</a>)\n"
-        "🚀<a href=\"https://t.me/centris_towers\">Телеграм</a> • "
-        "📷<a href=\"https://www.instagram.com/centristowers_uz/\">Инстаграм</a> • "
-        "⏸<a href=\"https://www.youtube.com/@CentrisTowers\">You Tube</a>",
+    CAPTION_LIST_2 = [
+        "Келажакни инобатга олган қулай локатсия",
+        "Худуд бўйича жойлашув ва нархлар",
+        "Парковка масаласи ва тарифлари",
+        "Хавфсизлик бўйича талабларга жавобимиз",
+        "Меҳмонлар учун қулайликлар",
+        "Макетдаги бино қани деб қолмаймизми?",
+        "Қарзга олгандан кўра, олмаслик яхшироқ.",
+        "Centris Towers қандай ва кимлар учун.",
+        "Ўхшамай қолса пулингиз қайтарилади",
+        "Бинонинг ташқи худуди.",
+        "Фитнес ва автосалоннинг боғлиқлиги.",
+        "Аёллар учун ажратилган зона",
+        "Нарх сиёсатининг муҳимлиги.",
+        'Вид муҳим деб билганлар  учун таклиф.',
+        "Сотиш учун олаётганларга тавсия.",
+        "Эвакуация кучли ўйланилган.",
+        "Бизнес сентр қуриш осонмас…",
+        "100% тўлов қилишнинг чегирмаси.",
+        "Чет эл фуқаролари ҳам олса бўладими?",
+        "Тўлиқ кўрсатув…"
+    ]
 
-        "✅2/15\n\n"
-        "Мавзу: Хизмат кўрсатиш харажатларини камайтириш бўйича режалар\n\n"
-        "Иброҳим Мамасаидов \"Centris Towers\" лойиҳаси асосчиси\n\n"
-        "<a href=\"https://youtu.be/S3rtsNlAVjU\">4К форматда кўриш</a>\n\n"
-        "Centris Towers - инновация ва замонавий услуб гуллаб-яшнайдиган янги авлод бизнес маркази\n\n"
-        "📞 Алоқа учун: <a href=\"tel:+998501554444\">+998501554444</a>\n\n"
-        "<a href=\"https://t.me/centris1\">Менежер билан боғланиш</a>\n\n"
-        "(<a href=\"https://yandex.ru/maps/org/110775045050\">📍Манзил: Тошкент шаҳри, Нуронийлар кўчаси 2</a>)\n"
-        "🚀<a href=\"https://t.me/centris_towers\">Телеграм</a> • "
-        "📷<a href=\"https://www.instagram.com/centristowers_uz/\">Инстаграм</a> • "
-        "⏸<a href=\"https://www.youtube.com/@CentrisTowers\">You Tube</a>",
-
-        "✅3/15\n\n"
-        "Мавзу: Таъсир қилувчи шахслар ўзимизда I Марказдаги ер нархи ўсиши тезлашган\n\n"
-        "Иброҳим Мамасаидов \"Centris Towers\" лойиҳаси асосчиси\n\n"
-        "Centris Towers - инновация ва замонавий услуб гуллаб-яшнайдиган янги авлод бизнес маркази  \n\n"
-        "📞 Алоқа учун: <a href=\"tel:+998501554444\">+998501554444</a>\n\n"
-        "<a href=\"https://t.me/centris1\">Менежер билан боғланиш</a>\n\n"
-        "(<a href=\"https://yandex.ru/maps/org/110775045050\">📍Манзил: Тошкент шаҳри, Нуронийлар кўчаси 2</a>)\n"
-        "🚀<a href=\"https://t.me/centris_towers\">Телеграм</a> • "
-        "📷<a href=\"https://www.instagram.com/centristowers_uz/\">Инстаграм</a> • "
-        "⏸<a href=\"https://www.youtube.com/@CentrisTowers\">You Tube</a>",
-
-        "✅4/15\n\n"
-        "Мавзу: Centris Towers - қўшимча қулайликлари\n\n"
-        "Иброҳим Мамасаидов \"Centris Towers\" лойиҳаси асосчиси\n\n"
-        "Centris Towers - инновация ва замонавий услуб гуллаб-яшнайдиган янги авлод бизнес маркази  \n\n"
-        "📞 Алоқа учун: <a href=\"tel:+998501554444\">+998501554444</a>\n\n"
-        "<a href=\"https://t.me/centris1\">Менежер билан боғланиш</a>\n\n"
-        "(<a href=\"https://yandex.ru/maps/org/110775045050\">📍Манзил: Тошкент шаҳри, Нуронийлар кўчаси 2</a>)\n"
-        "🚀<a href=\"https://t.me/centris_towers\">Телеграм</a> • "
-        "📷<a href=\"https://www.instagram.com/centristowers_uz/\">Инстаграм</a> • "
-        "⏸<a href=\"https://www.youtube.com/@CentrisTowers\">You Tube</a>",
-
-        "✅5/15\n\n"
-        "Мавзу: Бино қачон кўринади\n\n"
-        "Иброҳим Мамасаидов \"Centris Towers\" лойиҳаси асосчиси\n\n"
-        "Centris Towers - инновация ва замонавий услуб гуллаб-яшнайдиган янги авлод бизнес маркази  \n\n"
-        "📞 Алоқа учун: <a href=\"tel:+998501554444\">+998501554444</a>\n\n"
-        "<a href=\"https://t.me/centris1\">Менежер билан боғланиш</a>\n\n"
-        "(<a href=\"https://yandex.ru/maps/org/110775045050\">📍Манзил: Тошкент шаҳри, Нуронийлар кўчаси 2</a>)\n"
-        "🚀<a href=\"https://t.me/centris_towers\">Телеграм</a> • "
-        "📷<a href=\"https://www.instagram.com/centristowers_uz/\">Инстаграм</a> • "
-        "⏸<a href=\"https://www.youtube.com/@CentrisTowers\">You Tube</a>",
-
-        "✅6/15\n\n"
-        "Мавзу: Парковка сотилмайди\n\n"
-        "Иброҳим Мамасаидов \"Centris Towers\" лойиҳаси асосчиси\n\n"
-        "Centris Towers - инновация ва замонавий услуб гуллаб-яшнайдиган янги авлод бизнес маркази  \n\n"
-        "📞 Алоқа учун: <a href=\"tel:+998501554444\">+998501554444</a>\n\n"
-        "<a href=\"https://t.me/centris1\">Менежер билан боғланиш</a>\n\n"
-        "(<a href=\"https://yandex.ru/maps/org/110775045050\">📍Манзил: Тошкент шаҳри, Нуронийлар кўчаси 2</a>)\n"
-        "🚀<a href=\"https://t.me/centris_towers\">Телеграм</a> • "
-        "📷<a href=\"https://www.instagram.com/centristowers_uz/\">Инстаграм</a> • "
-        "⏸<a href=\"https://www.youtube.com/@CentrisTowers\">You Tube</a>",
-
-        "✅7/15\n\n"
-        "Мавзу: Centris Towers-Муваффақият Маркази\n\n"
-        "Иброҳим Мамасаидов \"Centris Towers\" лойиҳаси асосчиси\n\n"
-        "Centris Towers - инновация ва замонавий услуб гуллаб-яшнайдиган янги авлод бизнес маркази\n\n"
-        "📞 Алоқа учун: <a href=\"tel:+998501554444\">+998501554444</a>\n\n"
-        "<a href=\"https://t.me/centris1\">Менежер билан боғланиш</a>\n\n"
-        "(<a href=\"https://yandex.ru/maps/org/110775045050\">📍Манзил: Тошкент шаҳри, Нуронийлар кўчаси 2</a>)\n"
-        "🚀<a href=\"https://t.me/centris_towers\">Телеграм</a> • "
-        "📷<a href=\"https://www.instagram.com/centristowers_uz/\">Инстаграм</a> • "
-        "⏸<a href=\"https://www.youtube.com/@CentrisTowers\">You Tube</a>",
-
-        "✅8/15\n\n"
-        "Мавзу: Охирги пулига олинган\n\n"
-        "Иброҳим Мамасаидов \"Centris Towers\" лойиҳаси асосчиси\n\n"
-        "Centris Towers - инновация ва замонавий услуб гуллаб-яшнайдиган янги авлод бизнес маркази\n\n"
-        "📞 Алоқа учун: <a href=\"tel:+998501554444\">+998501554444</a>\n\n"
-        "<a href=\"https://t.me/centris1\">Менежер билан боғланиш</a>\n\n"
-        "(<a href=\"https://yandex.ru/maps/org/110775045050\">📍Манзил: Тошкент шаҳри, Нуронийлар кўчаси 2</a>)\n"
-        "🚀<a href=\"https://t.me/centris_towers\">Телеграм</a> • "
-        "📷<a href=\"https://www.instagram.com/centristowers_uz/\">Инстаграм</a> • "
-        "⏸<a href=\"https://www.youtube.com/@CentrisTowers\">You Tube</a>",
-
-        "✅9/15\n\n"
-        "Мавзу: Инвестиция хавфсизлиги\n\n"
-        "Иброҳим Мамасаидов \"Centris Towers\" лойиҳаси асосчиси\n\n"
-        "Centris Towers - инновация ва замонавий услуб гуллаб-яшнайдиган янги авлод бизнес маркази\n\n"
-        "📞 Алоқа учун: <a href=\"tel:+998501554444\">+998501554444</a>\n\n"
-        "<a href=\"https://t.me/centris1\">Менежер билан боғланиш</a>\n\n"
-        "(<a href=\"https://yandex.ru/maps/org/110775045050\">📍Манзил: Тошкент шаҳри, Нуронийлар кўчаси 2</a>)\n"
-        "🚀<a href=\"https://t.me/centris_towers\">Телеграм</a> • "
-        "📷<a href=\"https://www.instagram.com/centristowers_uz/\">Инстаграм</a> • "
-        "⏸<a href=\"https://www.youtube.com/@CentrisTowers\">You Tube</a>",
-
-        "✅10/15\n\n"
-        "Мавзу: Қурилиш битишига таъсир қилувчи омиллар\n\n"
-        "Иброҳим Мамасаидов \"Centris Towers\" лойиҳаси асосчиси\n\n"
-        "Centris Towers - инновация ва замонавий услуб гуллаб-яшнайдиган янги авлод бизнес маркази\n\n"
-        "📞 Алоқа учун: <a href=\"tel:+998501554444\">+998501554444</a>\n\n"
-        "<a href=\"https://t.me/centris1\">Менежер билан боғланиш</a>\n\n"
-        "(<a href=\"https://yandex.ru/maps/org/110775045050\">📍Манзил: Тошкент шаҳри, Нуронийлар кўчаси 2</a>)\n"
-        "🚀<a href=\"https://t.me/centris_towers\">Телеграм</a> • "
-        "📷<a href=\"https://www.instagram.com/centristowers_uz/\">Инстаграм</a> • "
-        "⏸<a href=\"https://www.youtube.com/@CentrisTowers\">You Tube</a>",
-
-        "✅11/15\n\n"
-        "Мавзу: Манга қўшниларим муҳим\n\n"
-        "Иброҳим Мамасаидов \"Centris Towers\" лойиҳаси асосчиси\n\n"
-        "Centris Towers - инновация ва замонавий услуб гуллаб-яшнайдиган янги авлод бизнес маркази\n\n"
-        "📞 Алоқа учун: <a href=\"tel:+998501554444\">+998501554444</a>\n\n"
-        "<a href=\"https://t.me/centris1\">Менежер билан боғланиш</a>\n\n"
-        "(<a href=\"https://yandex.ru/maps/org/110775045050\">📍Манзил: Тошкент шаҳри, Нуронийлар кўчаси 2</a>)\n"
-        "🚀<a href=\"https://t.me/centris_towers\">Телеграм</a> • "
-        "📷<a href=\"https://www.instagram.com/centristowers_uz/\">Инстаграм</a> • "
-        "⏸<a href=\"https://www.youtube.com/@CentrisTowers\">You Tube</a>",
-
-        "✅12/15\n\n"
-        "Мавзу: Бизга қайси сегмент қизиқ\n\n"
-        "Иброҳим Мамасаидов \"Centris Towers\" лойиҳаси асосчиси\n\n"
-        "Centris Towers - инновация ва замонавий услуб гуллаб-яшнайдиган янги авлод бизнес маркази\n\n"
-        "📞 Алоқа учун: <a href=\"tel:+998501554444\">+998501554444</a>\n\n"
-        "<a href=\"https://t.me/centris1\">Менежер билан боғланиш</a>\n\n"
-        "(<a href=\"https://yandex.ru/maps/org/110775045050\">📍Манзил: Тошкент шаҳри, Нуронийлар кўчаси 2</a>)\n"
-        "🚀<a href=\"https://t.me/centris_towers\">Телеграм</a> • "
-        "📷<a href=\"https://www.instagram.com/centristowers_uz/\">Инстаграм</a> • "
-        "⏸<a href=\"https://www.youtube.com/@CentrisTowers\">You Tube</a>",
-
-        "✅13/15\n\n"
-        "Мавзу: Centris Towers ғояси\n\n"
-        "Иброҳим Мамасаидов \"Centris Towers\" лойиҳаси асосчиси\n\n"
-        "Centris Towers - инновация ва замонавий услуб гуллаб-яшнайдиган янги авлод бизнес маркази\n\n"
-        "📞 Алоқа учун: <a href=\"tel:+998501554444\">+998501554444</a>\n\n"
-        "<a href=\"https://t.me/centris1\">Менежер билан боғланиш</a>\n\n"
-        "(<a href=\"https://yandex.ru/maps/org/110775045050\">📍Манзил: Тошкент шаҳри, Нуронийлар кўчаси 2</a>)\n"
-        "🚀<a href=\"https://t.me/centris_towers\">Телеграм</a> • "
-        "📷<a href=\"https://www.instagram.com/centristowers_uz/\">Инстаграм</a> • "
-        "⏸<a href=\"https://www.youtube.com/@CentrisTowers\">You Tube</a>",
-
-        "✅14/15\n\n"
-        "Мавзу: Centris Towers қулайликлари ва инвестиция бўйича хавфсизлиги\n\n"
-        "Иброҳим Мамасаидов \"Centris Towers\" лойиҳаси асосчиси\n\n"
-        "Centris Towers - инновация ва замонавий услуб гуллаб-яшнайдиган янги авлод бизнес маркази\n\n"
-        "📞 Алоқа учун: <a href=\"tel:+998501554444\">+998501554444</a>\n\n"
-        "<a href=\"https://t.me/centris1\">Менежер билан боғланиш</a>\n\n"
-        "(<a href=\"https://yandex.ru/maps/org/110775045050\">📍Манзил: Тошкент шаҳри, Нуронийлар кўчаси 2</a>)\n"
-        "🚀<a href=\"https://t.me/centris_towers\">Телеграм</a> • "
-        "📷<a href=\"https://www.instagram.com/centristowers_uz/\">Инстаграм</a> • "
-        "⏸<a href=\"https://www.youtube.com/@CentrisTowers\">You Tube</a>",
-
-        "✅15/15\n\n"
-        "Мавзу: Centris Towers-Муваффақият Маркази\n\n"
-        "Иброҳим Мамасаидов \"Centris Towers\" лойиҳаси асосчиси\n\n"
-        "Centris Towers - инновация ва замонавий услуб гуллаб-яшнайдиган янги авлод бизнес маркази\n\n"
-        "📞 Алоқа учун: <a href=\"tel:+998501554444\">+998501554444</a>\n\n"
-        "<a href=\"https://t.me/centris1\">Менежер билан боғланиш</a>\n\n"
-        "(<a href=\"https://yandex.ru/maps/org/110775045050\">📍Манзил: Тошкент шаҳри, Нуронийлар кўчаси 2</a>)\n"
-        "🚀<a href=\"https://t.me/centris_towers\">Телеграм</a> • "
-        "📷<a href=\"https://www.instagram.com/centristowers_uz/\">Инстаграм</a> • "
-        "⏸<a href=\"https://www.youtube.com/@CentrisTowers\">You Tube</a>",
+    CAPTION_LIST_3 = [
+        "Centris Towers билан ҳамкорлик шартлари",
+        "Ижара нархлари",
+        "Centris Towers нинг ташқи тузилиши",
+        "Энг оммабоп муаммонинг ечими",
+        "Қаҳвахона ёки кафе учун идеал жой",
+        "Биздаги 4 хил уникал ресторан",
+        "Centris Towers нинг бошқалардан фарқи",
+        "Қаҳва бурчак (Coffee Corner) учун таклиф",
+        "Бино қурилиши қачон тугайди?",
+        "Саволларга жавоб олиш учун кимга мурожаат қилиш керак?",
+        "Бизга кимлар қизиқ эмас?",
+        "Ёш болалар учун ўйин майдони бўладими?",
+        "Автосалон очадиганларга учун имконият",
+        "Бино фасади учун режалар",
+        "Аёллар учун қулайликлар",
+        "Co-working зоналари учун ажратилган имкониятлар",
+        "Ижара шартномаси долларда бўладими ёки сўмда?",
+        "Нималар мумкин эмас?",
+        "Пул оқимида хавфлар борми?",
+        "Шартнома учун кимлар билан келишиш керак?",
+        "Қандай суғурта (страховка) билан таъминлайди?",
+        "Имконият бўлмай қолса, тўланган пуллар нима бўлади?",
+        "Таклиф нима учун камаяди?",
+        "Нима учун тиллага эмас, кўчмас мулкка пул тиккан маъқул?",
+        "Centris Towers девелопер сифатида яқин келажакдаги қурилиш режалари ҳақида фикрингиз",
+        "ТОП-3 брендлар қаторида жой олишимиз мумкинми?",
+        "Centris Towers расман қачон очилиши мумкин?",
+        "Лифтлар билан боғлиқ қулайликлар",
+        "Чет элга сармоя киритиш керакми ёки Ўзбекистонга?",
+        "Дубай ва Озарбайжонга пул тикиш тўғрими?"
     ]
 
 
@@ -223,7 +95,7 @@ try:
 
 
     @dp.message_handler(commands=['start'])
-    async def cmd_start(message: types.Message):
+    async def cmd_start(message: types.Message, state: FSMContext):
         user_id = message.from_user.id
         # Добавляем пользователя в базу данных, если его нет
         if not db.user_exists(user_id):
@@ -232,7 +104,8 @@ try:
             db.update_last_sent(user_id, datetime.now())
 
         await message.answer("Привет! Я бот Centris Towers. Чем могу помочь?",
-                             reply_markup=get_lang_for_button(message))
+                             reply_markup=main_menu_keyboard)
+        await state.set_state(VideoStates.main_menu.state)
 
 
     @dp.message_handler(text="Unsubscribe")
@@ -263,23 +136,6 @@ try:
             "Iltimos, qaysi darsni ko'rmoqchi ekanligingizni tanlang:",
             reply_markup=get_lesson_keyboard()
         )
-
-
-    @dp.message_handler(Text(equals="Orqaga qaytish"))
-    async def cancel_selection(message: types.Message):
-        user_id = message.from_user.id
-        print(f"Пользователь {user_id} нажал 'Orqaga qaytish'")
-
-        if not db.user_exists(user_id):
-            print(f"Пользователь {user_id} не зарегистрирован")
-            await message.answer("Iltimos, /start buyrug'i bilan ro'yxatdan o'ting.")
-            return
-
-        await message.answer(
-            "Bosh sahifaga qaytdi",
-            reply_markup=get_lang_for_button(message)
-        )
-        print(f"Выбор отменён для пользователя {user_id}, показаны команды как в /start")
 
 
     @dp.message_handler(lambda message: any(message.text.startswith(f"{i}.") for i in range(1, 16)))
@@ -315,11 +171,11 @@ try:
             await message.answer("Video yuborishda xato yuz berdi. Iltimos, keyinroq urinib ko'ring.")
 
 
-    @dp.message_handler(chat_type=types.ChatType.PRIVATE)
-    async def handle_all_messages(message: types.Message):
-        user_id = message.from_user.id
-        print(f"Получено сообщение от {user_id}: {message.text}")
-        await message.answer("Izvinite, men bu buyruqni tushunmayapman. Iltimos, /start dan foydalaning.")
+    # @dp.message_handler(chat_type=types.ChatType.PRIVATE)
+    # async def handle_all_messages(message: types.Message):
+    #     user_id = message.from_user.id
+    #     print(f"Получено сообщение от {user_id}: {message.text}")
+    #     await message.answer("Kechirasiz, men bu buyruqni tushunmayapman. Iltimos, /start dan foydalaning.")
 
 
     @dp.message_handler(commands=['set_time'])
@@ -337,20 +193,143 @@ try:
             await message.reply("Неверный формат времени. Пример: /set_time 09:00")
             return
 
-        # Для групп
         if message.chat.type in [types.ChatType.GROUP, types.ChatType.SUPERGROUP]:
+            # Меняем время для группы
             if not db.user_exists(message.chat.id):
                 db.add_user(message.chat.id, message.chat.title or "Группа", None, preferred_time=new_time, is_group=True)
             db.set_preferred_time(message.chat.id, new_time)
             await message.reply(f"Время рассылки для этой группы установлено на {new_time}")
-            schedule_jobs_for_users()
         else:
-            # Для лички
+            # Меняем время для пользователя
             if not db.user_exists(message.from_user.id):
                 db.add_user(message.from_user.id, "Не указано", "Не указано", preferred_time=new_time)
             db.set_preferred_time(message.from_user.id, new_time)
             await message.reply(f"Время рассылки для вас установлено на {new_time}")
-            schedule_jobs_for_users()
+
+    # Главная клавиатура
+    main_menu_keyboard =ReplyKeyboardMarkup(
+        keyboard=[
+            [
+                KeyboardButton(text="Centris towers"),
+
+            ],
+            [
+                KeyboardButton(text="Golden lake")
+            ],
+            [
+                KeyboardButton(text="Centris Towers bilan bog'lanish")
+            ],
+            [
+                KeyboardButton(text="Bino bilan tanishish")
+            ],
+        ],
+        resize_keyboard=True
+    )
+
+
+
+    # Клавиатура сезонов
+    def get_season_keyboard():
+        keyboard = ReplyKeyboardMarkup(resize_keyboard=True)
+        keyboard.add(KeyboardButton("1-sezon"))
+        keyboard.add(KeyboardButton("2-sezon"))
+        keyboard.add(KeyboardButton("3-sezon"))
+        keyboard.add(KeyboardButton("Orqaga qaytish"))
+        return keyboard
+
+    # Клавиатура с названиями видео для сезона
+    def get_video_keyboard(caption_list):
+        keyboard = ReplyKeyboardMarkup(resize_keyboard=True)
+        for name in caption_list:
+            keyboard.add(KeyboardButton(name))
+        keyboard.add(KeyboardButton("Orqaga qaytish"))
+        return keyboard
+
+    # --- Обработчики ---
+
+    class VideoStates(StatesGroup):
+        main_menu = State()
+        season_select = State()
+        video_select = State()
+
+    @dp.message_handler(text="Centris towers")
+    async def centris_towers_menu(message: types.Message, state: FSMContext):
+        await message.answer("Sezonni tanlang:", reply_markup=get_season_keyboard())
+        await message.answer("Qaysi sezonni ko'rmoqchisiz?")
+        await state.set_state(VideoStates.season_select.state)
+
+    @dp.message_handler(text="Golden lake")
+    async def golden_lake_menu(message: types.Message, state: FSMContext):
+        await message.answer("Sezonni1 tanlang:", reply_markup=get_season_keyboard())
+        await message.answer("Qaysi sezonni ko'rmoqchisiz?")
+        await state.set_state(VideoStates.season_select.state)
+
+    @dp.message_handler(lambda m: m.text in ["1-sezon", "2-sezon", "3-sezon"], state=VideoStates.season_select)
+    async def centris_towers_season(message: types.Message, state: FSMContext):
+        if message.text == "1-sezon":
+            await message.answer("Darsni tanlang:", reply_markup=get_video_keyboard(CAPTION_LIST_1))
+            await state.set_state(VideoStates.video_select.state)
+        elif message.text == "2-sezon":
+            await message.answer("Darsni tanlang:", reply_markup=get_video_keyboard(CAPTION_LIST_2))
+            await state.set_state(VideoStates.video_select.state)
+        elif message.text == "3-sezon":
+            await message.answer("Darsni tanlang:", reply_markup=get_video_keyboard(CAPTION_LIST_3))
+            await state.set_state(VideoStates.video_select.state)
+
+    @dp.message_handler(text="Orqaga qaytish", state=VideoStates.video_select)
+    async def back_to_season_menu(message: types.Message, state: FSMContext):
+        await message.answer("Sezonni tanlang:", reply_markup=get_season_keyboard())
+        await message.answer("Qaysi sezonni ko'rmoqchisiz?")
+        await state.set_state(VideoStates.season_select.state)
+
+    @dp.message_handler(text="Orqaga qaytish", state=VideoStates.season_select)
+    async def back_to_main_menu(message: types.Message, state: FSMContext):
+        await message.answer("Bosh menyu:", reply_markup=main_menu_keyboard)
+        await state.finish()
+
+    @dp.message_handler(Command("centris_towers"))
+    async def centris_towers_command(message: types.Message):
+        await centris_towers_menu(message)
+
+    @dp.message_handler(Command("golden_lake"))
+    async def golden_lake_command(message: types.Message):
+        await golden_lake_menu(message)
+
+    @dp.message_handler(lambda m: m.text in CAPTION_LIST_1, state=VideoStates.video_select)
+    async def send_video_1(message: types.Message):
+        idx = CAPTION_LIST_1.index(message.text)
+        video_url = VIDEO_LIST_1[idx]
+        message_id = int(video_url.split("/")[-1])
+        await bot.copy_message(
+            chat_id=message.chat.id,
+            from_chat_id=-1002550852551,
+            message_id=message_id,
+            protect_content=True
+        )
+
+    @dp.message_handler(lambda m: m.text in CAPTION_LIST_2, state=VideoStates.video_select)
+    async def send_video_2(message: types.Message):
+        idx = CAPTION_LIST_2.index(message.text)
+        video_url = VIDEO_LIST_2[idx]
+        message_id = int(video_url.split("/")[-1])
+        await bot.copy_message(
+            chat_id=message.chat.id,
+            from_chat_id=-1002550852551,
+            message_id=message_id,
+            protect_content=True
+        )
+
+    @dp.message_handler(lambda m: m.text in CAPTION_LIST_3, state=VideoStates.video_select)
+    async def send_video_3(message: types.Message):
+        idx = CAPTION_LIST_3.index(message.text)
+        video_url = VIDEO_LIST_3[idx]
+        message_id = int(video_url.split("/")[-1])
+        await bot.copy_message(
+            chat_id=message.chat.id,
+            from_chat_id=-1002550852551,
+            message_id=message_id,
+            protect_content=True
+        )
 
 except Exception as exx:
     from datetime import datetime
