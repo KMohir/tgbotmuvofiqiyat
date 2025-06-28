@@ -19,10 +19,129 @@ try:
     # Инициализация планировщика
     scheduler = AsyncIOScheduler(timezone="Asia/Tashkent")
 
+    def get_video_list_by_season(season: str):
+        """Получить список видео по сезону"""
+        if season == "1-sezon":
+            return VIDEO_LIST_1
+        elif season == "2-sezon":
+            return VIDEO_LIST_2
+        elif season == "3-sezon":
+            return VIDEO_LIST_3
+        else:
+            return VIDEO_LIST_1
+
+    async def send_group_video(chat_id: int, season: str, video_index: int):
+        """Отправить видео в группу"""
+        try:
+            # Проверяем, не заблокирована ли группа
+            if db.is_group_banned(chat_id):
+                logger.info(f"Пропускаем отправку видео в заблокированную группу {chat_id}")
+                return False
+            
+            video_list = get_video_list_by_season(season)
+            
+            if video_index >= len(video_list):
+                logger.info(f"Группа {chat_id} просмотрела все видео сезона {season}")
+                return False
+            
+            video_url = video_list[video_index]
+            message_id = int(video_url.split("/")[-1])
+            
+            await bot.copy_message(
+                chat_id=chat_id,
+                from_chat_id=-1002550852551,
+                message_id=message_id,
+                protect_content=True
+            )
+            
+            logger.info(f"Видео {video_index} отправлено в группу {chat_id} (сезон {season})")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Ошибка при отправке видео в группу {chat_id}: {e}")
+            return False
+
+    def schedule_group_jobs():
+        """Планировать задачи для групп"""
+        try:
+            logger.info("Начало планирования задач для групп")
+            
+            # Удаляем старые задачи для групп
+            jobs = scheduler.get_jobs()
+            for job in jobs:
+                if job.id.startswith("group_"):
+                    scheduler.remove_job(job.id)
+            
+            # Получаем все группы с настройками
+            groups = db.get_all_groups_with_settings()
+            logger.info(f"Найдено {len(groups)} групп с настройками")
+            
+            for chat_id, season, video_index in groups:
+                if not season:
+                    continue
+                    
+                # Планируем задачи в зависимости от сезона
+                if season == "1-sezon":
+                    # 1-й сезон: 2 видео в день (08:00 и 20:00)
+                    scheduler.add_job(
+                        send_group_video_morning,
+                        trigger='cron',
+                        hour=8,
+                        minute=0,
+                        args=[chat_id, season, video_index],
+                        id=f"group_morning_{chat_id}",
+                        replace_existing=True
+                    )
+                    scheduler.add_job(
+                        send_group_video_evening,
+                        trigger='cron',
+                        hour=20,
+                        minute=0,
+                        args=[chat_id, season, video_index],
+                        id=f"group_evening_{chat_id}",
+                        replace_existing=True
+                    )
+                else:
+                    # 2-й и 3-й сезоны: 1 видео в день (08:00)
+                    scheduler.add_job(
+                        send_group_video_morning,
+                        trigger='cron',
+                        hour=8,
+                        minute=0,
+                        args=[chat_id, season, video_index],
+                        id=f"group_morning_{chat_id}",
+                        replace_existing=True
+                    )
+            
+            logger.info("Задачи для групп запланированы")
+            
+        except Exception as e:
+            logger.error(f"Ошибка при планировании задач для групп: {e}")
+
+    async def send_group_video_morning(chat_id: int, season: str, video_index: int):
+        """Отправить утреннее видео в группу"""
+        success = await send_group_video(chat_id, season, video_index)
+        if success:
+            # Увеличиваем индекс для следующего видео
+            db.set_group_video_settings(chat_id, season, video_index + 1)
+
+    async def send_group_video_evening(chat_id: int, season: str, video_index: int):
+        """Отправить вечернее видео в группу (только для 1-го сезона)"""
+        success = await send_group_video(chat_id, season, video_index)
+        if success:
+            # Увеличиваем индекс для следующего видео
+            db.set_group_video_settings(chat_id, season, video_index + 1)
+
     def get_next_video_index(user_id: int) -> int:
         """Получить следующий непросмотренный индекс видео"""
         viewed_videos = db.get_viewed_videos(user_id)
         current_index = db.get_video_index(user_id)
+        
+        # Если пользователь еще не просматривал видео, начинаем с сохраненного начального индекса
+        if not viewed_videos and current_index == 0:
+            start_index = db.get_start_video_index()
+            if start_index < len(VIDEO_LIST):
+                return start_index
         
         # Находим следующий непросмотренный индекс
         for i in range(current_index, len(VIDEO_LIST)):
@@ -56,30 +175,6 @@ try:
         except Exception as e:
             logger.error(f"Ошибка при отправке видео пользователю {user_id}: {e}")
             return False
-
-    # Новая функция для отправки видео в группу
-    async def send_daily_video_to_group(group_id: int):
-        try:
-            # Определяем номер дня с начала эпохи (например, с 1 января 2024)
-            # Это нужно, чтобы каждый день отправлялось следующее видео по порядку
-            start_date = datetime(2024, 1, 1, tzinfo=pytz.timezone("Asia/Tashkent"))
-            today = datetime.now(pytz.timezone("Asia/Tashkent"))
-            days_since_start = (today - start_date).days
-            
-            # Получаем индекс видео, зацикливая по списку
-            video_index = days_since_start % len(VIDEO_LIST)
-            
-            logger.info(f"Отправка ежедневного видео в группу {group_id}. Индекс видео: {video_index}")
-
-            await bot.forward_message(
-                chat_id=group_id,
-                from_chat_id=-1002550852551,  # ID вашего канала
-                message_id=int(VIDEO_LIST[video_index].split('/')[-1])
-            )
-            logger.info(f"Видео {video_index} успешно отправлено в группу {group_id}")
-
-        except Exception as e:
-            logger.error(f"Ошибка при отправке видео в группу {group_id}: {e}")
 
     # Функция для отправки видео конкретному пользователю
     async def send_scheduled_video(user_id: int) -> None:
@@ -188,6 +283,10 @@ try:
                     replace_existing=True
                 )
             logger.info("Задачи на 08:00 и 20:00 для всех получателей созданы")
+            
+            # Планируем задачи для групп с настройками
+            schedule_group_jobs()
+            
         except Exception as e:
             logger.error(f"Ошибка при планировании задач: {e}")
 

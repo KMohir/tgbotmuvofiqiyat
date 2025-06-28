@@ -124,9 +124,9 @@ try:
             if is_spam(message.from_user.id):
                 return
 
-            await message.answer("Ro'yxatdan muvaffaqiyatli o'tdingiz!", reply_markup=ReplyKeyboardRemove())
             contact = message.contact.phone_number
-            await save_user_data(message, state, contact)
+            await save_user_data(message, state, contact)  # Сохраняем пользователя сразу
+            await message.answer("Ro'yxatdan muvaffaqiyatli o'tdingiz!", reply_markup=ReplyKeyboardRemove())
         except Exception as e:
             logger.error(f"Ошибка при обработке контакта пользователя {message.from_user.id}: {e}")
             await message.answer("Xatolik yuz berdi. Iltimos, qaytadan urinib ko'ring.")
@@ -136,7 +136,8 @@ try:
         try:
             async with state.proxy() as data:
                 name = data.get('name')
-                db.update(message.from_user.id, name, contact)
+                db.add_user(message.from_user.id, name, contact)  # Сначала добавляем пользователя
+                db.update(message.from_user.id, name, contact)    # Затем обновляем данные
                 caption = get_video_caption()
                 try:
                     await bot.copy_message(
@@ -153,16 +154,6 @@ try:
                     await message.answer("Video yuborishda xato yuz berdi. Iltimos, keyinroq urinib ko'ring.")
 
                 try:
-                    # caption = get_video_caption()
-                    # await bot.copy_message(
-                    #     chat_id=message.chat.id,
-                    #     from_chat_id=-1002550852551,  # ID канала
-                    #     message_id=102,  # ID сообщения из ссылки
-                    #     caption=caption,  # С описанием
-                    #     parse_mode="HTML",
-                    #     reply_markup=get_lang_for_button(message),
-                    #     protect_content=True
-                    # )
                     print(1)
                 except Exception as e:
                     logger.error(f"Ошибка при отправке видео пользователю {message.from_user.id}: {e}")

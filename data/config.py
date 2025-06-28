@@ -23,9 +23,17 @@ except Exception as e:
     raise
 
 try:
-    ADMINS = env.list("ADMINS", default=[])
+    admins_str = env.str("ADMINS", default="")
+    if admins_str:
+        # Разделяем по запятой и преобразуем в числа
+        ADMINS = [int(admin_id.strip()) for admin_id in admins_str.split(',') if admin_id.strip()]
+    else:
+        ADMINS = []
+    
     if not ADMINS:
         logger.warning("ADMINS не указаны в переменных окружения")
+    else:
+        logger.info(f"Загружены админы: {ADMINS}")
 except Exception as e:
     logger.error(f"Ошибка при загрузке ADMINS: {e}")
     ADMINS = []

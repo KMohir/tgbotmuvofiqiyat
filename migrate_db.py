@@ -1,20 +1,36 @@
 import sqlite3
+import logging
 
-conn = sqlite3.connect("databaseprotestim.db")
-cursor = conn.cursor()
+# Настройка логирования
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-# Добавляем столбец is_subscribed
-try:
-    cursor.execute("ALTER TABLE users ADD COLUMN is_subscribed INTEGER DEFAULT 1")
-except sqlite3.OperationalError as e:
-    if "duplicate column name" in str(e):
-        print("Столбец is_subscribed уже существует, пропускаем.")
-    else:
-        raise e
+def migrate_database():
+    """Миграция базы данных для добавления поля is_banned"""
+    try:
+        conn = sqlite3.connect('centris.db')
+        cursor = conn.cursor()
+        
+        # Проверяем, существует ли поле is_banned
+        cursor.execute("PRAGMA table_info(users)")
+        columns = [column[1] for column in cursor.fetchall()]
+        
+        if 'is_banned' not in columns:
+            logger.info("Добавляем поле is_banned в таблицу users...")
+            cursor.execute('ALTER TABLE users ADD COLUMN is_banned BOOLEAN DEFAULT 0')
+            conn.commit()
+            logger.info("Поле is_banned успешно добавлено")
+        else:
+            logger.info("Поле is_banned уже существует")
+        
+        conn.close()
+        logger.info("Миграция завершена успешно")
+        
+    except Exception as e:
+        logger.error(f"Ошибка при миграции: {e}")
+        if 'conn' in locals():
+            conn.rollback()
+            conn.close()
 
-# Устанавливаем is_subscribed = 1 для всех существующих пользователей
-cursor.execute("UPDATE users SET is_subscribed = 1 WHERE is_subscribed IS NULL")
-conn.commit()
-conn.close()
-
-print("Столбец is_subscribed добавлен в таблицу users и установлен в 1 для всех пользователей.")
+if __name__ == "__main__":
+    migrate_database()

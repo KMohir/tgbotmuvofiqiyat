@@ -6,7 +6,7 @@ try:
     from keyboards.default.reply import key, get_lang_for_button
     from datetime import datetime
     from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
-    from handlers.users.video_lists import VIDEO_LIST_1, VIDEO_LIST_2, VIDEO_LIST_3, CAPTION_LIST_1, CAPTION_LIST_2, CAPTION_LIST_3
+    from handlers.users.video_lists import VIDEO_LIST_1, VIDEO_LIST_2, VIDEO_LIST_3, CAPTION_LIST_1, CAPTION_LIST_2, CAPTION_LIST_3, VIDEO_LIST_GOLDEN_1, GOLDEN_LAKE_TOPICS
     from aiogram.dispatcher import FSMContext
     from aiogram.dispatcher.filters.state import State, StatesGroup
 
@@ -251,30 +251,47 @@ try:
         main_menu = State()
         season_select = State()
         video_select = State()
+        project_select = State()  # Новое состояние для выбора проекта
 
     @dp.message_handler(text="Centris towers")
     async def centris_towers_menu(message: types.Message, state: FSMContext):
+        await state.update_data(project="centris")  # Сохраняем выбранный проект
         await message.answer("Sezonni tanlang:", reply_markup=get_season_keyboard())
         await message.answer("Qaysi sezonni ko'rmoqchisiz?")
         await state.set_state(VideoStates.season_select.state)
 
     @dp.message_handler(text="Golden lake")
     async def golden_lake_menu(message: types.Message, state: FSMContext):
-        await message.answer("Sezonni1 tanlang:", reply_markup=get_season_keyboard())
+        await state.update_data(project="golden_lake")  # Сохраняем выбранный проект
+        await message.answer("Sezonni tanlang:", reply_markup=get_season_keyboard())
         await message.answer("Qaysi sezonni ko'rmoqchisiz?")
         await state.set_state(VideoStates.season_select.state)
 
     @dp.message_handler(lambda m: m.text in ["1-sezon", "2-sezon", "3-sezon"], state=VideoStates.season_select)
-    async def centris_towers_season(message: types.Message, state: FSMContext):
-        if message.text == "1-sezon":
-            await message.answer("Darsni tanlang:", reply_markup=get_video_keyboard(CAPTION_LIST_1))
-            await state.set_state(VideoStates.video_select.state)
-        elif message.text == "2-sezon":
-            await message.answer("Darsni tanlang:", reply_markup=get_video_keyboard(CAPTION_LIST_2))
-            await state.set_state(VideoStates.video_select.state)
-        elif message.text == "3-sezon":
-            await message.answer("Darsni tanlang:", reply_markup=get_video_keyboard(CAPTION_LIST_3))
-            await state.set_state(VideoStates.video_select.state)
+    async def season_selection(message: types.Message, state: FSMContext):
+        data = await state.get_data()
+        project = data.get("project")
+        
+        if project == "centris":
+            if message.text == "1-sezon":
+                await message.answer("Darsni tanlang:", reply_markup=get_video_keyboard(CAPTION_LIST_1))
+                await state.set_state(VideoStates.video_select.state)
+            elif message.text == "2-sezon":
+                await message.answer("Darsni tanlang:", reply_markup=get_video_keyboard(CAPTION_LIST_2))
+                await state.set_state(VideoStates.video_select.state)
+            elif message.text == "3-sezon":
+                await message.answer("Darsni tanlang:", reply_markup=get_video_keyboard(CAPTION_LIST_3))
+                await state.set_state(VideoStates.video_select.state)
+        elif project == "golden_lake":
+            if message.text == "1-sezon":
+                await message.answer("Darsni tanlang:", reply_markup=get_video_keyboard(GOLDEN_LAKE_TOPICS))
+                await state.set_state(VideoStates.video_select.state)
+            elif message.text == "2-sezon":
+                await message.answer("Golden Lake 2-sezon hali tayyor emas")
+                await state.set_state(VideoStates.season_select.state)
+            elif message.text == "3-sezon":
+                await message.answer("Golden Lake 3-sezon hali tayyor emas")
+                await state.set_state(VideoStates.season_select.state)
 
     @dp.message_handler(text="Orqaga qaytish", state=VideoStates.video_select)
     async def back_to_season_menu(message: types.Message, state: FSMContext):
@@ -295,34 +312,26 @@ try:
     async def golden_lake_command(message: types.Message):
         await golden_lake_menu(message)
 
-    @dp.message_handler(lambda m: m.text in CAPTION_LIST_1, state=VideoStates.video_select)
-    async def send_video_1(message: types.Message):
-        idx = CAPTION_LIST_1.index(message.text)
-        video_url = VIDEO_LIST_1[idx]
-        message_id = int(video_url.split("/")[-1])
-        await bot.copy_message(
-            chat_id=message.chat.id,
-            from_chat_id=-1002550852551,
-            message_id=message_id,
-            protect_content=True
-        )
-
-    @dp.message_handler(lambda m: m.text in CAPTION_LIST_2, state=VideoStates.video_select)
-    async def send_video_2(message: types.Message):
-        idx = CAPTION_LIST_2.index(message.text)
-        video_url = VIDEO_LIST_2[idx]
-        message_id = int(video_url.split("/")[-1])
-        await bot.copy_message(
-            chat_id=message.chat.id,
-            from_chat_id=-1002550852551,
-            message_id=message_id,
-            protect_content=True
-        )
-
-    @dp.message_handler(lambda m: m.text in CAPTION_LIST_3, state=VideoStates.video_select)
-    async def send_video_3(message: types.Message):
-        idx = CAPTION_LIST_3.index(message.text)
-        video_url = VIDEO_LIST_3[idx]
+    @dp.message_handler(lambda m: m.text in CAPTION_LIST_1 + CAPTION_LIST_2 + CAPTION_LIST_3 + GOLDEN_LAKE_TOPICS, state=VideoStates.video_select)
+    async def send_video(message: types.Message, state: FSMContext):
+        data = await state.get_data()
+        project = data.get("project")
+        
+        if project == "centris":
+            if message.text in CAPTION_LIST_1:
+                idx = CAPTION_LIST_1.index(message.text)
+                video_url = VIDEO_LIST_1[idx]
+            elif message.text in CAPTION_LIST_2:
+                idx = CAPTION_LIST_2.index(message.text)
+                video_url = VIDEO_LIST_2[idx]
+            elif message.text in CAPTION_LIST_3:
+                idx = CAPTION_LIST_3.index(message.text)
+                video_url = VIDEO_LIST_3[idx]
+        elif project == "golden_lake":
+            if message.text in GOLDEN_LAKE_TOPICS:
+                idx = GOLDEN_LAKE_TOPICS.index(message.text)
+                video_url = VIDEO_LIST_GOLDEN_1[idx]
+        
         message_id = int(video_url.split("/")[-1])
         await bot.copy_message(
             chat_id=message.chat.id,
