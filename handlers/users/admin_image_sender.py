@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta
-from handlers.users.video_lists import VIDEO_LIST_1, VIDEO_LIST_2, VIDEO_LIST_3, CAPTION_LIST_1, CAPTION_LIST_2, CAPTION_LIST_3
+from handlers.users.video_lists import VIDEO_LIST_1, VIDEO_LIST_2, VIDEO_LIST_3, VIDEO_LIST_4, VIDEO_LIST_5, VIDEO_LIST_GOLDEN_1
 
 try:
     from aiogram import types
@@ -9,9 +9,43 @@ try:
     import asyncio
     from db import db
     from loader import dp, bot
+    from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+    from aiogram.dispatcher.filters.state import State, StatesGroup
 
     # ID администратора
     ADMIN_ID = 5657091547
+
+    # --- Новый FSM ---
+    class GroupVideoStates(StatesGroup):
+        waiting_for_project = State()
+        waiting_for_centr_season = State()
+        waiting_for_centr_video = State()
+        waiting_for_golden_video = State()
+
+    # --- Клавиатуры ---
+    def get_project_keyboard():
+        kb = InlineKeyboardMarkup(row_width=2)
+        kb.add(
+            InlineKeyboardButton("Centris Towers", callback_data="project_centr"),
+            InlineKeyboardButton("Golden Lake", callback_data="project_golden"),
+            InlineKeyboardButton("Оба", callback_data="project_both")
+        )
+        return kb
+
+    def get_season_keyboard():
+        kb = InlineKeyboardMarkup(row_width=2)
+        for season in ["1-sezon", "2-sezon", "3-sezon", "4-sezon", "5-sezon"]:
+            kb.add(InlineKeyboardButton(season, callback_data=f"season_{season}"))
+        return kb
+
+    def get_video_keyboard(video_list, viewed):
+        kb = InlineKeyboardMarkup(row_width=3)
+        has_unwatched = False
+        for idx, video in enumerate(video_list, 1):
+            if (idx-1) not in viewed:
+                kb.add(InlineKeyboardButton(str(idx), callback_data=f"video_{idx}"))
+                has_unwatched = True
+        return kb if has_unwatched else None
 
     @dp.message_handler(Command('set_start_video'), user_id=ADMIN_ID)
     async def set_start_video_command(message: types.Message, state: FSMContext):
@@ -21,107 +55,96 @@ try:
         )
         await state.set_state("waiting_for_video_number")
 
-    @dp.message_handler(Command('set_group_video'))
+    @dp.message_handler(Command('set_group_video'), user_id=ADMIN_ID)
     async def set_group_video_command(message: types.Message, state: FSMContext):
-        # Проверяем, что команда отправлена в группе и от админа
         if message.chat.type not in [types.ChatType.GROUP, types.ChatType.SUPERGROUP]:
             await message.answer("Bu buyruq faqat guruhlarda ishlaydi.")
             return
-            
-        if message.from_user.id != ADMIN_ID:
-            await message.answer("Sizda bu buyruqni bajarish uchun ruxsat yo'q.")
-            return
-        
-        keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True)
-        keyboard.add("1-sezon", "2-sezon", "3-sezon")
-        keyboard.add("Bekor qilish")
-        
-        await message.answer(
-            "Guruh uchun qaysi sezonni tanlaysiz?\n"
-            "1-sezon: 2 ta video (08:00 va 20:00)\n"
-            "2-sezon: 1 ta video (08:00)\n"
-            "3-sezon: 1 ta video (08:00)"
-        )
-        await state.set_state("waiting_for_season")
+        await message.answer("Группа учун проектни танланг:", reply_markup=get_project_keyboard())
+        await state.set_state(GroupVideoStates.waiting_for_project.state)
         await state.update_data(chat_id=message.chat.id)
 
-    @dp.message_handler(state="waiting_for_season")
-    async def process_season_selection(message: types.Message, state: FSMContext):
-        if message.from_user.id != ADMIN_ID:
-            await message.answer("Sizda bu buyruqni bajarish uchun ruxsat yo'q.")
+    @dp.callback_query_handler(lambda c: c.data.startswith("project_"), state=GroupVideoStates.waiting_for_project.state)
+    async def process_project_selection(callback_query: types.CallbackQuery, state: FSMContext):
+        project = callback_query.data.replace("project_", "")
+        await state.update_data(project=project)
+        if project in ["centr", "both"]:
+            await callback_query.message.edit_text("Centris Towers учун сезонни танланг:", reply_markup=get_season_keyboard())
+            await state.set_state(GroupVideoStates.waiting_for_centr_season.state)
+        elif project == "golden":
+            await callback_query.message.edit_text("Golden Lake учун стартовое видео танланг:", reply_markup=get_video_keyboard(VIDEO_LIST_GOLDEN_1, []))
+            await state.set_state(GroupVideoStates.waiting_for_golden_video.state)
+
+    @dp.callback_query_handler(lambda c: c.data.startswith("season_"), state=GroupVideoStates.waiting_for_centr_season.state)
+    async def process_centr_season(callback_query: types.CallbackQuery, state: FSMContext):
+        season = callback_query.data.replace("season_", "")
+        await state.update_data(centris_season=season)
+        season_map = {
+            "1-sezon": VIDEO_LIST_1,
+            "2-sezon": VIDEO_LIST_2,
+            "3-sezon": VIDEO_LIST_3,
+            "4-sezon": VIDEO_LIST_4,
+            "5-sezon": VIDEO_LIST_5,
+        }
+        video_list = season_map.get(season, [])
+        chat_id = (await state.get_data()).get("chat_id")
+        viewed = db.get_group_viewed_videos(f"centris_{chat_id}_{season}")
+        kb = get_video_keyboard(video_list, viewed)
+        if not kb:
+            await callback_query.message.edit_text("Barcha video ushbu sezon uchun yuborilgan!")
             await state.finish()
             return
+        await callback_query.message.edit_text(f"Centris Towers: {season} uchun start video tanlang:", reply_markup=kb)
+        await state.set_state(GroupVideoStates.waiting_for_centr_video.state)
 
-        if message.text == "Bekor qilish":
-            await message.answer("Bekor qilindi.", reply_markup=types.ReplyKeyboardRemove())
+    @dp.callback_query_handler(lambda c: c.data.startswith("video_"), state=GroupVideoStates.waiting_for_centr_video.state)
+    async def process_centr_video(callback_query: types.CallbackQuery, state: FSMContext):
+        video_idx = int(callback_query.data.replace("video_", "")) - 1
+        await state.update_data(centris_start_video=video_idx)
+        data = await state.get_data()
+        if data.get("project") == "both":
+            await callback_query.message.edit_text("Golden Lake учун стартовое видео танланг:", reply_markup=get_video_keyboard(VIDEO_LIST_GOLDEN_1, []))
+            await state.set_state(GroupVideoStates.waiting_for_golden_video.state)
+        else:
+            await save_group_settings(data)
+            await callback_query.message.edit_text("Настройки сохранены! Рассылка активирована.")
             await state.finish()
-            return
 
-        if message.text not in ["1-sezon", "2-sezon", "3-sezon"]:
-            await message.answer("Iltimos, to'g'ri sezonni tanlang.")
-            return
-
+    @dp.callback_query_handler(lambda c: c.data.startswith("video_"), state=GroupVideoStates.waiting_for_golden_video.state)
+    async def process_golden_video(callback_query: types.CallbackQuery, state: FSMContext):
+        video_idx = int(callback_query.data.replace("video_", "")) - 1
+        await state.update_data(golden_start_video=video_idx)
         data = await state.get_data()
         chat_id = data.get("chat_id")
-        
-        await state.update_data(season=message.text)
-        
-        # Показываем список видео для выбранного сезона
-        if message.text == "1-sezon":
-            video_list = CAPTION_LIST_1
-        elif message.text == "2-sezon":
-            video_list = CAPTION_LIST_2
-        else:  # 3-sezon
-            video_list = CAPTION_LIST_3
-
-        keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True)
-        for i, caption in enumerate(video_list, 1):
-            keyboard.add(f"{i}. {caption}")
-        keyboard.add("Bekor qilish")
-
-        await message.answer(
-            f"{message.text} uchun qaysi videodan boshlashni tanlang:",
-            reply_markup=keyboard
-        )
-        await state.set_state("waiting_for_group_video")
-
-    @dp.message_handler(state="waiting_for_group_video")
-    async def process_group_video_selection(message: types.Message, state: FSMContext):
-        if message.from_user.id != ADMIN_ID:
-            await message.answer("Sizda bu buyruqni bajarish uchun ruxsat yo'q.")
+        viewed = db.get_group_viewed_videos(f"golden_{chat_id}")
+        video_list = VIDEO_LIST_GOLDEN_1
+        kb = get_video_keyboard(video_list, viewed)
+        if not kb:
+            await callback_query.message.edit_text("Barcha Golden Lake videolari yuborilgan!")
             await state.finish()
             return
-
-        if message.text == "Bekor qilish":
-            await message.answer("Bekor qilindi.", reply_markup=types.ReplyKeyboardRemove())
-            await state.finish()
-            return
-
-        try:
-            # Извлекаем номер видео из текста (например, "1. Centris Towers'daги лобби" -> 1)
-            video_number = int(message.text.split('.')[0])
-            
-            data = await state.get_data()
-            season = data.get("season")
-            chat_id = data.get("chat_id")
-            
-            # Сохраняем настройки для группы
-            db.set_group_video_settings(chat_id, season, video_number - 1)
-            
-            await message.answer(
-                f"Guruh uchun {season} {video_number}-chi videodan boshlanadi.\n"
-                f"Har kungi yuborish faollashtirildi.",
-                reply_markup=types.ReplyKeyboardRemove()
-            )
-            
-            # Перезапускаем планировщик для группы
-            from handlers.users.video_scheduler import schedule_group_jobs
-            schedule_group_jobs()
-            
-        except (ValueError, IndexError):
-            await message.answer("Iltimos, to'g'ri video raqamini tanlang.")
-        
+        await save_group_settings(data)
+        await callback_query.message.edit_text("Настройки сохранены! Рассылка активирована.")
         await state.finish()
+
+    async def save_group_settings(data):
+        chat_id = data.get("chat_id")
+        project = data.get("project")
+        centris_enabled = project in ["centr", "both"]
+        golden_enabled = project in ["golden", "both"]
+        centris_season = data.get("centris_season") if centris_enabled else None
+        centris_start_video = data.get("centris_start_video") if centris_enabled else 0
+        golden_start_video = data.get("golden_start_video") if golden_enabled else 0
+        db.set_group_video_settings(
+            chat_id,
+            centris_enabled,
+            centris_season,
+            centris_start_video,
+            golden_enabled,
+            golden_start_video
+        )
+        from handlers.users.video_scheduler import schedule_group_jobs
+        schedule_group_jobs()
 
     @dp.message_handler(state="waiting_for_video_number")
     async def process_video_number(message: types.Message, state: FSMContext):
@@ -315,6 +338,15 @@ try:
             await message.answer(f"Группа {group_id} разблокирована.")
         except (IndexError, ValueError):
             await message.answer("Использование: /unban_group <ID_группы>")
+
+    @dp.message_handler(Command('reset_group_videos'), user_id=ADMIN_ID)
+    async def reset_group_videos_command(message: types.Message, state: FSMContext):
+        chat_id = message.chat.id
+        # Сбросить просмотренные для Centris Towers всех сезонов и Golden Lake
+        for season in ["1-sezon", "2-sezon", "3-sezon", "4-sezon", "5-sezon"]:
+            db.set_group_video_index_and_viewed(f"centris_{chat_id}_{season}", None, season, 0, [])
+        db.set_group_video_index_and_viewed(f"golden_{chat_id}", None, None, 0, [])
+        await message.answer("Прогресс группы сброшен. Теперь можно выбрать стартовое видео заново.")
 
 except Exception as exx:
     from datetime import datetime
