@@ -1,5 +1,5 @@
-# import sqlite3  # Для SQLite (оставьте закомментированным)
 import psycopg2  # Для PostgreSQL
+# import sqlite3  # Для SQLite
 from datetime import datetime
 import json
 import logging
@@ -33,49 +33,71 @@ class Database:
             logger.error(f"Ошибка при инициализации базы данных: {e}")
             raise
 
+    def _add_column_if_not_exists(self, cursor, table_name, column_name, column_type):
+        """Проверяет и добавляет столбец, если он не существует."""
+        cursor.execute("""
+            SELECT 1
+            FROM information_schema.columns
+            WHERE table_name = %s AND column_name = %s
+        """, (table_name, column_name))
+        if cursor.fetchone() is None:
+            cursor.execute(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_type}")
+            logger.info(f"Добавлен столбец '{column_name}' в таблицу '{table_name}'.")
+
     def create_tables(self):
         try:
             cursor = self.conn.cursor()
+
+            # --- Таблица users ---
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS users (
-                    user_id BIGINT PRIMARY KEY,
-                    name TEXT,
-                    phone TEXT,
-                    datetime TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    video_index INTEGER DEFAULT 0,
-                    preferred_time TEXT DEFAULT '07:00',
-                    last_sent TIMESTAMP,
-                    is_subscribed BOOLEAN DEFAULT TRUE,
-                    viewed_videos TEXT DEFAULT '[]',
-                    is_group BOOLEAN DEFAULT FALSE,
-                    is_banned BOOLEAN DEFAULT FALSE
+                    user_id BIGINT PRIMARY KEY
                 )
             ''')
+            self._add_column_if_not_exists(cursor, 'users', 'name', 'TEXT')
+            self._add_column_if_not_exists(cursor, 'users', 'phone', 'TEXT')
+            self._add_column_if_not_exists(cursor, 'users', 'datetime', 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP')
+            self._add_column_if_not_exists(cursor, 'users', 'video_index', 'INTEGER DEFAULT 0')
+            self._add_column_if_not_exists(cursor, 'users', 'preferred_time', "TEXT DEFAULT '07:00'")
+            self._add_column_if_not_exists(cursor, 'users', 'last_sent', 'TIMESTAMP')
+            self._add_column_if_not_exists(cursor, 'users', 'is_subscribed', 'BOOLEAN DEFAULT TRUE')
+            self._add_column_if_not_exists(cursor, 'users', 'viewed_videos', "TEXT DEFAULT '[]'")
+            self._add_column_if_not_exists(cursor, 'users', 'is_group', 'BOOLEAN DEFAULT FALSE')
+            self._add_column_if_not_exists(cursor, 'users', 'is_banned', 'BOOLEAN DEFAULT FALSE')
+
+            # --- Таблица support ---
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS support (
-                    id SERIAL PRIMARY KEY,
-                    user_id BIGINT,
-                    message TEXT,
-                    datetime TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    id SERIAL PRIMARY KEY
                 )
             ''')
+            self._add_column_if_not_exists(cursor, 'support', 'user_id', 'BIGINT')
+            self._add_column_if_not_exists(cursor, 'support', 'message', 'TEXT')
+            self._add_column_if_not_exists(cursor, 'support', 'datetime', 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP')
+
+            # --- Таблица settings ---
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS settings (
-                    key TEXT PRIMARY KEY,
-                    value TEXT
+                    key TEXT PRIMARY KEY
                 )
             ''')
+            self._add_column_if_not_exists(cursor, 'settings', 'value', 'TEXT')
+
+            # --- Таблица group_video_settings ---
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS group_video_settings (
-                    chat_id BIGINT PRIMARY KEY,
-                    season TEXT,
-                    video_index INTEGER DEFAULT 0
+                    chat_id BIGINT PRIMARY KEY
                 )
             ''')
+            self._add_column_if_not_exists(cursor, 'group_video_settings', 'project', 'TEXT')
+            self._add_column_if_not_exists(cursor, 'group_video_settings', 'season', 'TEXT')
+            self._add_column_if_not_exists(cursor, 'group_video_settings', 'video_index', 'INTEGER DEFAULT 0')
+            self._add_column_if_not_exists(cursor, 'group_video_settings', 'viewed_videos', "TEXT DEFAULT '[]'")
+
             self.conn.commit()
             cursor.close()
         except Exception as e:
-            logger.error(f"Ошибка при создании таблиц: {e}")
+            logger.error(f"Ошибка при создании/обновлении таблиц: {e}")
             self.conn.rollback()
 
     def user_exists(self, user_id):
@@ -165,7 +187,7 @@ class Database:
     def get_all_users_data(self):
         try:
             cursor = self.conn.cursor()
-            cursor.execute("SELECT user_id, name, phone, datetime, video_index, preferred_time, is_group FROM users")
+            cursor.execute("SELECT user_id, name, phone, datetime, video_index, preferred_time, last_sent, is_subscribed, viewed_videos, is_group, is_banned FROM users")
             result = cursor.fetchall()
             logger.info(f"get_all_users_data: найдено пользователей: {len(result)}")
             cursor.close()
@@ -343,7 +365,7 @@ class Database:
         try:
             cursor = self.conn.cursor()
             cursor.execute(
-                "INSERT INTO settings (key, value) VALUES (%s, %s) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value",
+                "INSERT INTO settings (key, value) VALUES (%s, %s) ON CONFLICT (key) DO UPDATE SET value = excluded.value",
                 ("start_video_index", str(video_index))
             )
             self.conn.commit()
@@ -363,12 +385,12 @@ class Database:
             logger.error(f"Ошибка при получении начального индекса видео: {e}")
             return 0
 
-    def set_group_video_settings(self, chat_id: int, season: str, video_index: int):
+    def set_group_video_settings(self, chat_id: int, project: str, season: str, video_index: int):
         try:
             cursor = self.conn.cursor()
             cursor.execute(
-                "INSERT INTO group_video_settings (chat_id, season, video_index) VALUES (%s, %s, %s) ON CONFLICT (chat_id) DO UPDATE SET season = EXCLUDED.season, video_index = EXCLUDED.video_index",
-                (chat_id, season, video_index)
+                "INSERT INTO group_video_settings (chat_id, project, season, video_index) VALUES (%s, %s, %s, %s) ON CONFLICT (chat_id) DO UPDATE SET project = excluded.project, season = excluded.season, video_index = excluded.video_index",
+                (chat_id, project, season, video_index)
             )
             self.conn.commit()
             cursor.close()
@@ -379,19 +401,19 @@ class Database:
     def get_group_video_settings(self, chat_id: int) -> tuple:
         try:
             cursor = self.conn.cursor()
-            cursor.execute("SELECT season, video_index FROM group_video_settings WHERE chat_id = %s", (chat_id,))
+            cursor.execute("SELECT project, season, video_index FROM group_video_settings WHERE chat_id = %s", (chat_id,))
             result = cursor.fetchone()
             cursor.close()
-            return (result[0], result[1]) if result else (None, 0)
+            return (result[0], result[1], result[2]) if result else (None, None, 0)
         except Exception as e:
             logger.error(f"Ошибка при получении настроек видео для группы {chat_id}: {e}")
-            return (None, 0)
+            return (None, None, 0)
 
     def get_all_groups_with_settings(self) -> list:
         try:
             cursor = self.conn.cursor()
             cursor.execute('''
-                SELECT chat_id, season, video_index 
+                SELECT chat_id, project, season, video_index 
                 FROM group_video_settings
             ''')
             result = cursor.fetchall()
@@ -402,7 +424,6 @@ class Database:
             return []
 
     def ban_group(self, group_id: int):
-        """Запретить группу"""
         try:
             cursor = self.conn.cursor()
             cursor.execute('''
@@ -417,7 +438,6 @@ class Database:
             self.conn.rollback()
 
     def unban_group(self, group_id: int):
-        """Разрешить группу"""
         try:
             cursor = self.conn.cursor()
             cursor.execute('''
@@ -432,7 +452,6 @@ class Database:
             self.conn.rollback()
 
     def is_group_banned(self, group_id: int) -> bool:
-        """Проверить, заблокирована ли группа"""
         try:
             cursor = self.conn.cursor()
             cursor.execute('''
@@ -447,7 +466,6 @@ class Database:
             return False
 
     def get_banned_groups(self) -> list:
-        """Получить список заблокированных групп"""
         try:
             cursor = self.conn.cursor()
             cursor.execute('''
@@ -461,6 +479,55 @@ class Database:
             logger.error(f"Ошибка при получении заблокированных групп: {e}")
             return []
 
+    def get_group_viewed_videos(self, chat_id):
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute("SELECT viewed_videos FROM group_video_settings WHERE chat_id = %s", (chat_id,))
+            result = cursor.fetchone()
+            cursor.close()
+            if result and result[0]:
+                return json.loads(result[0])
+            return []
+        except Exception as e:
+            logger.error(f"Ошибка при получении просмотренных видео группы {chat_id}: {e}")
+            return []
+
+    def mark_group_video_as_viewed(self, chat_id, video_index):
+        try:
+            viewed_videos = self.get_group_viewed_videos(chat_id)
+            if video_index not in viewed_videos:
+                viewed_videos.append(video_index)
+                cursor = self.conn.cursor()
+                cursor.execute(
+                    "UPDATE group_video_settings SET viewed_videos = %s WHERE chat_id = %s",
+                    (json.dumps(viewed_videos), chat_id)
+                )
+                self.conn.commit()
+                cursor.close()
+        except Exception as e:
+            logger.error(f"Ошибка при отметке видео как просмотренного группой {chat_id}: {e}")
+            self.conn.rollback()
+
+    def get_next_unwatched_group_video_index(self, chat_id, all_videos_count):
+        viewed = set(self.get_group_viewed_videos(chat_id))
+        for idx in range(all_videos_count):
+            if idx not in viewed:
+                return idx
+        return -1
+
+    def set_group_video_index_and_viewed(self, chat_id, project, season, video_index, viewed_videos):
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute(
+                "UPDATE group_video_settings SET project = %s, season = %s, video_index = %s, viewed_videos = %s WHERE chat_id = %s",
+                (project, season, video_index, json.dumps(viewed_videos), chat_id)
+            )
+            self.conn.commit()
+            cursor.close()
+        except Exception as e:
+            logger.error(f"Ошибка при обновлении индекса и просмотренных видео группы {chat_id}: {e}")
+            self.conn.rollback()
+
     def close(self):
         try:
             self.conn.close()
@@ -468,7 +535,7 @@ class Database:
             logger.error(f"Ошибка при закрытии соединения с базой данных: {e}")
 
 # Для SQLite (по умолчанию)
-# db = Database()
+db = Database()
 
 # Для PostgreSQL (оставьте закомментированным)
-db = Database()
+# db = Database()

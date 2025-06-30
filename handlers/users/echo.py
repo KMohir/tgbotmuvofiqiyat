@@ -30,7 +30,9 @@ try:
     ]
 
     @dp.message_handler(lambda message: message.text and not message.text.startswith('/') and message.text not in [
-        "Centris towers", "Golden lake", "1-sezon", "2-sezon", "3-sezon"
+        "Centris towers", "Golden lake", 
+        "Яқинлар 1.0 I I Иброҳим Мамасаидов", "Яқинлар 2.0 I I Иброҳим Мамасаидов", 
+        "Яқинлар 3.0 I I Иброҳим Мамасаидов", "Яқинлар 4.0 I I Иброҳим Мамасаидов"
     ], state=None, chat_type=types.ChatType.PRIVATE)
     async def bot_echo(message: types.Message):
         if not db.user_exists(message.from_user.id):
@@ -40,7 +42,9 @@ try:
 
     @dp.message_handler(
         lambda message: not message.text.startswith('/') and message.text not in [
-            "Centris towers", "Golden lake", "1-sezon", "2-sezon", "3-sezon"
+            "Centris towers", "Golden lake", 
+            "Яқинлар 1.0 I I Иброҳим Мамасаидов", "Яқинлар 2.0 I I Иброҳим Мамасаидов", 
+            "Яқинлар 3.0 I I Иброҳим Мамасаидов", "Яқинлар 4.0 I I Иброҳим Мамасаидов"
         ],
         state="*",
         content_types=types.ContentTypes.ANY,

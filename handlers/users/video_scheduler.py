@@ -8,7 +8,7 @@ try:
     import pytz
     import logging
     from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
-    from handlers.users.video_lists import VIDEO_LIST_1, VIDEO_LIST_2, VIDEO_LIST_3
+    from handlers.users.video_lists import VIDEO_LIST_1, VIDEO_LIST_2, VIDEO_LIST_3, VIDEO_LIST_4, VIDEO_LIST_5, VIDEO_LIST_GOLDEN_1
 
     # Настройка логирования
     logger = logging.getLogger(__name__)
@@ -19,44 +19,54 @@ try:
     # Инициализация планировщика
     scheduler = AsyncIOScheduler(timezone="Asia/Tashkent")
 
-    def get_video_list_by_season(season: str):
-        """Получить список видео по сезону"""
-        if season == "1-sezon":
-            return VIDEO_LIST_1
-        elif season == "2-sezon":
-            return VIDEO_LIST_2
-        elif season == "3-sezon":
-            return VIDEO_LIST_3
-        else:
-            return VIDEO_LIST_1
+    def get_video_list_by_project_and_season(project: str, season: str):
+        if project == "centris":
+            if season == "1-sezon":
+                return VIDEO_LIST_1
+            elif season == "2-sezon":
+                return VIDEO_LIST_2
+            elif season == "3-sezon":
+                return VIDEO_LIST_3
+            elif season == "4-sezon":
+                return VIDEO_LIST_4
+            elif season == "5-sezon":
+                return VIDEO_LIST_5
+            else:
+                return VIDEO_LIST_1
+        elif project == "golden_lake":
+            return VIDEO_LIST_GOLDEN_1
+        return []
 
-    async def send_group_video(chat_id: int, season: str, video_index: int):
-        """Отправить видео в группу"""
+    def get_all_group_videos(project):
+        if project == "centris":
+            return VIDEO_LIST_1 + VIDEO_LIST_2 + VIDEO_LIST_3 + VIDEO_LIST_4 + VIDEO_LIST_5
+        elif project == "golden_lake":
+            return VIDEO_LIST_GOLDEN_1
+        return []
+
+    async def send_group_video(chat_id: int, project: str, season: str, video_index: int):
         try:
-            # Проверяем, не заблокирована ли группа
             if db.is_group_banned(chat_id):
                 logger.info(f"Пропускаем отправку видео в заблокированную группу {chat_id}")
                 return False
-            
-            video_list = get_video_list_by_season(season)
-            
-            if video_index >= len(video_list):
-                logger.info(f"Группа {chat_id} просмотрела все видео сезона {season}")
+            all_videos = get_all_group_videos(project)
+            viewed = db.get_group_viewed_videos(chat_id)
+            # Найти следующее непросмотренное видео
+            next_idx = db.get_next_unwatched_group_video_index(chat_id, len(all_videos))
+            if next_idx == -1:
+                logger.info(f"Группа {chat_id} просмотрела все видео ({project})")
                 return False
-            
-            video_url = video_list[video_index]
+            video_url = all_videos[next_idx]
             message_id = int(video_url.split("/")[-1])
-            
             await bot.copy_message(
                 chat_id=chat_id,
                 from_chat_id=-1002550852551,
                 message_id=message_id,
                 protect_content=True
             )
-            
-            logger.info(f"Видео {video_index} отправлено в группу {chat_id} (сезон {season})")
+            db.mark_group_video_as_viewed(chat_id, next_idx)
+            logger.info(f"Видео {next_idx} отправлено в группу {chat_id} (проект {project})")
             return True
-            
         except Exception as e:
             logger.error(f"Ошибка при отправке видео в группу {chat_id}: {e}")
             return False
@@ -76,40 +86,47 @@ try:
             groups = db.get_all_groups_with_settings()
             logger.info(f"Найдено {len(groups)} групп с настройками")
             
-            for chat_id, season, video_index in groups:
-                if not season:
+            for chat_id, project, season, video_index in groups:
+                if not season or not project:
                     continue
-                    
-                # Планируем задачи в зависимости от сезона
-                if season == "1-sezon":
-                    # 1-й сезон: 2 видео в день (08:00 и 20:00)
+                if project == "centris":
+                    if season == "1-sezon":
+                        scheduler.add_job(
+                            send_group_video_morning,
+                            trigger='cron',
+                            hour=8,
+                            minute=0,
+                            args=[chat_id, project, season, video_index],
+                            id=f"group_morning_{chat_id}",
+                            replace_existing=True
+                        )
+                        scheduler.add_job(
+                            send_group_video_evening,
+                            trigger='cron',
+                            hour=20,
+                            minute=0,
+                            args=[chat_id, project, season, video_index],
+                            id=f"group_evening_{chat_id}",
+                            replace_existing=True
+                        )
+                    else:
+                        scheduler.add_job(
+                            send_group_video_morning,
+                            trigger='cron',
+                            hour=8,
+                            minute=0,
+                            args=[chat_id, project, season, video_index],
+                            id=f"group_morning_{chat_id}",
+                            replace_existing=True
+                        )
+                elif project == "golden_lake":
                     scheduler.add_job(
-                        send_group_video_morning,
+                        send_group_video_golden,
                         trigger='cron',
-                        hour=8,
+                        hour=11,
                         minute=0,
-                        args=[chat_id, season, video_index],
-                        id=f"group_morning_{chat_id}",
-                        replace_existing=True
-                    )
-                    scheduler.add_job(
-                        send_group_video_evening,
-                        trigger='cron',
-                        hour=20,
-                        minute=0,
-                        args=[chat_id, season, video_index],
-                        id=f"group_evening_{chat_id}",
-                        replace_existing=True
-                    )
-                else:
-                    # 2-й и 3-й сезоны: 1 видео в день (08:00)
-                    scheduler.add_job(
-                        send_group_video_morning,
-                        trigger='cron',
-                        hour=8,
-                        minute=0,
-                        args=[chat_id, season, video_index],
-                        id=f"group_morning_{chat_id}",
+                        args=[chat_id, project, season, video_index],
+                        id=f"group_golden_{chat_id}",
                         replace_existing=True
                     )
             
@@ -118,19 +135,14 @@ try:
         except Exception as e:
             logger.error(f"Ошибка при планировании задач для групп: {e}")
 
-    async def send_group_video_morning(chat_id: int, season: str, video_index: int):
-        """Отправить утреннее видео в группу"""
-        success = await send_group_video(chat_id, season, video_index)
-        if success:
-            # Увеличиваем индекс для следующего видео
-            db.set_group_video_settings(chat_id, season, video_index + 1)
+    async def send_group_video_morning(chat_id: int, project: str, season: str, video_index: int):
+        await send_group_video(chat_id, project, season, video_index)
 
-    async def send_group_video_evening(chat_id: int, season: str, video_index: int):
-        """Отправить вечернее видео в группу (только для 1-го сезона)"""
-        success = await send_group_video(chat_id, season, video_index)
-        if success:
-            # Увеличиваем индекс для следующего видео
-            db.set_group_video_settings(chat_id, season, video_index + 1)
+    async def send_group_video_evening(chat_id: int, project: str, season: str, video_index: int):
+        await send_group_video(chat_id, project, season, video_index)
+
+    async def send_group_video_golden(chat_id: int, project: str, season: str, video_index: int):
+        await send_group_video(chat_id, project, season, video_index)
 
     def get_next_video_index(user_id: int) -> int:
         """Получить следующий непросмотренный индекс видео"""

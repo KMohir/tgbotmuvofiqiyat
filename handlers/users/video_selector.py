@@ -6,9 +6,10 @@ try:
     from keyboards.default.reply import key, get_lang_for_button
     from datetime import datetime
     from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
-    from handlers.users.video_lists import VIDEO_LIST_1, VIDEO_LIST_2, VIDEO_LIST_3, CAPTION_LIST_1, CAPTION_LIST_2, CAPTION_LIST_3, VIDEO_LIST_GOLDEN_1, GOLDEN_LAKE_TOPICS
+    from handlers.users.video_lists import VIDEO_LIST_1, VIDEO_LIST_2, VIDEO_LIST_3, VIDEO_LIST_4, CAPTION_LIST_1, CAPTION_LIST_2, CAPTION_LIST_3, CAPTION_LIST_4, VIDEO_LIST_GOLDEN_1, GOLDEN_LAKE_TOPICS
     from aiogram.dispatcher import FSMContext
     from aiogram.dispatcher.filters.state import State, StatesGroup
+    from handlers.users.video_lists import CAPTION_LIST_5, VIDEO_LIST_5
 
     # Список описаний для извлечения названий уроков (только для кнопок)
     CAPTION_LIST_2 = [
@@ -231,9 +232,11 @@ try:
     # Клавиатура сезонов
     def get_season_keyboard():
         keyboard = ReplyKeyboardMarkup(resize_keyboard=True)
-        keyboard.add(KeyboardButton("1-sezon"))
-        keyboard.add(KeyboardButton("2-sezon"))
-        keyboard.add(KeyboardButton("3-sezon"))
+        keyboard.add(KeyboardButton("Яқинлар 1.0 I I Иброҳим Мамасаидов"))
+        keyboard.add(KeyboardButton("Яқинлар 2.0 I I Иброҳим Мамасаидов"))
+        keyboard.add(KeyboardButton("Яқинлар 3.0 I I Иброҳим Мамасаидов"))
+        keyboard.add(KeyboardButton("Яқинлар 4.0 I I Иброҳим Мамасаидов"))
+        keyboard.add(KeyboardButton("Яқинлар 5.0 I I Иброҳим Мамасаидов"))
         keyboard.add(KeyboardButton("Orqaga qaytish"))
         return keyboard
 
@@ -267,30 +270,48 @@ try:
         await message.answer("Qaysi sezonni ko'rmoqchisiz?")
         await state.set_state(VideoStates.season_select.state)
 
-    @dp.message_handler(lambda m: m.text in ["1-sezon", "2-sezon", "3-sezon"], state=VideoStates.season_select)
+    @dp.message_handler(lambda m: m.text in [
+        "Яқинлар 1.0 I I Иброҳим Мамасаидов",
+        "Яқинлар 2.0 I I Иброҳим Мамасаидов",
+        "Яқинлар 3.0 I I Иброҳим Мамасаидов",
+        "Яқинлар 4.0 I I Иброҳим Мамасаидов",
+        "Яқинлар 5.0 I I Иброҳим Мамасаидов"
+    ], state=VideoStates.season_select)
     async def season_selection(message: types.Message, state: FSMContext):
         data = await state.get_data()
         project = data.get("project")
         
         if project == "centris":
-            if message.text == "1-sezon":
+            if message.text == "Яқинлар 1.0 I I Иброҳим Мамасаидов":
                 await message.answer("Darsni tanlang:", reply_markup=get_video_keyboard(CAPTION_LIST_1))
                 await state.set_state(VideoStates.video_select.state)
-            elif message.text == "2-sezon":
+            elif message.text == "Яқинлар 2.0 I I Иброҳим Мамасаидов":
                 await message.answer("Darsni tanlang:", reply_markup=get_video_keyboard(CAPTION_LIST_2))
                 await state.set_state(VideoStates.video_select.state)
-            elif message.text == "3-sezon":
+            elif message.text == "Яқинлар 3.0 I I Иброҳим Мамасаидов":
                 await message.answer("Darsni tanlang:", reply_markup=get_video_keyboard(CAPTION_LIST_3))
                 await state.set_state(VideoStates.video_select.state)
+            elif message.text == "Яқинлар 4.0 I I Иброҳим Мамасаидов":
+                await message.answer("Darsni tanlang:", reply_markup=get_video_keyboard(CAPTION_LIST_4))
+                await state.set_state(VideoStates.video_select.state)
+            elif message.text == "Яқинлар 5.0 I I Иброҳим Мамасаидов":
+                await message.answer("Darsni tanlang:", reply_markup=get_video_keyboard(CAPTION_LIST_5))
+                await state.set_state(VideoStates.video_select.state)
         elif project == "golden_lake":
-            if message.text == "1-sezon":
+            if message.text == "Яқинлар 1.0 I I Иброҳим Мамасаидов":
                 await message.answer("Darsni tanlang:", reply_markup=get_video_keyboard(GOLDEN_LAKE_TOPICS))
                 await state.set_state(VideoStates.video_select.state)
-            elif message.text == "2-sezon":
+            elif message.text == "Яқинлар 2.0 I I Иброҳим Мамасаидов":
                 await message.answer("Golden Lake 2-sezon hali tayyor emas")
                 await state.set_state(VideoStates.season_select.state)
-            elif message.text == "3-sezon":
+            elif message.text == "Яқинлар 3.0 I I Иброҳим Мамасаидов":
                 await message.answer("Golden Lake 3-sezon hali tayyor emas")
+                await state.set_state(VideoStates.season_select.state)
+            elif message.text == "Яқинлар 4.0 I I Иброҳим Мамасаидов":
+                await message.answer("Golden Lake 4-sezon hali tayyor emas")
+                await state.set_state(VideoStates.season_select.state)
+            elif message.text == "Яқинлар 5.0 I I Иброҳим Мамасаидов":
+                await message.answer("Golden Lake 5-sezon hali tayyor emas")
                 await state.set_state(VideoStates.season_select.state)
 
     @dp.message_handler(text="Orqaga qaytish", state=VideoStates.video_select)
@@ -312,11 +333,12 @@ try:
     async def golden_lake_command(message: types.Message):
         await golden_lake_menu(message)
 
-    @dp.message_handler(lambda m: m.text in CAPTION_LIST_1 + CAPTION_LIST_2 + CAPTION_LIST_3 + GOLDEN_LAKE_TOPICS, state=VideoStates.video_select)
+    @dp.message_handler(lambda m: m.text in CAPTION_LIST_1 + CAPTION_LIST_2 + CAPTION_LIST_3 + CAPTION_LIST_4 + CAPTION_LIST_5 + GOLDEN_LAKE_TOPICS, state=VideoStates.video_select)
     async def send_video(message: types.Message, state: FSMContext):
         data = await state.get_data()
         project = data.get("project")
         
+        video_url = None
         if project == "centris":
             if message.text in CAPTION_LIST_1:
                 idx = CAPTION_LIST_1.index(message.text)
@@ -327,18 +349,59 @@ try:
             elif message.text in CAPTION_LIST_3:
                 idx = CAPTION_LIST_3.index(message.text)
                 video_url = VIDEO_LIST_3[idx]
+            elif message.text in CAPTION_LIST_4:
+                idx = CAPTION_LIST_4.index(message.text)
+                video_url = VIDEO_LIST_4[idx]
+            elif message.text in CAPTION_LIST_5:
+                idx = CAPTION_LIST_5.index(message.text)
+                video_url = VIDEO_LIST_5[idx]
         elif project == "golden_lake":
             if message.text in GOLDEN_LAKE_TOPICS:
                 idx = GOLDEN_LAKE_TOPICS.index(message.text)
                 video_url = VIDEO_LIST_GOLDEN_1[idx]
         
-        message_id = int(video_url.split("/")[-1])
-        await bot.copy_message(
-            chat_id=message.chat.id,
-            from_chat_id=-1002550852551,
-            message_id=message_id,
-            protect_content=True
-        )
+        if video_url:
+            message_id = int(video_url.split("/")[-1])
+            await bot.copy_message(
+                chat_id=message.chat.id,
+                from_chat_id=-1002550852551,
+                message_id=message_id,
+                protect_content=True
+            )
+            # Если это группа — сдвигаем индекс рассылки для группы вперёд и отмечаем просмотренное
+            if message.chat.type in [types.ChatType.GROUP, types.ChatType.SUPERGROUP]:
+                # Определяем глобальный индекс видео
+                if project == "centris":
+                    all_videos = VIDEO_LIST_1 + VIDEO_LIST_2 + VIDEO_LIST_3 + VIDEO_LIST_4 + VIDEO_LIST_5
+                    if message.text in CAPTION_LIST_1:
+                        idx = CAPTION_LIST_1.index(message.text)
+                        global_idx = idx
+                    elif message.text in CAPTION_LIST_2:
+                        idx = CAPTION_LIST_2.index(message.text)
+                        global_idx = len(CAPTION_LIST_1) + idx
+                    elif message.text in CAPTION_LIST_3:
+                        idx = CAPTION_LIST_3.index(message.text)
+                        global_idx = len(CAPTION_LIST_1) + len(CAPTION_LIST_2) + idx
+                    elif message.text in CAPTION_LIST_4:
+                        idx = CAPTION_LIST_4.index(message.text)
+                        global_idx = len(CAPTION_LIST_1) + len(CAPTION_LIST_2) + len(CAPTION_LIST_3) + idx
+                    elif message.text in CAPTION_LIST_5:
+                        idx = CAPTION_LIST_5.index(message.text)
+                        global_idx = len(CAPTION_LIST_1) + len(CAPTION_LIST_2) + len(CAPTION_LIST_3) + len(CAPTION_LIST_4) + idx
+                    else:
+                        global_idx = None
+                elif project == "golden_lake":
+                    all_videos = VIDEO_LIST_GOLDEN_1
+                    if message.text in GOLDEN_LAKE_TOPICS:
+                        global_idx = GOLDEN_LAKE_TOPICS.index(message.text)
+                    else:
+                        global_idx = None
+                else:
+                    global_idx = None
+                if global_idx is not None:
+                    db.mark_group_video_as_viewed(message.chat.id, global_idx)
+        else:
+            await message.answer("Video topilmadi.")
 
 except Exception as exx:
     from datetime import datetime
