@@ -86,7 +86,7 @@ class Database:
             # --- Таблица group_video_settings ---
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS group_video_settings (
-                    chat_id BIGINT PRIMARY KEY
+                    chat_id TEXT PRIMARY KEY
                 )
             ''')
             self._add_column_if_not_exists(cursor, 'group_video_settings', 'centris_enabled', 'BOOLEAN DEFAULT FALSE')

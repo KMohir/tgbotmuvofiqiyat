@@ -476,7 +476,7 @@ try:
     dp.register_message_handler(handle_time_selection, lambda message: message.text in ["09:00", "12:00", "15:00", "18:00", "21:00"])
 
     async def send_next_unwatched_video(user_id, video_list, viewed_key):
-        viewed = db.get_viewed_videos(user_id, viewed_key)
+        viewed = db.get_viewed_videos(user_id)
         for idx, _ in enumerate(video_list):
             if idx not in viewed:
                 try:
@@ -486,7 +486,7 @@ try:
                         message_id=int(video_list[idx].split("/")[-1]),
                         protect_content=True
                     )
-                    db.mark_video_as_viewed(user_id, idx, viewed_key)
+                    db.mark_video_as_viewed(user_id, idx)
                     return True
                 except Exception as e:
                     logger.error(f"Ошибка при отправке видео {idx} пользователю {user_id}: {e}")
