@@ -11,9 +11,7 @@ try:
     from aiogram.types import InputFile
     from db import db
     from loader import dp
-
-    # ID администратора
-    ADMIN_ID = 5657091547
+    from data.config import ADMINS
 
 
     @dp.message_handler(commands=['get_registration_time'], state="*")
@@ -32,7 +30,7 @@ try:
 
     @dp.message_handler(commands=['get_all_users'], state="*")
     async def get_all_users_command(message: types.Message, state: FSMContext):
-        if message.from_user.id != ADMIN_ID:
+        if message.from_user.id not in ADMINS:
             await message.reply("Sizda bu buyruqni bajarish uchun ruxsat yo'q.")
             return
 

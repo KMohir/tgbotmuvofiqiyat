@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta
 from handlers.users.video_lists import VIDEO_LIST_1, VIDEO_LIST_2, VIDEO_LIST_3, VIDEO_LIST_4, VIDEO_LIST_5, VIDEO_LIST_GOLDEN_1
+from data.config import ADMINS
 
 try:
     from aiogram import types
@@ -11,9 +12,6 @@ try:
     from loader import dp, bot
     from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
     from aiogram.dispatcher.filters.state import State, StatesGroup
-
-    # ID администратора
-    ADMIN_ID = 5657091547
 
     # --- Новый FSM ---
     class GroupVideoStates(StatesGroup):
@@ -47,7 +45,7 @@ try:
                 has_unwatched = True
         return kb if has_unwatched else None
 
-    @dp.message_handler(Command('set_start_video'), user_id=ADMIN_ID)
+    @dp.message_handler(Command('set_start_video'), user_id=ADMINS)
     async def set_start_video_command(message: types.Message, state: FSMContext):
         await message.answer(
             "Har kungi video yuborishni qaysi videodan boshlashni belgilang.\n"
@@ -55,7 +53,7 @@ try:
         )
         await state.set_state("waiting_for_video_number")
 
-    @dp.message_handler(Command('set_group_video'), user_id=ADMIN_ID)
+    @dp.message_handler(Command('set_group_video'), user_id=ADMINS)
     async def set_group_video_command(message: types.Message, state: FSMContext):
         if message.chat.type not in [types.ChatType.GROUP, types.ChatType.SUPERGROUP]:
             await message.answer("Bu buyruq faqat guruhlarda ishlaydi.")
@@ -148,7 +146,7 @@ try:
 
     @dp.message_handler(state="waiting_for_video_number")
     async def process_video_number(message: types.Message, state: FSMContext):
-        if message.from_user.id != ADMIN_ID:
+        if message.from_user.id not in ADMINS:
             await message.answer("Sizda bu buyruqni bajarish uchun ruxsat yo'q.")
             await state.finish()
             return
@@ -167,7 +165,7 @@ try:
         
         await state.finish()
 
-    @dp.message_handler(Command('send_media'), user_id=ADMIN_ID)
+    @dp.message_handler(Command('send_media'), user_id=ADMINS)
     async def send_media_command(message: types.Message, state: FSMContext):
         await message.answer(
             "Iltimos, barcha foydalanuvchilarga jo'natmoqchi bo'lgan rasmlar yoki videolarni yuboring. "
@@ -177,7 +175,7 @@ try:
 
     @dp.message_handler(content_types=[types.ContentType.PHOTO, types.ContentType.VIDEO], state="waiting_for_media")
     async def process_media(message: types.Message, state: FSMContext):
-        if message.from_user.id != ADMIN_ID:
+        if message.from_user.id not in ADMINS:
             await message.answer("Sizda bu buyruqni bajarish uchun ruxsat yo'q.")
             await state.finish()
             return
@@ -199,7 +197,7 @@ try:
 
     @dp.message_handler(Command('done'), state="waiting_for_media")
     async def finish_media_collection(message: types.Message, state: FSMContext):
-        if message.from_user.id != ADMIN_ID:
+        if message.from_user.id not in ADMINS:
             await message.answer("Sizda bu buyruqni bajarish uchun ruxsat yo'q.")
             await state.finish()
             return
@@ -222,7 +220,7 @@ try:
 
     @dp.message_handler(Command('skip'), state="waiting_for_caption")
     async def skip_caption(message: types.Message, state: FSMContext):
-        if message.from_user.id != ADMIN_ID:
+        if message.from_user.id not in ADMINS:
             await message.answer("Sizda bu buyruqni bajarish uchun ruxsat yo'q.")
             await state.finish()
             return
@@ -231,7 +229,7 @@ try:
 
     @dp.message_handler(state="waiting_for_caption")
     async def process_caption(message: types.Message, state: FSMContext):
-        if message.from_user.id != ADMIN_ID:
+        if message.from_user.id not in ADMINS:
             await message.answer("Sizda bu buyruqni bajarish uchun ruxsat yo'q.")
             await state.finish()
             return
@@ -288,7 +286,7 @@ try:
         await message.answer("Iltimos, rasm yoki video yuboring yoki /done buyrug'i bilan kirishni yakunlang.")
         await state.set_state("waiting_for_media")
 
-    @dp.message_handler(Command('get_all_users'), user_id=ADMIN_ID)
+    @dp.message_handler(Command('get_all_users'), user_id=ADMINS)
     async def get_all_users_command(message: types.Message):
         users_data = db.get_all_users_data()
         if not users_data:
@@ -315,7 +313,7 @@ try:
         else:
             await message.answer(response)
 
-    @dp.message_handler(Command('banned_groups'), user_id=ADMIN_ID)
+    @dp.message_handler(Command('banned_groups'), user_id=ADMINS)
     async def banned_groups_command(message: types.Message):
         banned_groups = db.get_banned_groups()
         if not banned_groups:
@@ -330,7 +328,7 @@ try:
 
         await message.answer(response)
 
-    @dp.message_handler(Command('unban_group'), user_id=ADMIN_ID)
+    @dp.message_handler(Command('unban_group'), user_id=ADMINS)
     async def unban_group_command(message: types.Message):
         try:
             group_id = int(message.text.split()[1])
@@ -339,7 +337,7 @@ try:
         except (IndexError, ValueError):
             await message.answer("Использование: /unban_group <ID_группы>")
 
-    @dp.message_handler(Command('reset_group_videos'), user_id=ADMIN_ID)
+    @dp.message_handler(Command('reset_group_videos'), user_id=ADMINS)
     async def reset_group_videos_command(message: types.Message, state: FSMContext):
         chat_id = message.chat.id
         # Сбросить просмотренные для Centris Towers всех сезонов и Golden Lake

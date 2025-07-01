@@ -215,7 +215,7 @@ try:
 
             ],
             [
-                KeyboardButton(text="Olden lake 1.0")
+                KeyboardButton(text="Golden lake")
             ],
             [
                 KeyboardButton(text="Centris Towers bilan bog'lanish")
@@ -267,7 +267,7 @@ try:
         await message.answer("Qaysi sezonni ko'rmoqchisiz?")
         await state.set_state(VideoStates.season_select.state)
 
-    @dp.message_handler(text="Olden lake 1.0")
+    @dp.message_handler(text="Golden lake")
     async def olden_lake_menu(message: types.Message, state: FSMContext):
         await state.update_data(project="olden_lake")
         await message.answer("Sezonni tanlang:", reply_markup=get_season_keyboard(project="olden_lake"))
@@ -311,16 +311,16 @@ try:
                 await message.answer("Darsni tanlang:", reply_markup=get_video_keyboard(GOLDEN_LAKE_TOPICS))
                 await state.set_state(VideoStates.video_select.state)
             elif message.text == "Яқинлар 2.0 I I Иброҳим Мамасаидов":
-                await message.answer("Olden lake 2-sezon hali tayyor emas")
+                await message.answer("Golden lake 2-sezon hali tayyor emas")
                 await state.set_state(VideoStates.season_select.state)
             elif message.text == "Яқинлар 3.0 I I Иброҳим Мамасаидов":
-                await message.answer("Olden lake 3-sezon hali tayyor emas")
+                await message.answer("Golden lake 3-sezon hali tayyor emas")
                 await state.set_state(VideoStates.season_select.state)
             elif message.text == "Яқинлар 4.0 I I Иброҳим Мамасаидов":
-                await message.answer("Olden lake 4-sezon hali tayyor emas")
+                await message.answer("Golden lake 4-sezon hali tayyor emas")
                 await state.set_state(VideoStates.season_select.state)
             elif message.text == "Яқинлар 5.0 I I Иброҳим Мамасаидов":
-                await message.answer("Olden lake 5-sezon hali tayyor emas")
+                await message.answer("Golden lake 5-sezon hali tayyor emas")
                 await state.set_state(VideoStates.season_select.state)
 
     @dp.message_handler(text="Orqaga qaytish", state=VideoStates.video_select)
