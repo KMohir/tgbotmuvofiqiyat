@@ -6,7 +6,7 @@ try:
     from keyboards.default.reply import key, get_lang_for_button
     from datetime import datetime
     from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
-    from handlers.users.video_lists import VIDEO_LIST_1, VIDEO_LIST_2, VIDEO_LIST_3, VIDEO_LIST_4, CAPTION_LIST_1, CAPTION_LIST_2, CAPTION_LIST_3, CAPTION_LIST_4, VIDEO_LIST_GOLDEN_1, GOLDEN_LAKE_TOPICS
+    from handlers.users.video_lists import VIDEO_LIST_1, VIDEO_LIST_2, VIDEO_LIST_3, VIDEO_LIST_4, CAPTION_LIST_1, CAPTION_LIST_2, CAPTION_LIST_3, CAPTION_LIST_4, VIDEO_LIST_GOLDEN_1, GOLDEN_LAKE_TOPICS, CAPTION_LIST_6, VIDEO_LIST_6
     from aiogram.dispatcher import FSMContext
     from aiogram.dispatcher.filters.state import State, StatesGroup
     from handlers.users.video_lists import CAPTION_LIST_5, VIDEO_LIST_5
@@ -300,7 +300,6 @@ try:
                 await message.answer("Darsni tanlang:", reply_markup=get_video_keyboard(CAPTION_LIST_5))
                 await state.set_state(VideoStates.video_select.state)
             elif message.text == "Яқинлар I Ташриф Centris Towers":
-                from handlers.users.video_lists import CAPTION_LIST_6
                 await message.answer("Darsni tanlang:", reply_markup=get_video_keyboard(CAPTION_LIST_6))
                 await state.set_state(VideoStates.video_select.state)
         elif project == "golden_lake":
@@ -362,7 +361,6 @@ try:
                 idx = CAPTION_LIST_5.index(message.text)
                 video_url = VIDEO_LIST_5[idx]
             elif message.text in CAPTION_LIST_6:
-                from handlers.users.video_lists import VIDEO_LIST_6
                 idx = CAPTION_LIST_6.index(message.text)
                 video_url = VIDEO_LIST_6[idx]
         elif project == "golden_lake":
