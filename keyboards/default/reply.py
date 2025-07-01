@@ -11,7 +11,7 @@ def get_lang_for_button(message):
 
             ],
             [
-                KeyboardButton(text="Olden lake 1.0")
+                KeyboardButton(text="Golden lake")
             ],
             [
                 KeyboardButton(text="Centris Towers bilan bog'lanish")
@@ -38,4 +38,4 @@ def key():
 
 
 main_menu_keyboard = ReplyKeyboardMarkup(resize_keyboard=True)
-main_menu_keyboard.add(KeyboardButton("Centris towers"), KeyboardButton("Olden lake 1.0"))
+main_menu_keyboard.add(KeyboardButton("Centris towers"), KeyboardButton("Golden lake"))
