@@ -237,6 +237,7 @@ try:
         keyboard.add(KeyboardButton("Яқинлар 3.0 I I Иброҳим Мамасаидов"))
         keyboard.add(KeyboardButton("Яқинлар 4.0 I I Иброҳим Мамасаидов"))
         keyboard.add(KeyboardButton("Яқинлар 5.0 I I Иброҳим Мамасаидов"))
+        keyboard.add(KeyboardButton("Яқинлар I Ташриф Centris Towers"))
         keyboard.add(KeyboardButton("Orqaga qaytish"))
         return keyboard
 
@@ -275,7 +276,8 @@ try:
         "Яқинлар 2.0 I I Иброҳим Мамасаидов",
         "Яқинлар 3.0 I I Иброҳим Мамасаидов",
         "Яқинлар 4.0 I I Иброҳим Мамасаидов",
-        "Яқинлар 5.0 I I Иброҳим Мамасаидов"
+        "Яқинлар 5.0 I I Иброҳим Мамасаидов",
+        "Яқинлар I Ташриф Centris Towers"
     ], state=VideoStates.season_select)
     async def season_selection(message: types.Message, state: FSMContext):
         data = await state.get_data()
@@ -296,6 +298,10 @@ try:
                 await state.set_state(VideoStates.video_select.state)
             elif message.text == "Яқинлар 5.0 I I Иброҳим Мамасаидов":
                 await message.answer("Darsni tanlang:", reply_markup=get_video_keyboard(CAPTION_LIST_5))
+                await state.set_state(VideoStates.video_select.state)
+            elif message.text == "Яқинлар I Ташриф Centris Towers":
+                from handlers.users.video_lists import CAPTION_LIST_6
+                await message.answer("Darsni tanlang:", reply_markup=get_video_keyboard(CAPTION_LIST_6))
                 await state.set_state(VideoStates.video_select.state)
         elif project == "golden_lake":
             if message.text == "Яқинлар 1.0 I I Иброҳим Мамасаидов":
@@ -333,7 +339,7 @@ try:
     async def golden_lake_command(message: types.Message):
         await golden_lake_menu(message)
 
-    @dp.message_handler(lambda m: m.text in CAPTION_LIST_1 + CAPTION_LIST_2 + CAPTION_LIST_3 + CAPTION_LIST_4 + CAPTION_LIST_5 + GOLDEN_LAKE_TOPICS, state=VideoStates.video_select)
+    @dp.message_handler(lambda m: m.text in CAPTION_LIST_1 + CAPTION_LIST_2 + CAPTION_LIST_3 + CAPTION_LIST_4 + CAPTION_LIST_5 + CAPTION_LIST_6 + GOLDEN_LAKE_TOPICS, state=VideoStates.video_select)
     async def send_video(message: types.Message, state: FSMContext):
         data = await state.get_data()
         project = data.get("project")
@@ -355,6 +361,10 @@ try:
             elif message.text in CAPTION_LIST_5:
                 idx = CAPTION_LIST_5.index(message.text)
                 video_url = VIDEO_LIST_5[idx]
+            elif message.text in CAPTION_LIST_6:
+                from handlers.users.video_lists import VIDEO_LIST_6
+                idx = CAPTION_LIST_6.index(message.text)
+                video_url = VIDEO_LIST_6[idx]
         elif project == "golden_lake":
             if message.text in GOLDEN_LAKE_TOPICS:
                 idx = GOLDEN_LAKE_TOPICS.index(message.text)
@@ -372,7 +382,7 @@ try:
             if message.chat.type in [types.ChatType.GROUP, types.ChatType.SUPERGROUP]:
                 # Определяем глобальный индекс видео
                 if project == "centris":
-                    all_videos = VIDEO_LIST_1 + VIDEO_LIST_2 + VIDEO_LIST_3 + VIDEO_LIST_4 + VIDEO_LIST_5
+                    all_videos = VIDEO_LIST_1 + VIDEO_LIST_2 + VIDEO_LIST_3 + VIDEO_LIST_4 + VIDEO_LIST_5 + VIDEO_LIST_6
                     if message.text in CAPTION_LIST_1:
                         idx = CAPTION_LIST_1.index(message.text)
                         global_idx = idx
@@ -388,6 +398,9 @@ try:
                     elif message.text in CAPTION_LIST_5:
                         idx = CAPTION_LIST_5.index(message.text)
                         global_idx = len(CAPTION_LIST_1) + len(CAPTION_LIST_2) + len(CAPTION_LIST_3) + len(CAPTION_LIST_4) + idx
+                    elif message.text in CAPTION_LIST_6:
+                        idx = CAPTION_LIST_6.index(message.text)
+                        global_idx = len(CAPTION_LIST_1) + len(CAPTION_LIST_2) + len(CAPTION_LIST_3) + len(CAPTION_LIST_4) + len(CAPTION_LIST_5) + idx
                     else:
                         global_idx = None
                 elif project == "golden_lake":
