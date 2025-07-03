@@ -28,7 +28,8 @@ async def my_chat_member_handler(message: types.ChatMemberUpdated):
                 user_id=group_id,
                 name=group_title,
                 phone=None,  # У групп нет номера телефона
-                is_group=True  # Указываем, что это группа
+                is_group=True,  # Указываем, что это группа
+                group_id=None  # Для самой группы group_id не нужен
             )
             logging.info(f"Бот добавлен в группу '{group_title}' (ID: {group_id}). Группа добавлена/обновлена в базе.")
 

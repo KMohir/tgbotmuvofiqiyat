@@ -136,7 +136,10 @@ try:
         try:
             async with state.proxy() as data:
                 name = data.get('name')
-                db.add_user(message.from_user.id, name, contact)  # Сначала добавляем пользователя
+                if message.chat.type in [types.ChatType.GROUP, types.ChatType.SUPERGROUP]:
+                    db.add_user(message.from_user.id, name, contact, group_id=message.chat.id)
+                else:
+                    db.add_user(message.from_user.id, name, contact)
                 db.update(message.from_user.id, name, contact)    # Затем обновляем данные
                 caption = get_video_caption()
                 try:

@@ -64,6 +64,7 @@ class Database:
             self._add_column_if_not_exists(cursor, 'users', 'viewed_videos', "TEXT DEFAULT '[]'")
             self._add_column_if_not_exists(cursor, 'users', 'is_group', 'BOOLEAN DEFAULT FALSE')
             self._add_column_if_not_exists(cursor, 'users', 'is_banned', 'BOOLEAN DEFAULT FALSE')
+            self._add_column_if_not_exists(cursor, 'users', 'group_id', 'TEXT')
 
             # --- Таблица support ---
             cursor.execute('''
@@ -111,14 +112,14 @@ class Database:
             logger.error(f"Ошибка при проверке существования пользователя {user_id}: {e}")
             return False
 
-    def add_user(self, user_id, name, phone, preferred_time="07:00", is_group=False):
+    def add_user(self, user_id, name, phone, preferred_time="07:00", is_group=False, group_id=None):
         try:
             cursor = self.conn.cursor()
             cursor.execute('''
-                INSERT INTO users (user_id, name, phone, preferred_time, is_group)
-                VALUES (%s, %s, %s, %s, %s)
+                INSERT INTO users (user_id, name, phone, preferred_time, is_group, group_id)
+                VALUES (%s, %s, %s, %s, %s, %s)
                 ON CONFLICT (user_id) DO NOTHING
-            ''', (user_id, name, phone, preferred_time, is_group))
+            ''', (user_id, name, phone, preferred_time, is_group, group_id))
             self.conn.commit()
             cursor.close()
         except Exception as e:
@@ -536,6 +537,17 @@ class Database:
         except Exception as e:
             logger.error(f"Ошибка при обновлении индекса и просмотренных видео группы {chat_id}: {e}")
             self.conn.rollback()
+
+    def get_users_by_group(self, group_id):
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute("SELECT user_id FROM users WHERE group_id = %s AND is_group = FALSE AND is_banned = FALSE", (group_id,))
+            result = [row[0] for row in cursor.fetchall()]
+            cursor.close()
+            return result
+        except Exception as e:
+            logger.error(f"Ошибка при получении пользователей группы {group_id}: {e}")
+            return []
 
     def close(self):
         try:

@@ -166,8 +166,8 @@ try:
             if db.is_group_banned(chat_id):
                 logger.info(f"Пропускаем отправку видео в заблокированную группу {chat_id}")
                 return False
-            # Получаем нужный список видео
             if project == "centris":
+                # Собираем общий список видео всех сезонов
                 season_map = {
                     "1-sezon": VIDEO_LIST_1,
                     "2-sezon": VIDEO_LIST_2,
@@ -175,47 +175,89 @@ try:
                     "4-sezon": VIDEO_LIST_4,
                     "5-sezon": VIDEO_LIST_5,
                 }
-                video_list = season_map.get(season, [])
-                viewed = db.get_group_viewed_videos(f"centris_{chat_id}_{season}")
-                # Определяем индекс видео для отправки
-                now = datetime.now(pytz.timezone("Asia/Tashkent"))
-                hour = now.hour
-                idx = start_video
-                if season == "1-sezon":
-                    if hour == 8:
-                        idx = start_video
-                    elif hour == 20:
-                        idx = start_video + 1
-                # Пропускаем просмотренные
-                while idx < len(video_list) and idx in viewed:
-                    idx += 1
+                all_seasons = [VIDEO_LIST_1, VIDEO_LIST_2, VIDEO_LIST_3, VIDEO_LIST_4, VIDEO_LIST_5]
+                all_videos = []
+                for s in all_seasons:
+                    all_videos.extend(s)
+                # Определяем глобальный стартовый индекс
+                if season in season_map:
+                    season_idx = list(season_map.keys()).index(season)
+                    global_start_idx = sum(len(s) for s in all_seasons[:season_idx]) + start_video
+                else:
+                    global_start_idx = 0
+                # Получаем просмотренные видео для группы
+                viewed = set()
+                for i, s in enumerate(all_seasons):
+                    viewed.update(db.get_group_viewed_videos(f"centris_{chat_id}_{list(season_map.keys())[i]}"))
+                # Получаем всех участников группы
+                group_users = db.get_users_by_group(chat_id)
+                # Получаем просмотренные видео всеми участниками
+                user_viewed = set()
+                for user_id in group_users:
+                    user_viewed.update(db.get_viewed_videos(user_id))
+                # Ищем первое непросмотренное видео начиная с глобального индекса
+                idx = global_start_idx
+                while idx < len(all_videos):
+                    if idx in viewed or idx in user_viewed:
+                        idx += 1
+                    else:
+                        break
+                if 0 <= idx < len(all_videos):
+                    video_url = all_videos[idx]
+                    message_id = int(video_url.split("/")[-1])
+                    await bot.copy_message(
+                        chat_id=chat_id,
+                        from_chat_id=-1002550852551,
+                        message_id=message_id,
+                        protect_content=True
+                    )
+                    logger.info(f"Видео {idx} отправлено в группу {chat_id} (проект {project})")
+                    # Определяем сезон и локальный индекс для отметки как просмотренного
+                    season_lengths = [len(s) for s in all_seasons]
+                    acc = 0
+                    for i, l in enumerate(season_lengths):
+                        if idx < acc + l:
+                            local_season = list(season_map.keys())[i]
+                            local_idx = idx - acc
+                            db.mark_group_video_as_viewed(f"centris_{chat_id}_{local_season}", local_idx)
+                            break
+                        acc += l
+                    return True
+                else:
+                    logger.info(f"Нет новых видео для отправки: idx={idx}, project={project}, season={season}")
+                    return False
             elif project == "golden_lake":
+                # Golden Lake — один сезон, но логика аналогична Centris
                 video_list = VIDEO_LIST_GOLDEN_1
-                viewed = db.get_group_viewed_videos(f"golden_{chat_id}")
+                total_videos = len(video_list)
+                viewed = set(db.get_group_viewed_videos(f"golden_{chat_id}"))
+                group_users = db.get_users_by_group(chat_id)
+                user_viewed = set()
+                for user_id in group_users:
+                    user_viewed.update(db.get_viewed_videos(user_id))
+                # Ищем первое непросмотренное видео начиная с стартового индекса
                 idx = start_video
-                while idx < len(video_list) and idx in viewed:
-                    idx += 1
-            else:
-                return False
-            # Проверяем границы
-            if 0 <= idx < len(video_list):
-                video_url = video_list[idx]
-                message_id = int(video_url.split("/")[-1])
-                await bot.copy_message(
-                    chat_id=chat_id,
-                    from_chat_id=-1002550852551,
-                    message_id=message_id,
-                    protect_content=True
-                )
-                logger.info(f"Видео {idx} отправлено в группу {chat_id} (проект {project})")
-                # Отмечаем как просмотренное
-                if project == "centris":
-                    db.mark_group_video_as_viewed(f"centris_{chat_id}_{season}", idx)
-                elif project == "golden_lake":
+                while idx < total_videos:
+                    if idx in viewed or idx in user_viewed:
+                        idx += 1
+                    else:
+                        break
+                if 0 <= idx < total_videos:
+                    video_url = video_list[idx]
+                    message_id = int(video_url.split("/")[-1])
+                    await bot.copy_message(
+                        chat_id=chat_id,
+                        from_chat_id=-1002550852551,
+                        message_id=message_id,
+                        protect_content=True
+                    )
+                    logger.info(f"Видео {idx} отправлено в группу {chat_id} (проект {project})")
                     db.mark_group_video_as_viewed(f"golden_{chat_id}", idx)
-                return True
+                    return True
+                else:
+                    logger.info(f"Нет новых видео для отправки: idx={idx}, project={project}, season={season}")
+                    return False
             else:
-                logger.info(f"Нет новых видео для отправки: idx={idx}, project={project}, season={season}")
                 return False
         except Exception as e:
             logger.error(f"Ошибка при отправке видео в группу {chat_id}: {e}")

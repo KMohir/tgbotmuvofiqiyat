@@ -10,6 +10,7 @@ try:
     from aiogram.dispatcher import FSMContext
     from aiogram.dispatcher.filters.state import State, StatesGroup
     from handlers.users.video_lists import CAPTION_LIST_5, VIDEO_LIST_5
+    from data.config import ADMINS
 
     # Список описаний для извлечения названий уроков (только для кнопок)
     CAPTION_LIST_2 = [
@@ -100,7 +101,10 @@ try:
         user_id = message.from_user.id
         # Добавляем пользователя в базу данных, если его нет
         if not db.user_exists(user_id):
-            db.add_user(user_id, "Не указано", "Не указано", "09:00")
+            if message.chat.type in [types.ChatType.GROUP, types.ChatType.SUPERGROUP]:
+                db.add_user(user_id, "Не указано", "Не указано", "09:00", group_id=message.chat.id)
+            else:
+                db.add_user(user_id, "Не указано", "Не указано", "09:00")
             # Устанавливаем last_sent как текущую дату и время
             db.update_last_sent(user_id, datetime.now())
 
@@ -112,10 +116,11 @@ try:
     @dp.message_handler(text="Unsubscribe")
     async def cmd_unsubscribe(message: types.Message):
         user_id = message.from_user.id
-        if not db.user_exists(user_id):
-            await message.answer("Iltimos, /start buyrug'i bilan ro'yxatdan o'ting.")
-            return
-
+        # Проверка регистрации только для лички и админов
+        if message.chat.type == types.ChatType.PRIVATE or user_id in ADMINS:
+            if not db.user_exists(user_id):
+                await message.answer("Iltimos, /start buyrug'i bilan ro'yxatdan o'ting.")
+                return
         db.unsubscribe_user(user_id)
         await message.answer("Siz obunadan chiqdingiz. Qayta obuna bo'lish uchun /start ni bosing.")
 
@@ -123,9 +128,9 @@ try:
     @dp.message_handler(Command("videos"))
     @dp.message_handler(Text(equals="FAQ ?"))
     async def cmd_videos(message: types.Message):
-        # Только для лички требуем регистрацию
-        if message.chat.type == types.ChatType.PRIVATE:
-            user_id = message.from_user.id
+        user_id = message.from_user.id
+        # Проверка регистрации только для лички и админов
+        if message.chat.type == types.ChatType.PRIVATE or user_id in ADMINS:
             if not db.user_exists(user_id):
                 await message.answer("Iltimos, /start buyrug'i bilan ro'yxatdan o'ting.")
                 return
@@ -141,9 +146,9 @@ try:
 
     @dp.message_handler(lambda message: any(message.text.startswith(f"{i}.") for i in range(1, 16)))
     async def send_selected_lesson(message: types.Message):
-        # Только для лички требуем регистрацию
-        if message.chat.type == types.ChatType.PRIVATE:
-            user_id = message.from_user.id
+        user_id = message.from_user.id
+        # Проверка регистрации только для лички и админов
+        if message.chat.type == types.ChatType.PRIVATE or user_id in ADMINS:
             if not db.user_exists(user_id):
                 await message.answer("Iltimos, /start buyrug'i bilan ro'yxatdan o'ting.")
                 return
@@ -197,7 +202,7 @@ try:
         if message.chat.type in [types.ChatType.GROUP, types.ChatType.SUPERGROUP]:
             # Меняем время для группы
             if not db.user_exists(message.chat.id):
-                db.add_user(message.chat.id, message.chat.title or "Группа", None, preferred_time=new_time, is_group=True)
+                db.add_user(message.chat.id, message.chat.title or "Группа", None, preferred_time=new_time, is_group=True, group_id=message.chat.id)
             db.set_preferred_time(message.chat.id, new_time)
             await message.reply(f"Время рассылки для этой группы установлено на {new_time}")
         else:
