@@ -12,11 +12,9 @@ try:
     import os
     from keyboards.default.reply import key, get_lang_for_button
 
-    @dp.message_handler(state=RegistrationStates.help)
     @dp.message_handler(Command("help"))
     async def bot_help(message: types.Message, state: FSMContext):
         text = "Buyruqlar ro'yxati:\n/taklif - Texnik yordamga habar yozish\n/about - Bino bilan tanishish"
-
         await message.answer(text, reply_markup=ReplyKeyboardRemove())
         await state.finish()
 
@@ -24,8 +22,6 @@ try:
     IMAGE_PATH2 = 'contact2.jpg'  # Изображение для Гугай Алены
     IMAGE_PATH3 = 'contact3.jpg'  # Изображение для Хакимовой Тахмины
 
-    @dp.message_handler(state=RegistrationStates.help)
-    @dp.message_handler(text="Centris Towers bilan bog'lanish")
     @dp.message_handler(Command("contact"))
     async def bot_contact(message: types.Message, state: FSMContext):
         # Текст для Нарзиева Самира (на узбекском)

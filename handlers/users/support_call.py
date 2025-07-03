@@ -19,23 +19,10 @@ try:
 
     @dp.message_handler(Text(equals=["/takliflar", "Takliflarni yuborish"]))
     async def ask_support(message: types.Message, state: FSMContext):
-        if not db.user_exists(message.from_user.id):
-            await bot.send_message(
-                message.from_user.id,
-                'Assalomu aleykum, Centris Towers yordamchi botiga hush kelibsiz!'
-            )
-            # Запрашиваем имя без выбора языка
-            await message.answer("Ismingizni kiriting")
-            await RegistrationStates.name.set()
-            return
-
         user_id = 5657091547  # ID оператора поддержки
-
-        # Создаем клавиатуру с кнопкой "Назад"
         back_keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
         back_button = types.KeyboardButton("Orqaga")
         back_keyboard.add(back_button)
-
         await message.answer(
             "Savolingizni yoki murojatingizni 1 ta habar orqali yuboring.",
             reply_markup=back_keyboard
@@ -59,15 +46,8 @@ try:
 
     @dp.message_handler(state="wait_for_support_message", content_types=types.ContentTypes.ANY)
     async def get_support_message(message: types.Message, state: FSMContext):
-        if not db.user_exists(message.from_user.id):
-            await message.answer("Iltimos, /start buyrug'i bilan ro'yxatdan o'ting.")
-            await state.reset_state()
-            return
-
         data = await state.get_data()
         second_id = data.get("second_id")
-
-        # Проверяем, нажал ли пользователь "Назад"
         if message.text == "Orqaga":
             await message.answer(
                 "Operatsiya bekor qilindi",
@@ -75,37 +55,30 @@ try:
             )
             await state.reset_state()
             return
-
-        # Уведомляем пользователя, что сообщение отправлено
         await message.answer(
             'Savolingiz / Murojatingiz bizning operatorlarga yuborildi, yaqin orada sizga javob beramiz!',
             reply_markup=ReplyKeyboardRemove()
         )
-
-        # Получаем данные пользователя
         name = db.get_name(message.from_user.id)
         phone = db.get_phone(message.from_user.id)
-
-        # Отправляем сообщение оператору и в группу
         for support_id in support_ids:
             if str(second_id) == support_id:
                 try:
                     keyboard = await support_keyboard(message, messages="one", user_id=message.from_user.id)
                     db.add_questions(message.from_user.id, message.message_id)
                     a = db.get_id()
-
-                    if message.text is None:  # Если это не текст (например, фото или видео)
+                    if message.text is None:
                         await message.copy_to(
                             second_id,
                             caption=f"Raqami: {a}\nI.SH.: {name}\nUsername: @{message.from_user.username}\nNomer: <code>{phone}</code>\nHabar: {message.caption or 'Matnsiz'}",
                             reply_markup=keyboard
                         )
                         await message.copy_to(
-                            -1002601209038,  # ID группы
+                            -1002601209038,
                             caption=f"Raqami: {a}\nI.SH.: {name}\nUsername: @{message.from_user.username}\nNomer: <code>{phone}</code>\nHabar: {message.caption or 'Matnsiz'}",
                             reply_markup=keyboard
                         )
-                    else:  # Если это текстовое сообщение
+                    else:
                         await bot.send_message(
                             second_id,
                             f"Raqami: {a}\nI.SH.: {name}\nUsername: @{message.from_user.username}\nNomer: <code>{phone}</code>\nHabar: {message.text}",
@@ -119,7 +92,6 @@ try:
                     print(f"Error sending to support: {e}")
                     continue
             else:
-                # Логика для ответа на предыдущее сообщение
                 db.add_questions(message.from_user.id, message.message_id)
                 reply = db.get_question(second_id)
                 keyboard = await support_keyboard(message, messages="one", user_id=message.from_user.id)
@@ -138,13 +110,11 @@ try:
                         )
                 except Exception as e:
                     print(f"Error replying to support: {e}")
-
                 await bot.send_message(
                     second_id,
                     "Yana savolingiz yoki murojatingiz bo'lsa, /taklif orqali berishingiz mumkin.",
                     reply_markup=get_lang_for_button(message)
                 )
-
         await state.reset_state()
 
 
@@ -164,30 +134,18 @@ try:
         await state.reset_state()
 
 
-
-
     @dp.message_handler(Text(equals=["/about", "Bino bilan tanishish"]))
     async def bot_help(message: types.Message):
-        if not db.user_exists(message.from_user.id):
-            await message.answer("Iltimos, /start buyrug'i bilan ro'yxatdan o'ting.")
-            return
-
-        # Создаём inline-клавиатуру
         markup = types.InlineKeyboardMarkup()
-        # Добавляем кнопку с типом url, которая ведёт на бота
         markup.add(
             types.InlineKeyboardButton(
                 text="Centris Towers botiga o'tish",
                 url="https://t.me/centris_towers_sells_bot"
             )
         )
-
-        # Текст сообщения
         caption = (
             "Centris Towers binolari haqida ko'proq ma'lumot olish uchun quyidagi tugmani bosing:"
         )
-
-        # Отправляем сообщение с inline-кнопкой
         await message.answer(
             caption,
             reply_markup=markup

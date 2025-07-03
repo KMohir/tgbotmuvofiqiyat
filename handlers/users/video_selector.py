@@ -116,11 +116,6 @@ try:
     @dp.message_handler(text="Unsubscribe")
     async def cmd_unsubscribe(message: types.Message):
         user_id = message.from_user.id
-        # Проверка регистрации только для лички и админов
-        if message.chat.type == types.ChatType.PRIVATE or user_id in ADMINS:
-            if not db.user_exists(user_id):
-                await message.answer("Iltimos, /start buyrug'i bilan ro'yxatdan o'ting.")
-                return
         db.unsubscribe_user(user_id)
         await message.answer("Siz obunadan chiqdingiz. Qayta obuna bo'lish uchun /start ni bosing.")
 
@@ -128,16 +123,6 @@ try:
     @dp.message_handler(Command("videos"))
     @dp.message_handler(Text(equals="FAQ ?"))
     async def cmd_videos(message: types.Message):
-        user_id = message.from_user.id
-        # Проверка регистрации только для лички и админов
-        if message.chat.type == types.ChatType.PRIVATE or user_id in ADMINS:
-            if not db.user_exists(user_id):
-                await message.answer("Iltimos, /start buyrug'i bilan ro'yxatdan o'ting.")
-                return
-            is_subscribed = db.get_subscription_status(user_id)
-            if not is_subscribed:
-                await message.answer("Siz obunadan chiqgansiz. Qayta obuna bo'lish uchun /start ni bosing.")
-                return
         await message.answer(
             "Iltimos, qaysi darsni ko'rmoqchi ekanligingizni tanlang:",
             reply_markup=get_lesson_keyboard()
@@ -146,12 +131,6 @@ try:
 
     @dp.message_handler(lambda message: any(message.text.startswith(f"{i}.") for i in range(1, 16)))
     async def send_selected_lesson(message: types.Message):
-        user_id = message.from_user.id
-        # Проверка регистрации только для лички и админов
-        if message.chat.type == types.ChatType.PRIVATE or user_id in ADMINS:
-            if not db.user_exists(user_id):
-                await message.answer("Iltimos, /start buyrug'i bilan ro'yxatdan o'ting.")
-                return
         try:
             lesson_number = int(message.text.split(".")[0])
             video_index = lesson_number - 1
@@ -160,7 +139,6 @@ try:
                 return
             video_url = VIDEO_LIST[video_index]
             message_id = int(video_url.split("/")[-1])
-            # Отправляем видео в тот же чат, откуда пришёл запрос
             await bot.copy_message(
                 chat_id=message.chat.id,
                 from_chat_id=-1002550852551,
@@ -168,7 +146,6 @@ try:
                 protect_content=True,
                 reply_markup=get_lesson_keyboard()
             )
-            # Отмечаем просмотр только для лички
             if message.chat.type == types.ChatType.PRIVATE:
                 db.mark_video_as_viewed(message.from_user.id, video_index)
         except (ValueError, IndexError) as e:

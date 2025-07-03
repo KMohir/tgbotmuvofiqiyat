@@ -17,10 +17,6 @@ try:
     @dp.message_handler(commands=['get_registration_time'], state="*")
     async def get_registration_time_command(message: types.Message, state: FSMContext):
         user_id = message.from_user.id
-        if not db.user_exists(user_id):
-            await message.reply("Siz hali ro'yxatdan o'tmagansiz!")
-            return
-
         reg_time = db.get_registration_time(user_id)
         if reg_time:
             await message.reply(f"Siz ro'yxatdan o'tgan vaqtingiz: {reg_time} (O'zbekiston vaqti)")
