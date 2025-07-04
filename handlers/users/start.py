@@ -53,6 +53,14 @@ try:
                 logger.warning(f"Обнаружен спам от пользователя {message.from_user.id}")
                 return
 
+            # Если команда из группы — не спрашивать имя, не запускать регистрацию
+            if message.chat.type in [types.ChatType.GROUP, types.ChatType.SUPERGROUP]:
+                if not db.user_exists(message.chat.id):
+                    db.add_user(message.chat.id, message.chat.title or "Группа", None, is_group=True, group_id=message.chat.id)
+                await message.answer("Бот активирован в группе!\nВсе участники могут пользоваться функциями без регистрации.", reply_markup=main_menu_keyboard)
+                return
+
+            # В личке — прежняя логика
             if not db.user_exists(message.from_user.id):
                 await bot.send_message(
                     message.from_user.id,
@@ -71,8 +79,6 @@ try:
                         reply_markup=get_lang_for_button(message),
                         protect_content=True
                     )
-
-
                 except Exception as e:
                     logger.error(f"Ошибка при отправке видео пользователю {message.from_user.id}: {e}")
                     await message.answer("Video yuborishda xato yuz berdi. Iltimos, keyinroq urinib ko'ring.")
@@ -126,7 +132,7 @@ try:
 
             contact = message.contact.phone_number
             await save_user_data(message, state, contact)  # Сохраняем пользователя сразу
-            await message.answer("Ro'yxatdan muvaffaqiyatli o'tdingiz!", reply_markup=ReplyKeyboardRemove())
+            await message.answer("Ro'yxatdan muvaffaqiyatli o'tdingiz!")
         except Exception as e:
             logger.error(f"Ошибка при обработке контакта пользователя {message.from_user.id}: {e}")
             await message.answer("Xatolik yuz berdi. Iltimos, qaytadan urinib ko'ring.")
@@ -143,15 +149,16 @@ try:
                 db.update(message.from_user.id, name, contact)    # Затем обновляем данные
                 caption = get_video_caption()
                 try:
-                    await bot.copy_message(
-                        chat_id=message.chat.id,
-                        from_chat_id=-1002550852551,
-                        message_id=135,
-                        caption='',
-                        parse_mode="HTML",
-                        reply_markup=get_lang_for_button(message),
-                        protect_content=True
-                    )
+
+                        await bot.copy_message(
+                            chat_id=message.chat.id,
+                            from_chat_id=-1002550852551,
+                            message_id=135,
+                            caption='',
+                            parse_mode="HTML",
+                            reply_markup=get_lang_for_button(message),
+                            protect_content=True
+                        )
                 except Exception as e:
                     logger.error(f"Ошибка при отправке видео после регистрации {message.from_user.id}: {e}")
                     await message.answer("Video yuborishda xato yuz berdi. Iltimos, keyinroq urinib ko'ring.")

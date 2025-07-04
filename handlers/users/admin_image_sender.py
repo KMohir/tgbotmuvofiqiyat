@@ -20,6 +20,13 @@ try:
         waiting_for_centr_video = State()
         waiting_for_golden_video = State()
 
+    # --- FSM для добавления сезона ---
+    class AddSeasonStates(StatesGroup):
+        waiting_for_project = State()
+        waiting_for_season_name = State()
+        waiting_for_video_links = State()
+        waiting_for_video_titles = State()
+
     # --- Клавиатуры ---
     def get_project_keyboard():
         kb = InlineKeyboardMarkup(row_width=2)
@@ -345,6 +352,61 @@ try:
             db.set_group_video_index_and_viewed(f"centris_{chat_id}_{season}", None, season, 0, [])
         db.set_group_video_index_and_viewed(f"golden_{chat_id}", None, None, 0, [])
         await message.answer("Прогресс группы сброшен. Теперь можно выбрать стартовое видео заново.")
+
+    @dp.message_handler(Command('add_season'), user_id=ADMINS)
+    async def add_season_command(message: types.Message, state: FSMContext):
+        kb = InlineKeyboardMarkup(row_width=2)
+        kb.add(
+            InlineKeyboardButton("Centris Towers", callback_data="add_project_centr"),
+            InlineKeyboardButton("Golden Lake", callback_data="add_project_golden")
+        )
+        await message.answer("Выберите проект для нового сезона:", reply_markup=kb)
+        await state.set_state(AddSeasonStates.waiting_for_project.state)
+
+    @dp.callback_query_handler(lambda c: c.data.startswith("add_project_"), state=AddSeasonStates.waiting_for_project.state)
+    async def add_season_project(callback_query: types.CallbackQuery, state: FSMContext):
+        project = callback_query.data.replace("add_project_", "")
+        await state.update_data(project=project)
+        await callback_query.message.edit_text("Введите название сезона:")
+        await state.set_state(AddSeasonStates.waiting_for_season_name.state)
+
+    @dp.message_handler(state=AddSeasonStates.waiting_for_season_name)
+    async def add_season_name(message: types.Message, state: FSMContext):
+        await state.update_data(season_name=message.text.strip())
+        await message.answer("Отправьте список ссылок на видео (каждая ссылка с новой строки):")
+        await state.set_state(AddSeasonStates.waiting_for_video_links.state)
+
+    @dp.message_handler(state=AddSeasonStates.waiting_for_video_links)
+    async def add_season_video_links(message: types.Message, state: FSMContext):
+        links = [l.strip() for l in message.text.strip().splitlines() if l.strip()]
+        await state.update_data(video_links=links)
+        await message.answer("Отправьте список названий видео (каждое название с новой строки, порядок должен совпадать со ссылками):")
+        await state.set_state(AddSeasonStates.waiting_for_video_titles.state)
+
+    @dp.message_handler(state=AddSeasonStates.waiting_for_video_titles)
+    async def add_season_video_titles(message: types.Message, state: FSMContext):
+        titles = [t.strip() for t in message.text.strip().splitlines() if t.strip()]
+        data = await state.get_data()
+        links = data.get("video_links", [])
+        if len(links) != len(titles):
+            await message.answer(f"Количество ссылок ({len(links)}) и названий ({len(titles)}) не совпадает! Попробуйте снова. Отправьте список названий видео:")
+            return
+        # Сохраняем сезон и видео в базу
+        project = data.get("project")
+        season_name = data.get("season_name")
+        db.add_season_with_videos(project, season_name, links, titles)
+        await message.answer(f"Сезон '{season_name}' успешно добавлен в проект '{project}'.")
+        await state.finish()
+
+    # --- Функция для добавления сезона и видео в базу ---
+    def add_season_with_videos(self, project, season_name, links, titles):
+        cursor = self.conn.cursor()
+        cursor.execute("INSERT INTO seasons (project, name) VALUES (?, ?)", (project, season_name))
+        season_id = cursor.lastrowid
+        for pos, (url, title) in enumerate(zip(links, titles)):
+            cursor.execute("INSERT INTO videos (season_id, url, title, position) VALUES (?, ?, ?, ?)", (season_id, url, title, pos))
+        self.conn.commit()
+        cursor.close()
 
 except Exception as exx:
     from datetime import datetime

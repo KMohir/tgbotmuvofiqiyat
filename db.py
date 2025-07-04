@@ -1,5 +1,4 @@
 import psycopg2  # Для PostgreSQL
-# import sqlite3  # Для SQLite
 from datetime import datetime
 import json
 import logging
@@ -20,7 +19,6 @@ load_dotenv()
 class Database:
     def __init__(self):
         try:
-            # Подключение к PostgreSQL
             self.conn = psycopg2.connect(
                 host=os.getenv('DB_HOST', 'localhost'),
                 port=os.getenv('DB_PORT', '5432'),
@@ -34,7 +32,6 @@ class Database:
             raise
 
     def _add_column_if_not_exists(self, cursor, table_name, column_name, column_type):
-        """Проверяет и добавляет столбец, если он не существует."""
         cursor.execute("""
             SELECT 1
             FROM information_schema.columns
@@ -47,7 +44,7 @@ class Database:
     def create_tables(self):
         try:
             cursor = self.conn.cursor()
-
+            
             # --- Таблица users ---
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS users (
@@ -95,6 +92,27 @@ class Database:
             self._add_column_if_not_exists(cursor, 'group_video_settings', 'centris_start_video', 'INTEGER DEFAULT 0')
             self._add_column_if_not_exists(cursor, 'group_video_settings', 'golden_enabled', 'BOOLEAN DEFAULT FALSE')
             self._add_column_if_not_exists(cursor, 'group_video_settings', 'golden_start_video', 'INTEGER DEFAULT 0')
+
+            # --- Таблица seasons ---
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS seasons (
+                    id SERIAL PRIMARY KEY,
+                    project TEXT NOT NULL,
+                    name TEXT NOT NULL
+                )
+            ''')
+
+            # --- Таблица videos ---
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS videos (
+                    id SERIAL PRIMARY KEY,
+                    season_id INTEGER REFERENCES seasons(id) ON DELETE CASCADE,
+                    url TEXT NOT NULL,
+                    title TEXT NOT NULL,
+                    position INTEGER NOT NULL
+                )
+            ''')
+            
             self.conn.commit()
             cursor.close()
         except Exception as e:
@@ -519,29 +537,33 @@ class Database:
             self.conn.rollback()
 
     def get_next_unwatched_group_video_index(self, chat_id, all_videos_count):
-        viewed = set(self.get_group_viewed_videos(chat_id))
-        for idx in range(all_videos_count):
-            if idx not in viewed:
-                return idx
-        return -1
+        try:
+            viewed_videos = self.get_group_viewed_videos(chat_id)
+            for i in range(all_videos_count):
+                if i not in viewed_videos:
+                    return i
+            return 0
+        except Exception as e:
+            logger.error(f"Ошибка при получении следующего непросмотренного видео для группы {chat_id}: {e}")
+            return 0
 
     def set_group_video_index_and_viewed(self, chat_id, project, season, video_index, viewed_videos):
         try:
             cursor = self.conn.cursor()
             cursor.execute(
-                "UPDATE group_video_settings SET project = %s, season = %s, video_index = %s, viewed_videos = %s WHERE chat_id = %s",
-                (project, season, video_index, json.dumps(viewed_videos), chat_id)
+                "UPDATE group_video_settings SET viewed_videos = %s WHERE chat_id = %s",
+                (json.dumps(viewed_videos), chat_id)
             )
             self.conn.commit()
             cursor.close()
         except Exception as e:
-            logger.error(f"Ошибка при обновлении индекса и просмотренных видео группы {chat_id}: {e}")
+            logger.error(f"Ошибка при установке индекса и просмотренных видео для группы {chat_id}: {e}")
             self.conn.rollback()
 
     def get_users_by_group(self, group_id):
         try:
             cursor = self.conn.cursor()
-            cursor.execute("SELECT user_id FROM users WHERE group_id = %s AND is_group = FALSE AND is_banned = FALSE", (group_id,))
+            cursor.execute("SELECT user_id FROM users WHERE group_id = %s", (group_id,))
             result = [row[0] for row in cursor.fetchall()]
             cursor.close()
             return result
@@ -550,13 +572,8 @@ class Database:
             return []
 
     def close(self):
-        try:
+        if hasattr(self, 'conn'):
             self.conn.close()
-        except Exception as e:
-            logger.error(f"Ошибка при закрытии соединения с базой данных: {e}")
 
-# Для SQLite (по умолчанию)
+# Создание экземпляра базы данных
 db = Database()
-
-# Для PostgreSQL (оставьте закомментированным)
-# db = Database()
