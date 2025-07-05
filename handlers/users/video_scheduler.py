@@ -85,23 +85,51 @@ try:
             if db.is_group_banned(chat_id):
                 logger.info(f"Пропускаем отправку видео в заблокированную группу {chat_id}")
                 return False
-            videos = get_videos_for_group(project, season_id)
-            if not videos:
+            # Получаем все сезоны проекта (отсортированные)
+            if project == "centris":
+                seasons = db.get_seasons_by_project("centr")
+            elif project == "golden_lake":
+                seasons = db.get_seasons_by_project("golden")
+            else:
+                seasons = []
+            # Собираем все видео всех сезонов в один список [(season_id, url, title, position)]
+            all_videos = []
+            for s_id, s_name in seasons:
+                videos = db.get_videos_by_season(s_id)
+                for url, title, position in videos:
+                    all_videos.append((s_id, url, title, position))
+            if not all_videos:
                 logger.info(f"Нет видео для рассылки: project={project}, season_id={season_id}")
                 return False
-            viewed = set(db.get_group_viewed_videos(f"{project}_{chat_id}_{season_id}"))
+            # Определяем глобальный стартовый индекс
+            # Найти индекс первого видео выбранного сезона и позиции
+            global_start_idx = 0
+            found = False
+            for idx, (s_id, url, title, position) in enumerate(all_videos):
+                if s_id == season_id and position == start_video:
+                    global_start_idx = idx
+                    found = True
+                    break
+            if not found:
+                global_start_idx = 0
+            # Получаем просмотренные видео для группы (глобальные индексы)
+            viewed = set()
+            for s_id, s_name in seasons:
+                viewed.update([global_idx for global_idx, (sid, _, _, pos) in enumerate(all_videos) if sid == s_id and pos in db.get_group_viewed_videos(f"{project}_{chat_id}_{s_id}")])
             group_users = db.get_users_by_group(chat_id)
             user_viewed = set()
             for user_id in group_users:
-                user_viewed.update(db.get_viewed_videos(user_id))
-            idx = start_video
-            while idx < len(videos):
+                for s_id, s_name in seasons:
+                    user_viewed.update([global_idx for global_idx, (sid, _, _, pos) in enumerate(all_videos) if sid == s_id and pos in db.get_viewed_videos(user_id)])
+            # Ищем первое непросмотренное видео начиная с глобального стартового индекса
+            idx = global_start_idx
+            while idx < len(all_videos):
                 if idx in viewed or idx in user_viewed:
                     idx += 1
                 else:
                     break
-            if 0 <= idx < len(videos):
-                url, title, position = videos[idx]
+            if 0 <= idx < len(all_videos):
+                s_id, url, title, position = all_videos[idx]
                 message_id = int(url.split("/")[-1])
                 await bot.copy_message(
                     chat_id=chat_id,
@@ -109,8 +137,8 @@ try:
                     message_id=message_id,
                     protect_content=True
                 )
-                logger.info(f"Видео {idx} отправлено в группу {chat_id} (проект {project})")
-                db.mark_group_video_as_viewed(f"{project}_{chat_id}_{season_id}", idx)
+                logger.info(f"Видео {position} сезона {s_id} отправлено в группу {chat_id} (проект {project})")
+                db.mark_group_video_as_viewed(f"{project}_{chat_id}_{s_id}", position)
                 return True
             else:
                 logger.info(f"Нет новых видео для отправки: idx={idx}, project={project}, season_id={season_id}")
