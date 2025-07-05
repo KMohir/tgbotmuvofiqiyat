@@ -376,8 +376,6 @@ async def send_video(message: types.Message, state: FSMContext):
             await message.answer("Video topilmadi.")
     except Exception as exx:
         from datetime import datetime
-        # Получить текущие дату и время
         now = datetime.now()
-        # Форматировать дату и время
         formatted_date_time = now.strftime("%Y-%m-%d %H:%M:%S")
         print('video selector', f"{formatted_date_time}", f"error {exx}")
