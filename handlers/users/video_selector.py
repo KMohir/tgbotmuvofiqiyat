@@ -213,15 +213,18 @@ main_menu_keyboard =ReplyKeyboardMarkup(
 # Клавиатура сезонов
 def get_season_keyboard(project=None):
     keyboard = ReplyKeyboardMarkup(resize_keyboard=True)
+    
     if project == "olden_lake":
-        keyboard.add(KeyboardButton("Golden lake 1"))
+        # Получаем сезоны Golden Lake из базы данных
+        golden_seasons = db.get_seasons_by_project("golden")
+        for season_id, season_name in golden_seasons:
+            keyboard.add(KeyboardButton(season_name))
     else:
-        keyboard.add(KeyboardButton("Яқинлар 1.0 I I Иброҳим Мамасаидов"))
-        keyboard.add(KeyboardButton("Яқинлар 2.0 I I Иброҳим Мамасаидов"))
-        keyboard.add(KeyboardButton("Яқинлар 3.0 I I Иброҳим Мамасаидов"))
-        keyboard.add(KeyboardButton("Яқинлар 4.0 I I Иброҳим Мамасаидов"))
-        keyboard.add(KeyboardButton("Яқинлар 5.0 I I Иброҳим Мамасаидов"))
-        keyboard.add(KeyboardButton("Яқинлар I Ташриф Centris Towers"))
+        # Получаем сезоны Centris Towers из базы данных
+        centris_seasons = db.get_seasons_by_project("centr")
+        for season_id, season_name in centris_seasons:
+            keyboard.add(KeyboardButton(season_name))
+    
     keyboard.add(KeyboardButton("Orqaga qaytish"))
     return keyboard
 
@@ -255,60 +258,53 @@ async def olden_lake_menu(message: types.Message, state: FSMContext):
     await message.answer("Qaysi sezonni ko'rmoqchisiz?")
     await state.set_state(VideoStates.season_select.state)
 
-@dp.message_handler(lambda m: m.text in [
-    "Яқинлар 1.0 I I Иброҳим Мамасаидов",
-    "Яқинлар 2.0 I I Иброҳим Мамасаидов",
-    "Яқинлар 3.0 I I Иброҳим Мамасаидов",
-    "Яқинлар 4.0 I I Иброҳим Мамасаидов",
-    "Яқинлар 5.0 I I Иброҳим Мамасаидов",
-    "Яқинлар I Ташриф Centris Towers",
-    "Golden lake 1"
-], state=VideoStates.season_select)
+@dp.message_handler(state=VideoStates.season_select)
 async def season_selection(message: types.Message, state: FSMContext):
     data = await state.get_data()
     project = data.get("project")
-    logging.warning(f"season_selection: project={project}, message.text={message.text}")
+    season_name = message.text.strip()
+    
+    logging.warning(f"season_selection: project={project}, message.text={season_name}")
+    
     if not project:
         await message.answer("Ошибка: не выбран проект. Попробуйте заново из главного меню.")
         return
-    if project == "centris":
-        if message.text == "Яқинлар 1.0 I I Иброҳим Мамасаидов":
-            await message.answer("Darsni tanlang:", reply_markup=get_video_keyboard(CAPTION_LIST_1))
-            await state.set_state(VideoStates.video_select.state)
-        elif message.text == "Яқинлар 2.0 I I Иброҳим Мамасаидов":
-            await message.answer("Darsni tanlang:", reply_markup=get_video_keyboard(CAPTION_LIST_2))
-            await state.set_state(VideoStates.video_select.state)
-        elif message.text == "Яқинлар 3.0 I I Иброҳим Мамасаидов":
-            await message.answer("Darsni tanlang:", reply_markup=get_video_keyboard(CAPTION_LIST_3))
-            await state.set_state(VideoStates.video_select.state)
-        elif message.text == "Яқинлар 4.0 I I Иброҳим Мамасаидов":
-            await message.answer("Darsni tanlang:", reply_markup=get_video_keyboard(CAPTION_LIST_4))
-            await state.set_state(VideoStates.video_select.state)
-        elif message.text == "Яқинлар 5.0 I I Иброҳим Мамасаидов":
-            await message.answer("Darsni tanlang:", reply_markup=get_video_keyboard(CAPTION_LIST_5))
-            await state.set_state(VideoStates.video_select.state)
-        elif message.text == "Яқинлар I Ташриф Centris Towers":
-            await message.answer("Darsni tanlang:", reply_markup=get_video_keyboard(CAPTION_LIST_6))
-            await state.set_state(VideoStates.video_select.state)
-    elif project == "olden_lake":
-        if message.text == "Golden lake 1":
-            logging.warning("Golden lake 1 выбран, показываем GOLDEN_LIST")
-            await message.answer("Darsni tanlang:", reply_markup=get_video_keyboard(GOLDEN_LIST))
-            await state.set_state(VideoStates.video_select.state)
-        elif message.text == "Яқинлар 2.0 I I Иброҳим Мамасаидов":
-            await message.answer("Golden lake 2-sezon hali tayyor emas")
-            await state.set_state(VideoStates.season_select.state)
-        elif message.text == "Яқинлар 3.0 I I Иброҳим Мамасаидов":
-            await message.answer("Golden lake 3-sezon hali tayyor emas")
-            await state.set_state(VideoStates.season_select.state)
-        elif message.text == "Яқинлар 4.0 I I Иброҳим Мамасаидов":
-            await message.answer("Golden lake 4-sezon hali tayyor emas")
-            await state.set_state(VideoStates.season_select.state)
-        elif message.text == "Яқинлар 5.0 I I Иброҳим Мамасаидов":
-            await message.answer("Golden lake 5-sezon hali tayyor emas")
-            await state.set_state(VideoStates.season_select.state)
-    else:
-        await message.answer(f"Ошибка: неизвестный проект {project}")
+    
+    if season_name == "Orqaga qaytish":
+        await back_to_main_menu(message, state)
+        return
+    
+    # Получаем сезон из базы данных
+    season_data = db.get_season_by_name(season_name)
+    if not season_data:
+        await message.answer("Сезон не найден. Попробуйте выбрать другой сезон.")
+        return
+    
+    season_id, season_project, season_name = season_data
+    
+    # Проверяем, что сезон принадлежит выбранному проекту
+    if project == "centris" and season_project != "centr":
+        await message.answer("Этот сезон не принадлежит проекту Centris Towers.")
+        return
+    elif project == "olden_lake" and season_project != "golden":
+        await message.answer("Этот сезон не принадлежит проекту Golden Lake.")
+        return
+    
+    # Получаем видео для этого сезона
+    videos = db.get_videos_by_season_name(season_name)
+    if not videos:
+        await message.answer("В этом сезоне нет видео.")
+        return
+    
+    # Создаем клавиатуру с названиями видео
+    video_titles = [video[1] for video in videos]  # video[1] - это title
+    keyboard = get_video_keyboard(video_titles)
+    
+    # Сохраняем информацию о сезоне в состоянии
+    await state.update_data(season_id=season_id, season_name=season_name, videos=videos)
+    
+    await message.answer("Darsni tanlang:", reply_markup=keyboard)
+    await state.set_state(VideoStates.video_select.state)
 
 @dp.message_handler(text="Orqaga qaytish", state=VideoStates.video_select)
 async def back_to_season_menu(message: types.Message, state: FSMContext):
@@ -334,36 +330,26 @@ async def centris_towers_command(message: types.Message):
 async def olden_lake_command(message: types.Message):
     await olden_lake_menu(message)
 
-@dp.message_handler(lambda m: m.text in CAPTION_LIST_1 + CAPTION_LIST_2 + CAPTION_LIST_3 + CAPTION_LIST_4 + CAPTION_LIST_5 + CAPTION_LIST_6 + GOLDEN_LIST, state=VideoStates.video_select)
+@dp.message_handler(state=VideoStates.video_select)
 async def send_video(message: types.Message, state: FSMContext):
     try:
         data = await state.get_data()
         project = data.get("project")
+        videos = data.get("videos", [])
+        season_name = data.get("season_name")
         
+        if message.text == "Orqaga qaytish":
+            await back_to_season_menu(message, state)
+            return
+        
+        # Ищем видео по названию
         video_url = None
-        if project == "centris":
-            if message.text in CAPTION_LIST_1:
-                idx = CAPTION_LIST_1.index(message.text)
-                video_url = VIDEO_LIST_1[idx]
-            elif message.text in CAPTION_LIST_2:
-                idx = CAPTION_LIST_2.index(message.text)
-                video_url = VIDEO_LIST_2[idx]
-            elif message.text in CAPTION_LIST_3:
-                idx = CAPTION_LIST_3.index(message.text)
-                video_url = VIDEO_LIST_3[idx]
-            elif message.text in CAPTION_LIST_4:
-                idx = CAPTION_LIST_4.index(message.text)
-                video_url = VIDEO_LIST_4[idx]
-            elif message.text in CAPTION_LIST_5:
-                idx = CAPTION_LIST_5.index(message.text)
-                video_url = VIDEO_LIST_5[idx]
-            elif message.text in CAPTION_LIST_6:
-                idx = CAPTION_LIST_6.index(message.text)
-                video_url = VIDEO_LIST_6[idx]
-        elif project == "olden_lake":
-            if message.text in GOLDEN_LIST:
-                idx = GOLDEN_LIST.index(message.text)
-                video_url = VIDEO_LIST_GOLDEN_1[idx]
+        video_position = None
+        for url, title, position in videos:
+            if title == message.text:
+                video_url = url
+                video_position = position
+                break
         
         if video_url:
             message_id = int(video_url.split("/")[-1])
@@ -373,41 +359,19 @@ async def send_video(message: types.Message, state: FSMContext):
                 message_id=message_id,
                 protect_content=True
             )
-            # Если это группа — сдвигаем индекс рассылки для группы вперёд и отмечаем просмотренное
+            
+            # Если это группа — отмечаем видео как просмотренное
             if message.chat.type in [types.ChatType.GROUP, types.ChatType.SUPERGROUP]:
-                # Определяем глобальный индекс видео
+                # Создаем уникальный идентификатор для группы и сезона
                 if project == "centris":
-                    all_videos = VIDEO_LIST_1 + VIDEO_LIST_2 + VIDEO_LIST_3 + VIDEO_LIST_4 + VIDEO_LIST_5 + VIDEO_LIST_6
-                    if message.text in CAPTION_LIST_1:
-                        idx = CAPTION_LIST_1.index(message.text)
-                        global_idx = idx
-                    elif message.text in CAPTION_LIST_2:
-                        idx = CAPTION_LIST_2.index(message.text)
-                        global_idx = len(CAPTION_LIST_1) + idx
-                    elif message.text in CAPTION_LIST_3:
-                        idx = CAPTION_LIST_3.index(message.text)
-                        global_idx = len(CAPTION_LIST_1) + len(CAPTION_LIST_2) + idx
-                    elif message.text in CAPTION_LIST_4:
-                        idx = CAPTION_LIST_4.index(message.text)
-                        global_idx = len(CAPTION_LIST_1) + len(CAPTION_LIST_2) + len(CAPTION_LIST_3) + idx
-                    elif message.text in CAPTION_LIST_5:
-                        idx = CAPTION_LIST_5.index(message.text)
-                        global_idx = len(CAPTION_LIST_1) + len(CAPTION_LIST_2) + len(CAPTION_LIST_3) + len(CAPTION_LIST_4) + idx
-                    elif message.text in CAPTION_LIST_6:
-                        idx = CAPTION_LIST_6.index(message.text)
-                        global_idx = len(CAPTION_LIST_1) + len(CAPTION_LIST_2) + len(CAPTION_LIST_3) + len(CAPTION_LIST_4) + len(CAPTION_LIST_5) + idx
-                    else:
-                        global_idx = None
+                    group_key = f"centris_{message.chat.id}_{season_name}"
                 elif project == "olden_lake":
-                    all_videos = VIDEO_LIST_GOLDEN_1
-                    if message.text in GOLDEN_LIST:
-                        global_idx = GOLDEN_LIST.index(message.text)
-                    else:
-                        global_idx = None
+                    group_key = f"golden_{message.chat.id}"
                 else:
-                    global_idx = None
-                if global_idx is not None:
-                    db.mark_group_video_as_viewed(message.chat.id, global_idx)
+                    group_key = f"{project}_{message.chat.id}"
+                
+                # Отмечаем видео как просмотренное
+                db.mark_group_video_as_viewed(group_key, video_position)
         else:
             await message.answer("Video topilmadi.")
     except Exception as exx:

@@ -27,6 +27,19 @@ try:
         waiting_for_video_links = State()
         waiting_for_video_titles = State()
 
+    # --- FSM для редактирования сезона ---
+    class EditSeasonStates(StatesGroup):
+        waiting_for_season_id = State()
+        waiting_for_new_name = State()
+        waiting_for_action = State()  # edit_name, edit_video, delete_video, delete_season
+
+    # --- FSM для редактирования видео ---
+    class EditVideoStates(StatesGroup):
+        waiting_for_video_id = State()
+        waiting_for_new_url = State()
+        waiting_for_new_title = State()
+        waiting_for_new_position = State()
+
     # --- Клавиатуры ---
     def get_project_keyboard():
         kb = InlineKeyboardMarkup(row_width=2)
@@ -398,15 +411,442 @@ try:
         await message.answer(f"Сезон '{season_name}' успешно добавлен в проект '{project}'.")
         await state.finish()
 
-    # --- Функция для добавления сезона и видео в базу ---
-    def add_season_with_videos(self, project, season_name, links, titles):
-        cursor = self.conn.cursor()
-        cursor.execute("INSERT INTO seasons (project, name) VALUES (?, ?)", (project, season_name))
-        season_id = cursor.lastrowid
-        for pos, (url, title) in enumerate(zip(links, titles)):
-            cursor.execute("INSERT INTO videos (season_id, url, title, position) VALUES (?, ?, ?, ?)", (season_id, url, title, pos))
-        self.conn.commit()
-        cursor.close()
+    @dp.message_handler(Command('list_seasons'), user_id=ADMINS)
+    async def list_seasons_command(message: types.Message):
+        try:
+            # Получаем сезоны с количеством видео для Centris Towers
+            centris_seasons = db.get_seasons_with_videos_by_project("centr")
+            # Получаем сезоны с количеством видео для Golden Lake
+            golden_seasons = db.get_seasons_with_videos_by_project("golden")
+            
+            response = "📋 Список добавленных сезонов:\n\n"
+            
+            if centris_seasons:
+                response += "🏢 Centris Towers:\n"
+                for season_id, season_name, video_count in centris_seasons:
+                    response += f"  • {season_name} ({video_count} видео)\n"
+                response += "\n"
+            
+            if golden_seasons:
+                response += "🏘️ Golden Lake:\n"
+                for season_id, season_name, video_count in golden_seasons:
+                    response += f"  • {season_name} ({video_count} видео)\n"
+            
+            if not centris_seasons and not golden_seasons:
+                response += "Пока нет добавленных сезонов."
+            
+            await message.answer(response)
+        except Exception as e:
+            await message.answer(f"Ошибка при получении списка сезонов: {e}")
+
+    @dp.message_handler(Command('edit_season'), user_id=ADMINS)
+    async def edit_season_command(message: types.Message, state: FSMContext):
+        try:
+            # Получаем все сезоны с количеством видео
+            centris_seasons = db.get_seasons_with_videos_by_project("centr")
+            golden_seasons = db.get_seasons_with_videos_by_project("golden")
+            
+            if not centris_seasons and not golden_seasons:
+                await message.answer("Нет сезонов для редактирования.")
+                return
+            
+            response = "📝 Выберите сезон для редактирования (введите ID):\n\n"
+            
+            if centris_seasons:
+                response += "🏢 Centris Towers:\n"
+                for season_id, season_name, video_count in centris_seasons:
+                    response += f"  ID {season_id}: {season_name} ({video_count} видео)\n"
+                response += "\n"
+            
+            if golden_seasons:
+                response += "🏘️ Golden Lake:\n"
+                for season_id, season_name, video_count in golden_seasons:
+                    response += f"  ID {season_id}: {season_name} ({video_count} видео)\n"
+            
+            await message.answer(response)
+            await state.set_state(EditSeasonStates.waiting_for_season_id.state)
+        except Exception as e:
+            await message.answer(f"Ошибка при получении списка сезонов: {e}")
+
+    @dp.message_handler(state=EditSeasonStates.waiting_for_season_id)
+    async def process_season_id_for_edit(message: types.Message, state: FSMContext):
+        try:
+            season_id = int(message.text.strip())
+            season_data = db.get_season_by_id(season_id)
+            
+            if not season_data:
+                await message.answer("Сезон с таким ID не найден. Попробуйте снова:")
+                return
+            
+            season_id, project, season_name = season_data
+            videos = db.get_videos_with_ids_by_season(season_id)
+            
+            await state.update_data(season_id=season_id, project=project, season_name=season_name)
+            
+            response = f"📝 Редактирование сезона:\n"
+            response += f"ID: {season_id}\n"
+            response += f"Проект: {project}\n"
+            response += f"Название: {season_name}\n"
+            response += f"Количество видео: {len(videos)}\n\n"
+            
+            if videos:
+                response += "Видео в сезоне:\n"
+                for video_id, url, title, position in videos:
+                    response += f"  ID {video_id}: {title} (позиция {position})\n"
+            
+            response += "\nВыберите действие:\n"
+            response += "1. Изменить название сезона\n"
+            response += "2. Редактировать видео\n"
+            response += "3. Удалить видео\n"
+            response += "4. Удалить весь сезон\n"
+            response += "5. Отмена"
+            
+            await message.answer(response)
+            await state.set_state(EditSeasonStates.waiting_for_action.state)
+        except ValueError:
+            await message.answer("Пожалуйста, введите корректный ID сезона (число):")
+        except Exception as e:
+            await message.answer(f"Ошибка: {e}")
+
+    @dp.message_handler(state=EditSeasonStates.waiting_for_action)
+    async def process_edit_action(message: types.Message, state: FSMContext):
+        action = message.text.strip()
+        data = await state.get_data()
+        season_id = data.get("season_id")
+        
+        if action == "1":
+            await message.answer("Введите новое название сезона:")
+            await state.set_state(EditSeasonStates.waiting_for_new_name.state)
+        elif action == "2":
+            await message.answer("Введите ID видео для редактирования:")
+            await state.set_state(EditVideoStates.waiting_for_video_id.state)
+        elif action == "3":
+            await message.answer("Введите ID видео для удаления:")
+            await state.set_state(EditVideoStates.waiting_for_video_id.state)
+        elif action == "4":
+            # Подтверждение удаления сезона
+            kb = InlineKeyboardMarkup(row_width=2)
+            kb.add(
+                InlineKeyboardButton("Да, удалить", callback_data=f"confirm_delete_season_{season_id}"),
+                InlineKeyboardButton("Отмена", callback_data="cancel_delete")
+            )
+            await message.answer("⚠️ Вы уверены, что хотите удалить весь сезон и все его видео?", reply_markup=kb)
+            await state.finish()
+        elif action == "5":
+            await message.answer("Редактирование отменено.")
+            await state.finish()
+        else:
+            await message.answer("Пожалуйста, выберите действие (1-5):")
+
+    @dp.message_handler(state=EditSeasonStates.waiting_for_new_name)
+    async def process_new_season_name(message: types.Message, state: FSMContext):
+        new_name = message.text.strip()
+        data = await state.get_data()
+        season_id = data.get("season_id")
+        
+        if db.update_season(season_id, new_name):
+            await message.answer(f"✅ Название сезона успешно изменено на: {new_name}")
+        else:
+            await message.answer("❌ Ошибка при обновлении названия сезона.")
+        
+        await state.finish()
+
+    @dp.message_handler(state=EditVideoStates.waiting_for_video_id)
+    async def process_video_id_for_edit(message: types.Message, state: FSMContext):
+        try:
+            video_id = int(message.text.strip())
+            video_data = db.get_video_by_id(video_id)
+            
+            if not video_data:
+                await message.answer("Видео с таким ID не найдено. Попробуйте снова:")
+                return
+            
+            video_id, season_id, url, title, position = video_data
+            await state.update_data(video_id=video_id, season_id=season_id, url=url, title=title, position=position)
+            
+            response = f"📹 Редактирование видео:\n"
+            response += f"ID: {video_id}\n"
+            response += f"Название: {title}\n"
+            response += f"Позиция: {position}\n"
+            response += f"URL: {url}\n\n"
+            response += "Выберите действие:\n"
+            response += "1. Изменить URL\n"
+            response += "2. Изменить название\n"
+            response += "3. Изменить позицию\n"
+            response += "4. Удалить видео\n"
+            response += "5. Отмена"
+            
+            await message.answer(response)
+            await state.set_state(EditVideoStates.waiting_for_new_url.state)
+        except ValueError:
+            await message.answer("Пожалуйста, введите корректный ID видео (число):")
+        except Exception as e:
+            await message.answer(f"Ошибка: {e}")
+
+    @dp.message_handler(state=EditVideoStates.waiting_for_new_url)
+    async def process_video_edit_action(message: types.Message, state: FSMContext):
+        action = message.text.strip()
+        data = await state.get_data()
+        
+        if action == "1":
+            await message.answer("Введите новый URL видео:")
+            await state.set_state(EditVideoStates.waiting_for_new_url.state)
+        elif action == "2":
+            await message.answer("Введите новое название видео:")
+            await state.set_state(EditVideoStates.waiting_for_new_title.state)
+        elif action == "3":
+            await message.answer("Введите новую позицию видео (число):")
+            await state.set_state(EditVideoStates.waiting_for_new_position.state)
+        elif action == "4":
+            video_id = data.get("video_id")
+            if db.delete_video(video_id):
+                await message.answer("✅ Видео успешно удалено.")
+            else:
+                await message.answer("❌ Ошибка при удалении видео.")
+            await state.finish()
+        elif action == "5":
+            await message.answer("Редактирование видео отменено.")
+            await state.finish()
+        else:
+            await message.answer("Пожалуйста, выберите действие (1-5):")
+
+    @dp.message_handler(state=EditVideoStates.waiting_for_new_url)
+    async def process_new_video_url(message: types.Message, state: FSMContext):
+        new_url = message.text.strip()
+        data = await state.get_data()
+        video_id = data.get("video_id")
+        title = data.get("title")
+        position = data.get("position")
+        
+        if db.update_video(video_id, new_url, title, position):
+            await message.answer(f"✅ URL видео успешно изменен на: {new_url}")
+        else:
+            await message.answer("❌ Ошибка при обновлении URL видео.")
+        
+        await state.finish()
+
+    @dp.message_handler(state=EditVideoStates.waiting_for_new_title)
+    async def process_new_video_title(message: types.Message, state: FSMContext):
+        new_title = message.text.strip()
+        data = await state.get_data()
+        video_id = data.get("video_id")
+        url = data.get("url")
+        position = data.get("position")
+        
+        if db.update_video(video_id, url, new_title, position):
+            await message.answer(f"✅ Название видео успешно изменено на: {new_title}")
+        else:
+            await message.answer("❌ Ошибка при обновлении названия видео.")
+        
+        await state.finish()
+
+    @dp.message_handler(state=EditVideoStates.waiting_for_new_position)
+    async def process_new_video_position(message: types.Message, state: FSMContext):
+        try:
+            new_position = int(message.text.strip())
+            data = await state.get_data()
+            video_id = data.get("video_id")
+            url = data.get("url")
+            title = data.get("title")
+            
+            if db.update_video(video_id, url, title, new_position):
+                await message.answer(f"✅ Позиция видео успешно изменена на: {new_position}")
+            else:
+                await message.answer("❌ Ошибка при обновлении позиции видео.")
+        except ValueError:
+            await message.answer("Пожалуйста, введите корректную позицию (число):")
+            return
+        
+        await state.finish()
+
+    @dp.callback_query_handler(lambda c: c.data.startswith("confirm_delete_season_"))
+    async def confirm_delete_season(callback_query: types.CallbackQuery):
+        season_id = int(callback_query.data.replace("confirm_delete_season_", ""))
+        
+        if db.delete_season(season_id):
+            await callback_query.message.edit_text("✅ Сезон и все его видео успешно удалены.")
+        else:
+            await callback_query.message.edit_text("❌ Ошибка при удалении сезона.")
+        
+        await callback_query.answer()
+
+    @dp.callback_query_handler(lambda c: c.data == "cancel_delete")
+    async def cancel_delete_season(callback_query: types.CallbackQuery):
+        await callback_query.message.edit_text("❌ Удаление отменено.")
+        await callback_query.answer()
+
+    @dp.message_handler(Command('delete_season'), user_id=ADMINS)
+    async def delete_season_command(message: types.Message):
+        try:
+            # Парсим ID сезона из команды
+            args = message.text.split()
+            if len(args) != 2:
+                await message.answer("Использование: /delete_season <ID_сезона>")
+                return
+            
+            season_id = int(args[1])
+            season_data = db.get_season_by_id(season_id)
+            
+            if not season_data:
+                await message.answer("Сезон с таким ID не найден.")
+                return
+            
+            season_id, project, season_name = season_data
+            videos = db.get_videos_by_season(season_id)
+            
+            response = f"⚠️ Подтвердите удаление сезона:\n"
+            response += f"ID: {season_id}\n"
+            response += f"Проект: {project}\n"
+            response += f"Название: {season_name}\n"
+            response += f"Количество видео: {len(videos)}\n\n"
+            response += "Все видео будут удалены безвозвратно!"
+            
+            kb = InlineKeyboardMarkup(row_width=2)
+            kb.add(
+                InlineKeyboardButton("Да, удалить", callback_data=f"confirm_delete_season_{season_id}"),
+                InlineKeyboardButton("Отмена", callback_data="cancel_delete")
+            )
+            
+            await message.answer(response, reply_markup=kb)
+        except ValueError:
+            await message.answer("Пожалуйста, введите корректный ID сезона (число).")
+        except Exception as e:
+            await message.answer(f"Ошибка: {e}")
+
+    @dp.message_handler(Command('season_help'), user_id=ADMINS)
+    async def season_help_command(message: types.Message):
+        help_text = """
+📋 **Команды для управления сезонами:**
+
+**Добавление:**
+• `/add_season` - Добавить новый сезон
+• `/list_seasons` - Показать все сезоны
+
+**Редактирование:**
+• `/edit_season` - Редактировать существующий сезон
+  - Изменить название сезона
+  - Редактировать видео (URL, название, позиция)
+  - Удалить отдельные видео
+
+**Удаление:**
+• `/delete_season <ID>` - Удалить сезон по ID
+
+**Утилиты:**
+• `/migrate_old_seasons` - Перенести старые сезоны в базу данных
+• `/fix_season_order` - Исправить порядок сезонов (Яқинлар I Ташриф будет последним)
+
+**Примеры использования:**
+1. Добавить сезон: `/add_season`
+2. Посмотреть сезоны: `/list_seasons`
+3. Редактировать сезон: `/edit_season` (затем выбрать ID)
+4. Удалить сезон: `/delete_season 5`
+5. Исправить порядок: `/fix_season_order`
+
+⚠️ **Внимание:** Удаление сезона удаляет все его видео безвозвратно!
+
+📝 **Особенности:**
+• Сезон "Яқинлар I Ташриф Centris Towers" всегда будет последним в меню
+• Новые сезоны добавляются в правильном порядке автоматически
+        """
+        await message.answer(help_text)
+
+    @dp.message_handler(Command('migrate_old_seasons'), user_id=ADMINS)
+    async def migrate_old_seasons_command(message: types.Message):
+        """Миграция старых сезонов в базу данных"""
+        try:
+            # Проверяем, есть ли уже сезоны в базе
+            centris_seasons = db.get_seasons_by_project("centr")
+            golden_seasons = db.get_seasons_by_project("golden")
+            
+            if centris_seasons or golden_seasons:
+                await message.answer("Сезоны уже есть в базе данных. Миграция не требуется.")
+                return
+            
+            # Добавляем старые сезоны Centris Towers
+            old_centris_seasons = [
+                ("centr", "Яқинлар 1.0 I I Иброҳим Мамасаидов", VIDEO_LIST_1, CAPTION_LIST_1),
+                ("centr", "Яқинлар 2.0 I I Иброҳим Мамасаидов", VIDEO_LIST_2, CAPTION_LIST_2),
+                ("centr", "Яқинлар 3.0 I I Иброҳим Мамасаидов", VIDEO_LIST_3, CAPTION_LIST_3),
+                ("centr", "Яқинлар 4.0 I I Иброҳим Мамасаидов", VIDEO_LIST_4, CAPTION_LIST_4),
+                ("centr", "Яқинлар 5.0 I I Иброҳим Мамасаидов", VIDEO_LIST_5, CAPTION_LIST_5),
+                ("centr", "Яқинлар I Ташриф Centris Towers", VIDEO_LIST_6, CAPTION_LIST_6),
+            ]
+            
+            # Добавляем старые сезоны Golden Lake
+            old_golden_seasons = [
+                ("golden", "Golden lake 1", VIDEO_LIST_GOLDEN_1, GOLDEN_LIST),
+            ]
+            
+            migrated_count = 0
+            
+            # Мигрируем Centris Towers
+            for project, season_name, video_list, caption_list in old_centris_seasons:
+                if len(video_list) == len(caption_list):
+                    db.add_season_with_videos(project, season_name, video_list, caption_list)
+                    migrated_count += 1
+            
+            # Мигрируем Golden Lake
+            for project, season_name, video_list, caption_list in old_golden_seasons:
+                if len(video_list) == len(caption_list):
+                    db.add_season_with_videos(project, season_name, video_list, caption_list)
+                    migrated_count += 1
+            
+            await message.answer(f"✅ Миграция завершена! Добавлено {migrated_count} сезонов.")
+            
+        except Exception as e:
+            await message.answer(f"❌ Ошибка при миграции: {e}")
+
+    @dp.message_handler(Command('fix_season_order'), user_id=ADMINS)
+    async def fix_season_order_command(message: types.Message):
+        """Исправить порядок сезонов, чтобы 'Яқинлар I Ташриф Centris Towers' был последним"""
+        try:
+            # Получаем все сезоны Centris Towers
+            centris_seasons = db.get_seasons_by_project("centr")
+            
+            if not centris_seasons:
+                await message.answer("Нет сезонов Centris Towers для исправления порядка.")
+                return
+            
+            # Проверяем, есть ли сезон "Яқинлар I Ташриф Centris Towers"
+            tour_season = None
+            other_seasons = []
+            
+            for season_id, season_name in centris_seasons:
+                if season_name == "Яқинлар I Ташриф Centris Towers":
+                    tour_season = (season_id, season_name)
+                else:
+                    other_seasons.append((season_id, season_name))
+            
+            if not tour_season:
+                await message.answer("Сезон 'Яқинлар I Ташриф Centris Towers' не найден в базе данных.")
+                return
+            
+            # Удаляем сезон "Яқинлар I Ташриф Centris Towers" и добавляем его заново
+            # Это обеспечит, что он будет последним по ID
+            tour_season_id, tour_season_name = tour_season
+            
+            # Получаем видео этого сезона
+            videos = db.get_videos_by_season(tour_season_id)
+            if not videos:
+                await message.answer("В сезоне 'Яқинлар I Ташриф Centris Towers' нет видео.")
+                return
+            
+            # Сохраняем данные видео
+            video_data = [(url, title, position) for url, title, position in videos]
+            
+            # Удаляем старый сезон (видео удалятся каскадно)
+            if db.delete_season(tour_season_id):
+                # Добавляем сезон заново
+                urls = [data[0] for data in video_data]
+                titles = [data[1] for data in video_data]
+                db.add_season_with_videos("centr", tour_season_name, urls, titles)
+                
+                await message.answer("✅ Порядок сезонов исправлен! Сезон 'Яқинлар I Ташриф Centris Towers' теперь будет последним.")
+            else:
+                await message.answer("❌ Ошибка при исправлении порядка сезонов.")
+                
+        except Exception as e:
+            await message.answer(f"❌ Ошибка при исправлении порядка сезонов: {e}")
 
 except Exception as exx:
     from datetime import datetime

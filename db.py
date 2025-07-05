@@ -571,6 +571,243 @@ class Database:
             logger.error(f"Ошибка при получении пользователей группы {group_id}: {e}")
             return []
 
+    def add_season_with_videos(self, project, season_name, links, titles):
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute("INSERT INTO seasons (project, name) VALUES (%s, %s) RETURNING id", (project, season_name))
+            season_id = cursor.fetchone()[0]
+            for pos, (url, title) in enumerate(zip(links, titles)):
+                cursor.execute("INSERT INTO videos (season_id, url, title, position) VALUES (%s, %s, %s, %s)", (season_id, url, title, pos))
+            self.conn.commit()
+            cursor.close()
+            logger.info(f"Сезон '{season_name}' успешно добавлен в проект '{project}' с {len(links)} видео")
+        except Exception as e:
+            logger.error(f"Ошибка при добавлении сезона '{season_name}' в проект '{project}': {e}")
+            self.conn.rollback()
+
+    def get_seasons_by_project(self, project):
+        try:
+            cursor = self.conn.cursor()
+            if project == "centr":
+                # Для Centris Towers: специальная сортировка, чтобы "Яқинлар I Ташриф Centris Towers" был последним
+                cursor.execute("""
+                    SELECT id, name FROM seasons 
+                    WHERE project = %s 
+                    ORDER BY 
+                        CASE 
+                            WHEN name = 'Яқинлар I Ташриф Centris Towers' THEN 1 
+                            ELSE 0 
+                        END,
+                        id
+                """, (project,))
+            else:
+                # Для других проектов обычная сортировка по ID
+                cursor.execute("SELECT id, name FROM seasons WHERE project = %s ORDER BY id", (project,))
+            result = cursor.fetchall()
+            cursor.close()
+            return result
+        except Exception as e:
+            logger.error(f"Ошибка при получении сезонов проекта '{project}': {e}")
+            return []
+
+    def get_videos_by_season(self, season_id):
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute("SELECT url, title, position FROM videos WHERE season_id = %s ORDER BY position", (season_id,))
+            result = cursor.fetchall()
+            cursor.close()
+            return result
+        except Exception as e:
+            logger.error(f"Ошибка при получении видео сезона {season_id}: {e}")
+            return []
+
+    def get_season_by_id(self, season_id):
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute("SELECT id, project, name FROM seasons WHERE id = %s", (season_id,))
+            result = cursor.fetchone()
+            cursor.close()
+            return result
+        except Exception as e:
+            logger.error(f"Ошибка при получении сезона {season_id}: {e}")
+            return None
+
+    def update_season(self, season_id, season_name):
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute("UPDATE seasons SET name = %s WHERE id = %s", (season_name, season_id))
+            self.conn.commit()
+            cursor.close()
+            logger.info(f"Сезон {season_id} обновлен: {season_name}")
+            return True
+        except Exception as e:
+            logger.error(f"Ошибка при обновлении сезона {season_id}: {e}")
+            self.conn.rollback()
+            return False
+
+    def update_video(self, video_id, url, title, position):
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute("UPDATE videos SET url = %s, title = %s, position = %s WHERE id = %s", (url, title, position, video_id))
+            self.conn.commit()
+            cursor.close()
+            logger.info(f"Видео {video_id} обновлено")
+            return True
+        except Exception as e:
+            logger.error(f"Ошибка при обновлении видео {video_id}: {e}")
+            self.conn.rollback()
+            return False
+
+    def get_video_by_id(self, video_id):
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute("SELECT id, season_id, url, title, position FROM videos WHERE id = %s", (video_id,))
+            result = cursor.fetchone()
+            cursor.close()
+            return result
+        except Exception as e:
+            logger.error(f"Ошибка при получении видео {video_id}: {e}")
+            return None
+
+    def delete_video(self, video_id):
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute("DELETE FROM videos WHERE id = %s", (video_id,))
+            self.conn.commit()
+            cursor.close()
+            logger.info(f"Видео {video_id} удалено")
+            return True
+        except Exception as e:
+            logger.error(f"Ошибка при удалении видео {video_id}: {e}")
+            self.conn.rollback()
+            return False
+
+    def delete_season(self, season_id):
+        try:
+            cursor = self.conn.cursor()
+            # Сначала удаляем все видео сезона (каскадное удаление)
+            cursor.execute("DELETE FROM videos WHERE season_id = %s", (season_id,))
+            # Затем удаляем сам сезон
+            cursor.execute("DELETE FROM seasons WHERE id = %s", (season_id,))
+            self.conn.commit()
+            cursor.close()
+            logger.info(f"Сезон {season_id} и все его видео удалены")
+            return True
+        except Exception as e:
+            logger.error(f"Ошибка при удалении сезона {season_id}: {e}")
+            self.conn.rollback()
+            return False
+
+    def get_videos_with_ids_by_season(self, season_id):
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute("SELECT id, url, title, position FROM videos WHERE season_id = %s ORDER BY position", (season_id,))
+            result = cursor.fetchall()
+            cursor.close()
+            return result
+        except Exception as e:
+            logger.error(f"Ошибка при получении видео с ID сезона {season_id}: {e}")
+            return []
+
+    def get_season_by_name(self, season_name):
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute("SELECT id, project, name FROM seasons WHERE name = %s", (season_name,))
+            result = cursor.fetchone()
+            cursor.close()
+            return result
+        except Exception as e:
+            logger.error(f"Ошибка при получении сезона по названию '{season_name}': {e}")
+            return None
+
+    def get_videos_by_season_name(self, season_name):
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute("""
+                SELECT v.url, v.title, v.position 
+                FROM videos v 
+                JOIN seasons s ON v.season_id = s.id 
+                WHERE s.name = %s 
+                ORDER BY v.position
+            """, (season_name,))
+            result = cursor.fetchall()
+            cursor.close()
+            return result
+        except Exception as e:
+            logger.error(f"Ошибка при получении видео сезона '{season_name}': {e}")
+            return []
+
+    def get_all_videos_by_project(self, project):
+        """Получить все видео всех сезонов проекта"""
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute("""
+                SELECT v.url, v.title, v.position, s.name as season_name
+                FROM videos v 
+                JOIN seasons s ON v.season_id = s.id 
+                WHERE s.project = %s 
+                ORDER BY s.id, v.position
+            """, (project,))
+            result = cursor.fetchall()
+            cursor.close()
+            return result
+        except Exception as e:
+            logger.error(f"Ошибка при получении всех видео проекта '{project}': {e}")
+            return []
+
+    def get_videos_by_season_id(self, season_id):
+        """Получить видео по ID сезона"""
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute("""
+                SELECT url, title, position 
+                FROM videos 
+                WHERE season_id = %s 
+                ORDER BY position
+            """, (season_id,))
+            result = cursor.fetchall()
+            cursor.close()
+            return result
+        except Exception as e:
+            logger.error(f"Ошибка при получении видео сезона {season_id}: {e}")
+            return []
+
+    def get_seasons_with_videos_by_project(self, project):
+        """Получить сезоны с количеством видео, с правильной сортировкой"""
+        try:
+            cursor = self.conn.cursor()
+            if project == "centr":
+                # Для Centris Towers: специальная сортировка
+                cursor.execute("""
+                    SELECT s.id, s.name, COUNT(v.id) as video_count
+                    FROM seasons s
+                    LEFT JOIN videos v ON s.id = v.season_id
+                    WHERE s.project = %s
+                    GROUP BY s.id, s.name
+                    ORDER BY 
+                        CASE 
+                            WHEN s.name = 'Яқинлар I Ташриф Centris Towers' THEN 1 
+                            ELSE 0 
+                        END,
+                        s.id
+                """, (project,))
+            else:
+                # Для других проектов обычная сортировка
+                cursor.execute("""
+                    SELECT s.id, s.name, COUNT(v.id) as video_count
+                    FROM seasons s
+                    LEFT JOIN videos v ON s.id = v.season_id
+                    WHERE s.project = %s
+                    GROUP BY s.id, s.name
+                    ORDER BY s.id
+                """, (project,))
+            result = cursor.fetchall()
+            cursor.close()
+            return result
+        except Exception as e:
+            logger.error(f"Ошибка при получении сезонов с видео проекта '{project}': {e}")
+            return []
+
     def close(self):
         if hasattr(self, 'conn'):
             self.conn.close()
