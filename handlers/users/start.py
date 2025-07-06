@@ -13,6 +13,7 @@ try:
     from states.state import RegistrationStates
     from translation import _
     import time
+    from aiogram.dispatcher.storage import DELTA
 
     # Настройка логирования
     logger = logging.getLogger(__name__)
@@ -47,7 +48,7 @@ try:
         return caption
 
     @dp.message_handler(CommandStart())
-    async def bot_start(message: types.Message):
+    async def bot_start(message: types.Message, state: FSMContext):
         try:
             if is_spam(message.from_user.id):
                 logger.warning(f"Обнаружен спам от пользователя {message.from_user.id}")
@@ -55,6 +56,10 @@ try:
 
             # Если команда из группы — не спрашивать имя, не запускать регистрацию
             if message.chat.type in [types.ChatType.GROUP, types.ChatType.SUPERGROUP]:
+                # Проверка: если админ — сбросить FSM для всей группы
+                if db.is_admin(message.from_user.id):
+                    await state.finish()
+                    await message.answer("Guruh uchun FSM holatlari bekor qilindi, /start buyrug'i admin tomonidan bajarildi.")
                 if not db.user_exists(message.chat.id):
                     db.add_user(message.chat.id, message.chat.title or "Группа", None, is_group=True, group_id=message.chat.id)
                 await message.answer("Бот активирован в группе!\nВсе участники могут пользоваться функциями без регистрации.", reply_markup=main_menu_keyboard)
