@@ -101,4 +101,70 @@ class Database:
             logger.error(f"Ошибка при получении статуса подписки: {e}")
             return False
         finally:
+            cursor.close()
+
+    def add_admin(self, user_id: int, is_superadmin: bool = False) -> bool:
+        """Добавить админа"""
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute(
+                "INSERT OR IGNORE INTO admins (user_id, is_superadmin) VALUES (?, ?)",
+                (user_id, int(is_superadmin))
+            )
+            self.conn.commit()
+            return True
+        except Exception as e:
+            logger.error(f"Ошибка при добавлении админа: {e}")
+            return False
+        finally:
+            cursor.close()
+
+    def remove_admin(self, user_id: int) -> bool:
+        """Удалить админа"""
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute("DELETE FROM admins WHERE user_id = ?", (user_id,))
+            self.conn.commit()
+            return True
+        except Exception as e:
+            logger.error(f"Ошибка при удалении админа: {e}")
+            return False
+        finally:
+            cursor.close()
+
+    def is_admin(self, user_id: int) -> bool:
+        """Проверить, является ли пользователь админом"""
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute("SELECT 1 FROM admins WHERE user_id = ?", (user_id,))
+            return cursor.fetchone() is not None
+        except Exception as e:
+            logger.error(f"Ошибка при проверке админа: {e}")
+            return False
+        finally:
+            cursor.close()
+
+    def is_superadmin(self, user_id: int) -> bool:
+        """Проверить, является ли пользователь супер-админом"""
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute("SELECT is_superadmin FROM admins WHERE user_id = ?", (user_id,))
+            result = cursor.fetchone()
+            return bool(result and result[0])
+        except Exception as e:
+            logger.error(f"Ошибка при проверке супер-админа: {e}")
+            return False
+        finally:
+            cursor.close()
+
+    def get_all_admins(self) -> list:
+        """Получить список всех админов"""
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute("SELECT user_id, is_superadmin FROM admins")
+            return cursor.fetchall()
+        except Exception as e:
+            logger.error(f"Ошибка при получении списка админов: {e}")
+            return []
+        finally:
             cursor.close() 

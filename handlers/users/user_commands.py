@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+from functools import wraps
 
 try:
 
@@ -55,6 +56,77 @@ try:
             )
         except Exception as e:
             await message.reply(f"Excel faylini yaratishda xatolik yuz berdi: {str(e)}")
+
+
+    # Декоратор для проверки прав админа
+    async def is_admin(user_id):
+        return db.is_admin(user_id)
+
+    async def is_superadmin(user_id):
+        return db.is_superadmin(user_id)
+
+    def admin_required(superadmin_only=False):
+        def decorator(func):
+            @wraps(func)
+            async def wrapper(message: types.Message, *args, **kwargs):
+                user_id = message.from_user.id
+                if superadmin_only:
+                    if not await is_superadmin(user_id):
+                        await message.reply("Только главный админ может использовать эту команду.")
+                        return
+                else:
+                    if not await is_admin(user_id):
+                        await message.reply("У вас нет прав администратора.")
+                        return
+                return await func(message, *args, **kwargs)
+            return wrapper
+        return decorator
+
+    @dp.message_handler(commands=['add_admin'])
+    @admin_required(superadmin_only=True)
+    async def add_admin_command(message: types.Message):
+        args = message.get_args().split()
+        if not args or not args[0].isdigit():
+            await message.reply("Используйте: /add_admin <user_id>")
+            return
+        user_id = int(args[0])
+        if db.is_admin(user_id):
+            await message.reply("Этот пользователь уже админ.")
+            return
+        db.add_admin(user_id)
+        await message.reply(f"Пользователь {user_id} добавлен в админы.")
+
+    @dp.message_handler(commands=['remove_admin'])
+    @admin_required(superadmin_only=True)
+    async def remove_admin_command(message: types.Message):
+        args = message.get_args().split()
+        if not args or not args[0].isdigit():
+            await message.reply("Используйте: /remove_admin <user_id>")
+            return
+        user_id = int(args[0])
+        if not db.is_admin(user_id):
+            await message.reply("Этот пользователь не является админом.")
+            return
+        if db.is_superadmin(user_id):
+            await message.reply("Нельзя удалить главного админа.")
+            return
+        db.remove_admin(user_id)
+        await message.reply(f"Пользователь {user_id} удалён из админов.")
+
+    @dp.message_handler(commands=['list_admins'])
+    @admin_required()
+    async def list_admins_command(message: types.Message):
+        admins = db.get_all_admins()
+        if not admins:
+            await message.reply("Список админов пуст.")
+            return
+        text = "Список админов:\n"
+        for user_id, is_super in admins:
+            if is_super:
+                text += f"{user_id} — главный админ\n"
+            else:
+                text += f"{user_id}\n"
+        await message.reply(text)
 
 
 except Exception as exx:

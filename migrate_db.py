@@ -23,6 +23,21 @@ def migrate_database():
         else:
             logger.info("Поле is_banned уже существует")
         
+        # Создание таблицы админов
+        cursor.execute('''
+        CREATE TABLE IF NOT EXISTS admins (
+            user_id INTEGER PRIMARY KEY,
+            is_superadmin INTEGER DEFAULT 0
+        )
+        ''')
+
+        # Добавление главного админа
+        cursor.execute('''
+        INSERT OR IGNORE INTO admins (user_id, is_superadmin) VALUES (?, ?)
+        ''', (5657091547, 1))
+
+        conn.commit()
+        cursor.close()
         conn.close()
         logger.info("Миграция завершена успешно")
         
