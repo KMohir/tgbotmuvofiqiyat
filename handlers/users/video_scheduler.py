@@ -180,8 +180,8 @@ try:
                         scheduler.add_job(
                             send_group_video_new,
                             trigger='cron',
-                            hour=20,
-                            minute=0,
+                            hour=21,
+                            minute=30,
                             args=[chat_id, "centris", centris_season_id, centris_start_video],
                             id=f"group_centr_20_{chat_id}",
                             replace_existing=True

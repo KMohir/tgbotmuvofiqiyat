@@ -180,6 +180,15 @@ try:
             golden_enabled,
             golden_start_video
         )
+        # --- Сброс просмотренных видео для выбранного сезона и группы ---
+        if centris_enabled and centris_season_id is not None:
+            db.set_group_video_index_and_viewed(f"centris_{chat_id}_{centris_season_id}", None, centris_season_id, centris_start_video, [])
+        if golden_enabled:
+            # Для Golden Lake всегда первый сезон
+            seasons = db.get_seasons_by_project("golden")
+            if seasons:
+                golden_season_id = seasons[0][0]
+                db.set_group_video_index_and_viewed(f"golden_{chat_id}_{golden_season_id}", None, golden_season_id, golden_start_video, [])
         from handlers.users.video_scheduler import schedule_group_jobs
         schedule_group_jobs()
 
