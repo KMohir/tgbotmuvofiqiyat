@@ -83,26 +83,22 @@ try:
     async def send_group_video_new(chat_id: int, project: str, season_id: int, start_video: int):
         try:
             if db.is_group_banned(chat_id):
-                logger.info(f"Пропускаем отправку видео в заблокированную группу {chat_id}")
+                logger.error(f"Группа {chat_id} заблокирована, рассылка не производится")
                 return False
-            # Получаем все сезоны проекта (отсортированные)
             if project == "centris":
                 seasons = db.get_seasons_by_project("centr")
             elif project == "golden_lake":
                 seasons = db.get_seasons_by_project("golden")
             else:
                 seasons = []
-            # Собираем все видео всех сезонов в один список [(season_id, url, title, position)]
             all_videos = []
             for s_id, s_name in seasons:
                 videos = db.get_videos_by_season(s_id)
                 for url, title, position in videos:
                     all_videos.append((s_id, url, title, position))
             if not all_videos:
-                logger.info(f"Нет видео для рассылки: project={project}, season_id={season_id}")
+                logger.error(f"Нет видео для рассылки: project={project}, season_id={season_id}")
                 return False
-            # Определяем глобальный стартовый индекс
-            # Найти индекс первого видео выбранного сезона и позиции
             global_start_idx = 0
             found = False
             for idx, (s_id, url, title, position) in enumerate(all_videos):
@@ -111,8 +107,17 @@ try:
                     found = True
                     break
             if not found:
-                global_start_idx = 0
-            # Получаем просмотренные видео для группы (глобальные индексы)
+                for idx, (s_id, url, title, position) in enumerate(all_videos):
+                    if s_id == season_id and position >= start_video:
+                        global_start_idx = idx
+                        found = True
+                        break
+            if not found:
+                for idx, (s_id, url, title, position) in enumerate(all_videos):
+                    if s_id == season_id:
+                        global_start_idx = idx
+                        found = True
+                        break
             viewed = set()
             for s_id, s_name in seasons:
                 viewed.update([global_idx for global_idx, (sid, _, _, pos) in enumerate(all_videos) if sid == s_id and pos in db.get_group_viewed_videos(f"{project}_{chat_id}_{s_id}")])
@@ -121,7 +126,8 @@ try:
             for user_id in group_users:
                 for s_id, s_name in seasons:
                     user_viewed.update([global_idx for global_idx, (sid, _, _, pos) in enumerate(all_videos) if sid == s_id and pos in db.get_viewed_videos(user_id)])
-            # Ищем первое непросмотренное видео начиная с глобального стартового индекса
+            # Логируем стартовые параметры и просмотренные видео
+            logger.error(f"[GROUP_VIDEO] chat_id={chat_id}, project={project}, season_id={season_id}, start_video={start_video}, global_start_idx={global_start_idx}, viewed={list(viewed)}")
             idx = global_start_idx
             while idx < len(all_videos):
                 if idx in viewed or idx in user_viewed:
@@ -131,23 +137,50 @@ try:
             if 0 <= idx < len(all_videos):
                 s_id, url, title, position = all_videos[idx]
                 message_id = int(url.split("/")[-1])
-                await bot.copy_message(
-                    chat_id=chat_id,
-                    from_chat_id=-1002550852551,
-                    message_id=message_id,
-                    protect_content=True
-                )
-                logger.info(f"Видео {position} сезона {s_id} отправлено в группу {chat_id} (проект {project})")
+                try:
+                    await bot.copy_message(
+                        chat_id=chat_id,
+                        from_chat_id=-1002550852551,
+                        message_id=message_id,
+                        protect_content=True
+                    )
+                except Exception as e:
+                    logger.error(f"Ошибка при отправке видео {position} в группу {chat_id}: {e}")
                 db.mark_group_video_as_viewed(f"{project}_{chat_id}_{s_id}", position)
                 return True
             else:
-                logger.info(f"Нет новых видео для отправки: idx={idx}, project={project}, season_id={season_id}")
+                logger.error(f"Нет новых видео для отправки: project={project}, season_id={season_id}, idx={idx}, viewed={list(viewed)}")
                 return False
         except Exception as e:
             logger.error(f"Ошибка при отправке видео в группу {chat_id}: {e}")
             return False
 
     # --- Планировщик для групп ---
+    async def send_group_video_by_settings(chat_id: int):
+        """
+        Отправляет видео в группу в зависимости от group_video_settings:
+        - Если группа не настроена — не отправлять
+        - Если centris_enabled/golden_enabled — отправлять только соответствующие видео
+        - Если оба True — отправлять оба потока
+        """
+        settings = db.get_group_video_settings(chat_id)
+        if not settings or (not settings[0] and not settings[3]):
+            logger.info(f"Группа {chat_id} не настроена для рассылки видео")
+            return False
+        centris_enabled, centris_season_id, centris_start_video, golden_enabled, golden_start_video = settings
+        sent = False
+        if centris_enabled:
+            # Отправить видео Centris
+            res = await send_group_video_new(chat_id, "centris", centris_season_id, centris_start_video)
+            sent = sent or res
+        if golden_enabled:
+            # Golden Lake — всегда первый сезон (или из настроек)
+            seasons = db.get_seasons_by_project("golden")
+            golden_season_id = seasons[0][0] if seasons else None
+            res = await send_group_video_new(chat_id, "golden_lake", golden_season_id, golden_start_video)
+            sent = sent or res
+        return sent
+
     def schedule_group_jobs():
         try:
             logger.info("Начало планирования задач для групп (логика через базу)")
@@ -158,59 +191,33 @@ try:
             groups = db.get_all_groups_with_settings()
             logger.info(f"Найдено {len(groups)} групп с настройками")
             for chat_id, centris_enabled, centris_season_id, centris_start_video, golden_enabled, golden_start_video in groups:
-                # Получаем имя сезона Centris по ID
+                # Если ни centris, ни golden не включены — не планируем
+                if not centris_enabled and not golden_enabled:
+                    continue
+                # Планируем одну задачу на группу (тест: 23:12)
+                scheduler.add_job(
+                    send_group_video_by_settings,
+                    trigger='cron',
+                    hour=00,
+                    minute=10,
+                    args=[chat_id],
+                    id=f"group_video_{chat_id}",
+                    replace_existing=True
+                )
+                # Если centris_enabled и это первый сезон — планируем доп. время (пример: 21:30)
                 centris_season_name = None
                 if centris_season_id:
                     season_data = db.get_season_by_id(centris_season_id)
                     if season_data:
                         centris_season_name = season_data[2]
-                # Centris Towers
-                if centris_enabled:
-                    if centris_season_name and (centris_season_name == "1-sezon" or centris_season_name == "Яқинлар 1.0 I I Иброҳим Мамасаидов"):
-                        # Первый сезон — 08:00 и 20:00
-                        scheduler.add_job(
-                            send_group_video_new,
-                            trigger='cron',
-                            hour=8,
-                            minute=0,
-                            args=[chat_id, "centris", centris_season_id, centris_start_video],
-                            id=f"group_centr_08_{chat_id}",
-                            replace_existing=True
-                        )
-                        scheduler.add_job(
-                            send_group_video_new,
-                            trigger='cron',
-                            hour=21,
-                            minute=30,
-                            args=[chat_id, "centris", centris_season_id, centris_start_video],
-                            id=f"group_centr_20_{chat_id}",
-                            replace_existing=True
-                        )
-                    else:
-                        # Остальные сезоны — только 08:00
-                        scheduler.add_job(
-                            send_group_video_new,
-                            trigger='cron',
-                            hour=8,
-                            minute=0,
-                            args=[chat_id, "centris", centris_season_id, centris_start_video],
-                            id=f"group_centr_08_{chat_id}",
-                            replace_existing=True
-                        )
-                # Golden Lake — всегда 11:00
-                if golden_enabled:
-                    # Получаем первый сезон Golden Lake (или текущий)
-                    golden_season_id = None
-                    seasons = db.get_seasons_by_project("golden")
-                    if seasons:
-                        golden_season_id = seasons[0][0]
+                if centris_enabled and centris_season_name and (centris_season_name == "1-sezon" or centris_season_name == "Яқинлар 1.0 I I Иброҳим Мамасаидов"):
                     scheduler.add_job(
-                        send_group_video_new,
+                        send_group_video_by_settings,
                         trigger='cron',
-                        hour=11,
-                        minute=0,
-                        args=[chat_id, "golden_lake", golden_season_id, golden_start_video],
-                        id=f"group_golden_11_{chat_id}",
+                        hour=21,
+                        minute=30,
+                        args=[chat_id],
+                        id=f"group_video_evening_{chat_id}",
                         replace_existing=True
                     )
             logger.info("Задачи для групп (логика через базу) запланированы")

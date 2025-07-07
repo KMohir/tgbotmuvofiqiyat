@@ -12,7 +12,7 @@ try:
     from aiogram.types import InputFile
     from db import db
     from loader import dp
-    from data.config import ADMINS
+    from data.config import ADMINS, SUPER_ADMIN_ID
 
 
     @dp.message_handler(commands=['get_registration_time'], state="*")
@@ -60,10 +60,11 @@ try:
 
     # Декоратор для проверки прав админа
     async def is_admin(user_id):
-        return db.is_admin(user_id)
+        return user_id == SUPER_ADMIN_ID or db.is_admin(user_id)
 
+    # Новая функция проверки супер-админа
     async def is_superadmin(user_id):
-        return db.is_superadmin(user_id)
+        return user_id == SUPER_ADMIN_ID
 
     def admin_required(superadmin_only=False):
         def decorator(func):

@@ -313,8 +313,8 @@ async def back_to_main_menu(message: types.Message, state: FSMContext):
     await state.finish()
 
 @dp.message_handler(Command("centris_towers"))
-async def centris_towers_command(message: types.Message):
-    await centris_towers_menu(message)
+async def centris_towers_command(message: types.Message, state: FSMContext):
+    await centris_towers_menu(message, state)
 
 @dp.message_handler(Command("olden_lake"))
 async def olden_lake_command(message: types.Message):
