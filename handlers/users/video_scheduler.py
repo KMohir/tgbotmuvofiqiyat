@@ -194,33 +194,56 @@ try:
                 # Если ни centris, ни golden не включены — не планируем
                 if not centris_enabled and not golden_enabled:
                     continue
-                # Планируем одну задачу на группу (тест: 23:12)
-                scheduler.add_job(
-                    send_group_video_by_settings,
-                    trigger='cron',
-                    hour=00,
-                    minute=10,
-                    args=[chat_id],
-                    id=f"group_video_{chat_id}",
-                    replace_existing=True
-                )
-                # Если centris_enabled и это первый сезон — планируем доп. время (пример: 21:30)
                 centris_season_name = None
                 if centris_season_id:
                     season_data = db.get_season_by_id(centris_season_id)
                     if season_data:
                         centris_season_name = season_data[2]
-                if centris_enabled and centris_season_name and (centris_season_name == "1-sezon" or centris_season_name == "Яқинлар 1.0 I I Иброҳим Мамасаидов"):
+                # Centris Towers
+                if centris_enabled:
+                    # Первый сезон — 08:00 и 20:00
+                    if centris_season_name and (centris_season_name == "1-sezon" or centris_season_name == "Яқинлар 1.0 I I Иброҳим Мамасаидов"):
+                        scheduler.add_job(
+                            send_group_video_by_settings,
+                            trigger='cron',
+                            hour=8,
+                            minute=0,
+                            args=[chat_id],
+                            id=f"group_centrismorning_{chat_id}",
+                            replace_existing=True
+                        )
+                        scheduler.add_job(
+                            send_group_video_by_settings,
+                            trigger='cron',
+                            hour=20,
+                            minute=0,
+                            args=[chat_id],
+                            id=f"group_centrisevening_{chat_id}",
+                            replace_existing=True
+                        )
+                    else:
+                        # Остальные сезоны — только 08:00
+                        scheduler.add_job(
+                            send_group_video_by_settings,
+                            trigger='cron',
+                            hour=8,
+                            minute=0,
+                            args=[chat_id],
+                            id=f"group_centrismorning_{chat_id}",
+                            replace_existing=True
+                        )
+                # Golden Lake — только 11:00
+                if golden_enabled:
                     scheduler.add_job(
                         send_group_video_by_settings,
                         trigger='cron',
-                        hour=21,
-                        minute=30,
+                        hour=11,
+                        minute=0,
                         args=[chat_id],
-                        id=f"group_video_evening_{chat_id}",
+                        id=f"group_golden_{chat_id}",
                         replace_existing=True
                     )
-            logger.info("Задачи для групп (логика через базу) запланированы")
+            logger.info("Задачи для групп (логика через базу) запланированы по новым правилам")
         except Exception as e:
             logger.error(f"Ошибка при планировании задач для групп: {e}")
 
