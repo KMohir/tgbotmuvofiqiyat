@@ -19,6 +19,7 @@ try:
         waiting_for_centr_season = State()
         waiting_for_centr_video = State()
         waiting_for_golden_video = State()
+        waiting_for_golden_season = State()
 
     # --- FSM для добавления сезона ---
     class AddSeasonStates(StatesGroup):
@@ -114,17 +115,24 @@ try:
     async def process_centr_season(callback_query: types.CallbackQuery, state: FSMContext):
         season_id = int(callback_query.data.replace("season_", ""))
         await state.update_data(centris_season_id=season_id)
-        videos = db.get_videos_by_season(season_id)
-        chat_id = (await state.get_data()).get("chat_id")
-        viewed = db.get_group_viewed_videos(f"centris_{chat_id}_{season_id}")
-        kb = get_video_keyboard_from_db(videos, viewed)
-        if not kb:
-            await callback_query.message.edit_text("Barcha video ushbu sezon uchun yuborilgan!")
+        data = await state.get_data()
+        if data.get("project") == "both":
+            # После выбора Centris — предложить выбрать сезон Golden Lake
+            await callback_query.message.edit_text("Golden Lake учун сезонни танланг:")
+            await state.set_state(GroupVideoStates.waiting_for_golden_season.state)
+        else:
+            await save_group_settings(data)
+            await callback_query.message.edit_text("Настройки сохранены! Рассылка активирована.")
             await state.finish()
-            return
-        await state.update_data(centris_videos=videos)
-        await callback_query.message.edit_text(f"Centris Towers: стартовое видео для выбранного сезона:", reply_markup=kb)
-        await state.set_state(GroupVideoStates.waiting_for_centr_video.state)
+
+    @dp.callback_query_handler(lambda c: c.data.startswith("season_"), state=GroupVideoStates.waiting_for_golden_season.state)
+    async def process_golden_season(callback_query: types.CallbackQuery, state: FSMContext):
+        season_id = int(callback_query.data.replace("season_", ""))
+        await state.update_data(golden_season_id=season_id)
+        data = await state.get_data()
+        await save_group_settings(data)
+        await callback_query.message.edit_text("Настройки сохранены! Рассылка активирована.")
+        await state.finish()
 
     @dp.callback_query_handler(lambda c: c.data.startswith("video_"), state=GroupVideoStates.waiting_for_centr_video.state)
     async def process_centr_video(callback_query: types.CallbackQuery, state: FSMContext):
@@ -170,25 +178,19 @@ try:
         centris_enabled = project in ["centr", "both"]
         golden_enabled = project in ["golden", "both"]
         centris_season_id = data.get("centris_season_id") if centris_enabled else None
-        centris_start_video = data.get("centris_start_video") if centris_enabled else 0
-        golden_start_video = data.get("golden_start_video") if golden_enabled else 0
+        golden_season_id = data.get("golden_season_id") if golden_enabled else None
         db.set_group_video_settings(
             chat_id,
             centris_enabled,
             centris_season_id,
-            centris_start_video,
             golden_enabled,
-            golden_start_video
+            golden_season_id
         )
         # --- Сброс просмотренных видео для выбранного сезона и группы ---
         if centris_enabled and centris_season_id is not None:
-            db.set_group_video_index_and_viewed(f"centris_{chat_id}_{centris_season_id}", None, centris_season_id, centris_start_video, [])
-        if golden_enabled:
-            # Для Golden Lake всегда первый сезон
-            seasons = db.get_seasons_by_project("golden")
-            if seasons:
-                golden_season_id = seasons[0][0]
-                db.set_group_video_index_and_viewed(f"golden_{chat_id}_{golden_season_id}", None, golden_season_id, golden_start_video, [])
+            db.set_group_video_index_and_viewed(f"centris_{chat_id}_{centris_season_id}", None, centris_season_id, 0, [])
+        if golden_enabled and golden_season_id is not None:
+            db.set_group_video_index_and_viewed(f"golden_{chat_id}_{golden_season_id}", None, golden_season_id, 0, [])
         from handlers.users.video_scheduler import schedule_group_jobs
         schedule_group_jobs()
 

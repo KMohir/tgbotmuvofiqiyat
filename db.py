@@ -86,9 +86,8 @@ class Database:
             ''')
             self._add_column_if_not_exists(cursor, 'group_video_settings', 'centris_enabled', 'BOOLEAN DEFAULT 0')
             self._add_column_if_not_exists(cursor, 'group_video_settings', 'centris_season', 'TEXT')
-            self._add_column_if_not_exists(cursor, 'group_video_settings', 'centris_start_video', 'INTEGER DEFAULT 0')
             self._add_column_if_not_exists(cursor, 'group_video_settings', 'golden_enabled', 'BOOLEAN DEFAULT 0')
-            self._add_column_if_not_exists(cursor, 'group_video_settings', 'golden_start_video', 'INTEGER DEFAULT 0')
+            self._add_column_if_not_exists(cursor, 'group_video_settings', 'golden_season', 'TEXT')
             self._add_column_if_not_exists(cursor, 'group_video_settings', 'viewed_videos', "TEXT DEFAULT '[]'")
             # --- Таблица seasons ---
             cursor.execute('''
@@ -400,21 +399,20 @@ class Database:
             logger.error(f"Ошибка при получении начального индекса видео: {e}")
             return 0
 
-    def set_group_video_settings(self, chat_id: int, centris_enabled: bool, centris_season: str, centris_start_video: int, golden_enabled: bool, golden_start_video: int):
+    def set_group_video_settings(self, chat_id: int, centris_enabled: bool, centris_season: str, golden_enabled: bool, golden_season: str):
         try:
             cursor = self.conn.cursor()
             cursor.execute(
                 """
-                INSERT INTO group_video_settings (chat_id, centris_enabled, centris_season, centris_start_video, golden_enabled, golden_start_video)
-                VALUES (%s, %s, %s, %s, %s, %s)
+                INSERT INTO group_video_settings (chat_id, centris_enabled, centris_season, golden_enabled, golden_season)
+                VALUES (%s, %s, %s, %s, %s)
                 ON CONFLICT (chat_id) DO UPDATE SET
-                    centris_enabled = excluded.centris_enabled,
-                    centris_season = excluded.centris_season,
-                    centris_start_video = excluded.centris_start_video,
+                    centris_enabled = excluded.centrus_enabled,
+                    centris_season = excluded.centrus_season,
                     golden_enabled = excluded.golden_enabled,
-                    golden_start_video = excluded.golden_start_video
+                    golden_season = excluded.golden_season
                 """,
-                (chat_id, centris_enabled, centris_season, centris_start_video, golden_enabled, golden_start_video)
+                (chat_id, centris_enabled, centris_season, golden_enabled, golden_season)
             )
             self.conn.commit()
             cursor.close()
@@ -425,19 +423,19 @@ class Database:
     def get_group_video_settings(self, chat_id: int) -> tuple:
         try:
             cursor = self.conn.cursor()
-            cursor.execute("SELECT centris_enabled, centris_season, centris_start_video, golden_enabled, golden_start_video FROM group_video_settings WHERE chat_id = %s", (chat_id,))
+            cursor.execute("SELECT centris_enabled, centris_season, golden_enabled, golden_season FROM group_video_settings WHERE chat_id = %s", (chat_id,))
             result = cursor.fetchone()
             cursor.close()
-            return (result[0], result[1], result[2], result[3], result[4]) if result else (None, None, 0, None, 0)
+            return (result[0], result[1], result[2], result[3]) if result else (None, None, None, None)
         except Exception as e:
             logger.error(f"Ошибка при получении настроек видео для группы {chat_id}: {e}")
-            return (None, None, 0, None, 0)
+            return (None, None, None, None)
 
     def get_all_groups_with_settings(self) -> list:
         try:
             cursor = self.conn.cursor()
             cursor.execute('''
-                SELECT chat_id, centris_enabled, centris_season, centris_start_video, golden_enabled, golden_start_video
+                SELECT chat_id, centris_enabled, centris_season, golden_enabled, golden_season
                 FROM group_video_settings
             ''')
             result = cursor.fetchall()
