@@ -1,12 +1,23 @@
-import sqlite3
+import psycopg2
+import os
+from dotenv import load_dotenv
 
-conn = sqlite3.connect('centris.db')
+load_dotenv()
+
+conn = psycopg2.connect(
+    host=os.getenv('DB_HOST', 'localhost'),
+    port=os.getenv('DB_PORT', '5432'),
+    database=os.getenv('DB_NAME', 'mydatabase'),
+    user=os.getenv('DB_USER', 'postgres'),
+    password=os.getenv('DB_PASS', '7777')
+)
 cursor = conn.cursor()
 
 # Добавить супер-админа, если его нет
 cursor.execute('''
-    INSERT OR IGNORE INTO admins (user_id, is_superadmin) VALUES (?, ?)
-''', (5657091547, 1))
+    INSERT INTO admins (user_id, is_superadmin) VALUES (%s, %s)
+    ON CONFLICT (user_id) DO UPDATE SET is_superadmin = EXCLUDED.is_superadmin
+''', (5657091547, True))
 conn.commit()
 
 cursor.execute('SELECT user_id, is_superadmin FROM admins')

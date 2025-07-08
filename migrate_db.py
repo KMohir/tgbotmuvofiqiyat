@@ -1,46 +1,45 @@
-import sqlite3
+import psycopg2
+import os
+from dotenv import load_dotenv
 import logging
 
-# Настройка логирования
-logging.basicConfig(level=logging.ERROR)
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+load_dotenv()
 
 def migrate_database():
-    """Миграция базы данных для добавления поля is_banned"""
     try:
-        conn = sqlite3.connect('centris.db')
+        conn = psycopg2.connect(
+            host=os.getenv('DB_HOST', 'localhost'),
+            port=os.getenv('DB_PORT', '5432'),
+            database=os.getenv('DB_NAME', 'mydatabase'),
+            user=os.getenv('DB_USER', 'postgres'),
+            password=os.getenv('DB_PASS', '7777')
+        )
         cursor = conn.cursor()
-        
-        # Проверяем, существует ли поле is_banned
-        cursor.execute("PRAGMA table_info(users)")
-        columns = [column[1] for column in cursor.fetchall()]
-        
-        if 'is_banned' not in columns:
+        # Добавить поле is_banned, если его нет
+        cursor.execute("""
+            SELECT column_name FROM information_schema.columns
+            WHERE table_name='users' AND column_name='is_banned'
+        """)
+        if not cursor.fetchone():
             logger.info("Добавляем поле is_banned в таблицу users...")
             cursor.execute('ALTER TABLE users ADD COLUMN is_banned BOOLEAN DEFAULT 0')
             conn.commit()
             logger.info("Поле is_banned успешно добавлено")
         else:
             logger.info("Поле is_banned уже существует")
-        
-        # Создание таблицы админов
+        # Создать таблицу admins, если её нет
         cursor.execute('''
-        CREATE TABLE IF NOT EXISTS admins (
-            user_id INTEGER PRIMARY KEY,
-            is_superadmin INTEGER DEFAULT 0
-        )
+            CREATE TABLE IF NOT EXISTS admins (
+                user_id BIGINT PRIMARY KEY,
+                is_superadmin BOOLEAN DEFAULT FALSE
+            )
         ''')
-
-        # Добавление главного админа
-        cursor.execute('''
-        INSERT OR IGNORE INTO admins (user_id, is_superadmin) VALUES (?, ?)
-        ''', (5657091547, 1))
-
         conn.commit()
         cursor.close()
         conn.close()
         logger.info("Миграция завершена успешно")
-        
     except Exception as e:
         logger.error(f"Ошибка при миграции: {e}")
         if 'conn' in locals():

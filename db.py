@@ -1,5 +1,4 @@
 import psycopg2  # Для PostgreSQL
-#import sqlite3  # Для SQLite
 from datetime import datetime
 import json
 import logging
@@ -28,17 +27,18 @@ class Database:
                 user=os.getenv('DB_USER', 'postgres'),
                 password=os.getenv('DB_PASS', '7777')
             )
-            # Подключение к SQLite для теста (оставлено для примера)
-            # self.conn = sqlite3.connect('centris.db', check_same_thread=False)
             self.create_tables()
         except Exception as e:
             logger.error(f"Ошибка при инициализации базы данных: {e}")
             raise
 
     def _add_column_if_not_exists(self, cursor, table_name, column_name, column_type):
-        cursor.execute(f"PRAGMA table_info({table_name})")
-        columns = [column[1] for column in cursor.fetchall()]
-        if column_name not in columns:
+        # Проверка наличия столбца в PostgreSQL
+        cursor.execute("""
+            SELECT column_name FROM information_schema.columns
+            WHERE table_name=%s AND column_name=%s
+        """, (table_name, column_name))
+        if not cursor.fetchone():
             cursor.execute(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_type}")
             logger.info(f"Добавлен столбец '{column_name}' в таблицу '{table_name}'.")
 
