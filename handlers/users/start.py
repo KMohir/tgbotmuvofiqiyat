@@ -60,7 +60,7 @@ try:
                 logger.error(f"Попытка сброса FSM: chat_id={message.chat.id}, user_id={message.from_user.id}")
                 await state.finish()
                 logger.error(f"FSM сброшен: chat_id={message.chat.id}, user_id={message.from_user.id}")
-                await message.answer("FSM (машинное состояние) сброшено командой /start админом.")
+                # Сообщение пользователю не отправляем
 
             # Если команда из группы — не спрашивать имя, не запускать регистрацию
             if message.chat.type in [types.ChatType.GROUP, types.ChatType.SUPERGROUP]:

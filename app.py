@@ -16,6 +16,8 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+db.create_tables()  # Автоматически создать все таблицы, если их нет
+
 async def on_startup(dispatcher):
     # Уведомляет про запуск
     await on_startup_notify(dispatcher)
