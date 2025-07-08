@@ -12,7 +12,7 @@ try:
     from aiogram.types import InputFile
     from db import db
     from loader import dp
-    from data.config import ADMINS, SUPER_ADMIN_ID
+    from data.config import ADMINS
 
 
     @dp.message_handler(commands=['get_registration_time'], state="*")
@@ -83,9 +83,14 @@ try:
             return wrapper
         return decorator
 
+    def is_superadmin(user_id):
+        return user_id in ADMINS
+
     @dp.message_handler(commands=['add_admin'])
-    @admin_required(superadmin_only=True)
     async def add_admin_command(message: types.Message):
+        if not is_superadmin(message.from_user.id):
+            await message.reply("Только супер-админ может добавлять админов.")
+            return
         args = message.get_args().split()
         if not args or not args[0].isdigit():
             await message.reply("Используйте: /add_admin <user_id>")
@@ -94,12 +99,16 @@ try:
         if db.is_admin(user_id):
             await message.reply("Этот пользователь уже админ.")
             return
-        db.add_admin(user_id)
-        await message.reply(f"Пользователь {user_id} добавлен в админы.")
+        if db.add_admin(user_id):
+            await message.reply(f"Пользователь {user_id} добавлен в админы.")
+        else:
+            await message.reply("Ошибка при добавлении админа.")
 
     @dp.message_handler(commands=['remove_admin'])
-    @admin_required(superadmin_only=True)
     async def remove_admin_command(message: types.Message):
+        if not is_superadmin(message.from_user.id):
+            await message.reply("Только супер-админ может удалять админов.")
+            return
         args = message.get_args().split()
         if not args or not args[0].isdigit():
             await message.reply("Используйте: /remove_admin <user_id>")
@@ -108,25 +117,23 @@ try:
         if not db.is_admin(user_id):
             await message.reply("Этот пользователь не является админом.")
             return
-        if db.is_superadmin(user_id):
-            await message.reply("Нельзя удалить главного админа.")
-            return
-        db.remove_admin(user_id)
-        await message.reply(f"Пользователь {user_id} удалён из админов.")
+        if db.remove_admin(user_id):
+            await message.reply(f"Пользователь {user_id} удалён из админов.")
+        else:
+            await message.reply("Ошибка при удалении админа.")
 
     @dp.message_handler(commands=['list_admins'])
-    @admin_required()
     async def list_admins_command(message: types.Message):
+        if not (is_superadmin(message.from_user.id) or db.is_admin(message.from_user.id)):
+            await message.reply("У вас нет прав для этой команды.")
+            return
         admins = db.get_all_admins()
         if not admins:
             await message.reply("Список админов пуст.")
             return
-        text = "Список админов:\n"
-        for user_id, is_super in admins:
-            if is_super:
-                text += f"{user_id} — главный админ\n"
-            else:
-                text += f"{user_id}\n"
+        text = "Список обычных админов:\n"
+        for user_id in admins:
+            text += f"{user_id}\n"
         await message.reply(text)
 
 
