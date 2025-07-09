@@ -14,6 +14,7 @@ try:
     from translation import _
     import time
     from aiogram.dispatcher.storage import DELTA
+    from data.config import SUPER_ADMIN_ID
 
     # Настройка логирования
     logger = logging.getLogger(__name__)
@@ -54,12 +55,15 @@ try:
                 logger.warning(f"Обнаружен спам от пользователя {message.from_user.id}")
                 return
 
+            # Логируем попытку сброса FSM
+            if message.from_user.id == SUPER_ADMIN_ID or db.is_admin(message.from_user.id):
+                logger.error(f"Попытка сброса FSM: chat_id={message.chat.id}, user_id={message.from_user.id}")
+                await state.finish()
+                logger.error(f"FSM сброшен: chat_id={message.chat.id}, user_id={message.from_user.id}")
+                # Сообщение пользователю не отправляем
+
             # Если команда из группы — не спрашивать имя, не запускать регистрацию
             if message.chat.type in [types.ChatType.GROUP, types.ChatType.SUPERGROUP]:
-                # Проверка: если админ — сбросить FSM для всей группы
-                if db.is_admin(message.from_user.id):
-                    await state.finish()
-                    await message.answer("Guruh uchun FSM holatlari bekor qilindi, /start buyrug'i admin tomonidan bajarildi.")
                 if not db.user_exists(message.chat.id):
                     db.add_user(message.chat.id, message.chat.title or "Группа", None, is_group=True, group_id=message.chat.id)
                 await message.answer("Bot guruhda faollashtirildi! Barcha ishtirokchilar ro‘yxatdan o‘tmasdan funksiyalardan foydalanishlari mumkin.", reply_markup=main_menu_keyboard)

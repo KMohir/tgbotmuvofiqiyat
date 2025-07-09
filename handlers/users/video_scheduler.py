@@ -82,11 +82,16 @@ try:
         return []
 
     # --- Новая функция рассылки для групп ---
+<<<<<<< HEAD
     async def send_group_video_new(chat_id: int, project: str, season_id: int = None, start_video: int = None):
+=======
+    async def send_group_video_new(chat_id: int, project: str, season_id: int):
+>>>>>>> 0d848342bf44aa8185bfe05a6ce57230135301ca
         try:
             if db.is_group_banned(chat_id):
-                logger.info(f"Пропускаем отправку видео в заблокированную группу {chat_id}")
+                logger.error(f"Группа {chat_id} заблокирована, рассылка не производится")
                 return False
+<<<<<<< HEAD
 
             # Получаем стартовые значения из базы
             season_db, video_db = db.get_group_video_start(chat_id, project)
@@ -170,6 +175,33 @@ try:
             logger.info(f"Нет новых видео для отправки во всех сезонах проекта {project}")
             return False
 
+=======
+            all_videos = db.get_videos_by_season(season_id)
+            if not all_videos:
+                logger.error(f"Нет видео для рассылки: project={project}, season_id={season_id}")
+                return False
+            viewed = db.get_group_viewed_videos(f"{project}_{chat_id}_{season_id}")
+            # Найти следующее непросмотренное видео
+            next_idx = None
+            for idx, (url, title, position) in enumerate(all_videos):
+                if position not in viewed:
+                    next_idx = idx
+                    break
+            if next_idx is None:
+                logger.info(f"Группа {chat_id} просмотрела все видео сезона {season_id} ({project})")
+                return False
+            video_url, video_title, video_position = all_videos[next_idx]
+            message_id = int(video_url.split("/")[-1])
+            await bot.copy_message(
+                chat_id=chat_id,
+                from_chat_id=-1002550852551,
+                message_id=message_id,
+                protect_content=True
+            )
+            db.mark_group_video_as_viewed(f"{project}_{chat_id}_{season_id}", video_position)
+            logger.info(f"Видео {video_position} отправлено в группу {chat_id} (проект {project}, сезон {season_id})")
+            return True
+>>>>>>> 0d848342bf44aa8185bfe05a6ce57230135301ca
         except Exception as e:
             logger.error(f"Ошибка при отправке видео в группу {chat_id}: {e}")
             try:
@@ -178,7 +210,34 @@ try:
                 pass
             return False
 
+<<<<<<< HEAD
     # --- Планировщик для групп (старая логика) ---
+=======
+    # --- Планировщик для групп ---
+    async def send_group_video_by_settings(chat_id: int):
+        """
+        Отправляет видео в группу в зависимости от group_video_settings:
+        - Если группа не настроена — не отправлять
+        - Если centris_enabled/golden_enabled — отправлять только соответствующие видео
+        - Если оба True — отправлять оба потока
+        """
+        settings = db.get_group_video_settings(chat_id)
+        if not settings or (not settings[0] and not settings[2]):
+            logger.info(f"Группа {chat_id} не настроена для рассылки видео")
+            return False
+        centris_enabled, centris_season_id, golden_enabled, golden_season_id = settings
+        sent = False
+        if centris_enabled and centris_season_id:
+            # Отправить видео Centris
+            res = await send_group_video_new(chat_id, "centris", centris_season_id)
+            sent = sent or res
+        if golden_enabled and golden_season_id:
+            # Golden Lake — всегда первый сезон (или из настроек)
+            res = await send_group_video_new(chat_id, "golden_lake", golden_season_id)
+            sent = sent or res
+        return sent
+
+>>>>>>> 0d848342bf44aa8185bfe05a6ce57230135301ca
     def schedule_group_jobs():
         try:
             logger.info("Начало планирования задач для групп (старая логика)")
@@ -188,6 +247,7 @@ try:
                     scheduler.remove_job(job.id)
             groups = db.get_all_groups_with_settings()
             logger.info(f"Найдено {len(groups)} групп с настройками")
+<<<<<<< HEAD
             for row in groups:
                 chat_id = row[0]
                 centris_enabled = row[1]
@@ -218,6 +278,80 @@ try:
                         replace_existing=True
                     )
             logger.info("Задачи для групп (старая логика) запланированы")
+=======
+            for chat_id, centris_enabled, centris_season_id, golden_enabled, golden_season_id in groups:
+                # Если ни centris, ни golden не включены — не планируем
+                if not centris_enabled and not golden_enabled:
+                    continue
+                centris_season_name = None
+                if centris_season_id:
+                    season_data = db.get_season_by_id(centris_season_id)
+                    if season_data:
+                        centris_season_name = season_data[2]
+                # Centris Towers
+                if centris_enabled and centris_season_id:
+                    # 1-й сезон — 08:00 и 20:00
+                    if centris_season_name and (centris_season_name == "1-sezon" or centris_season_name == "Яқинлар 1.0 I I Иброҳим Мамасаидов"):
+                        scheduler.add_job(
+                            send_group_video_by_settings,
+                            trigger='cron',
+                            hour=8,
+                            minute=0,
+                            args=[chat_id],
+                            id=f"group_centrismorning_{chat_id}",
+                            replace_existing=True,
+                            timezone="Asia/Tashkent"
+                        )
+                        scheduler.add_job(
+                            send_group_video_by_settings,
+                            trigger='cron',
+                            hour=20,
+                            minute=0,
+                            args=[chat_id],
+                            id=f"group_centrisevening_{chat_id}",
+                            replace_existing=True,
+                            timezone="Asia/Tashkent"
+                        )
+                    else:
+                        # Остальные сезоны — только 08:00
+                        scheduler.add_job(
+                            send_group_video_by_settings,
+                            trigger='cron',
+                            hour=8,
+                            minute=0,
+                            args=[chat_id],
+                            id=f"group_centrismorning_{chat_id}",
+                            replace_existing=True,
+                            timezone="Asia/Tashkent"
+                        )
+                # Golden Lake
+                if golden_enabled and golden_season_id:
+                    # Если выбран только Golden Lake — 08:00
+                    if not centris_enabled:
+                        scheduler.add_job(
+                            send_group_video_by_settings,
+                            trigger='cron',
+                            hour=8,
+                            minute=0,
+                            args=[chat_id],
+                            id=f"group_golden_{chat_id}",
+                            replace_existing=True,
+                            timezone="Asia/Tashkent"
+                        )
+                    # Если выбраны оба — Golden Lake в 11:00
+                    else:
+                        scheduler.add_job(
+                            send_group_video_by_settings,
+                            trigger='cron',
+                            hour=11,
+                            minute=0,
+                            args=[chat_id],
+                            id=f"group_golden_{chat_id}",
+                            replace_existing=True,
+                            timezone="Asia/Tashkent"
+                        )
+            logger.info("Задачи для групп (логика через базу) запланированы по новым правилам")
+>>>>>>> 0d848342bf44aa8185bfe05a6ce57230135301ca
         except Exception as e:
             logger.error(f"Ошибка при планировании задач для групп: {e}")
 
