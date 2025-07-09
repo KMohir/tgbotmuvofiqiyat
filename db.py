@@ -31,26 +31,12 @@ class Database:
             logger.error(f"Ошибка при инициализации базы данных: {e}")
             raise
 
-<<<<<<< HEAD
-=======
-    def _add_column_if_not_exists(self, cursor, table_name, column_name, column_type):
-        # Проверка наличия столбца в PostgreSQL
-        cursor.execute("""
-            SELECT column_name FROM information_schema.columns
-            WHERE table_name=%s AND column_name=%s
-        """, (table_name, column_name))
-        if not cursor.fetchone():
-            cursor.execute(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_type}")
-            logger.info(f"Добавлен столбец '{column_name}' в таблицу '{table_name}'.")
-
->>>>>>> 0d848342bf44aa8185bfe05a6ce57230135301ca
     def create_tables(self):
         try:
             cursor = self.conn.cursor()
             # --- Таблица users ---
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS users (
-<<<<<<< HEAD
                     user_id BIGINT PRIMARY KEY,
                     name TEXT,
                     phone TEXT,
@@ -65,38 +51,6 @@ class Database:
                     group_id TEXT
                 )
             ''')
-=======
-                    user_id INTEGER PRIMARY KEY
-                )
-            ''')
-            self._add_column_if_not_exists(cursor, 'users', 'name', 'TEXT')
-            self._add_column_if_not_exists(cursor, 'users', 'phone', 'TEXT')
-            self._add_column_if_not_exists(cursor, 'users', 'datetime', 'TEXT DEFAULT CURRENT_TIMESTAMP')
-            self._add_column_if_not_exists(cursor, 'users', 'video_index', 'INTEGER DEFAULT 0')
-            self._add_column_if_not_exists(cursor, 'users', 'preferred_time', "TEXT DEFAULT '07:00'")
-            self._add_column_if_not_exists(cursor, 'users', 'last_sent', 'TEXT')
-            self._add_column_if_not_exists(cursor, 'users', 'is_subscribed', 'BOOLEAN DEFAULT 1')
-            self._add_column_if_not_exists(cursor, 'users', 'viewed_videos', "TEXT DEFAULT '[]'")
-            self._add_column_if_not_exists(cursor, 'users', 'is_group', 'BOOLEAN DEFAULT 0')
-            self._add_column_if_not_exists(cursor, 'users', 'is_banned', 'BOOLEAN DEFAULT 0')
-            self._add_column_if_not_exists(cursor, 'users', 'group_id', 'TEXT')
-            # --- Таблица support ---
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS support (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT
-                )
-            ''')
-            self._add_column_if_not_exists(cursor, 'support', 'user_id', 'INTEGER')
-            self._add_column_if_not_exists(cursor, 'support', 'message', 'TEXT')
-            self._add_column_if_not_exists(cursor, 'support', 'datetime', 'TEXT DEFAULT CURRENT_TIMESTAMP')
-            # --- Таблица settings ---
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS settings (
-                    key TEXT PRIMARY KEY
-                )
-            ''')
-            self._add_column_if_not_exists(cursor, 'settings', 'value', 'TEXT')
->>>>>>> 0d848342bf44aa8185bfe05a6ce57230135301ca
             # --- Таблица group_video_settings ---
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS group_video_settings (
@@ -112,18 +66,10 @@ class Database:
                     is_subscribed INTEGER DEFAULT 1
                 )
             ''')
-<<<<<<< HEAD
-=======
-            self._add_column_if_not_exists(cursor, 'group_video_settings', 'centris_enabled', 'BOOLEAN DEFAULT 0')
-            self._add_column_if_not_exists(cursor, 'group_video_settings', 'centris_season', 'TEXT')
-            self._add_column_if_not_exists(cursor, 'group_video_settings', 'golden_enabled', 'BOOLEAN DEFAULT 0')
-            self._add_column_if_not_exists(cursor, 'group_video_settings', 'golden_season', 'TEXT')
-            self._add_column_if_not_exists(cursor, 'group_video_settings', 'viewed_videos', "TEXT DEFAULT '[]'")
->>>>>>> 0d848342bf44aa8185bfe05a6ce57230135301ca
             # --- Таблица seasons ---
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS seasons (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    id INTEGER PRIMARY KEY,
                     project TEXT NOT NULL,
                     name TEXT NOT NULL
                 )
@@ -131,25 +77,18 @@ class Database:
             # --- Таблица videos ---
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS videos (
-<<<<<<< HEAD
                     id SERIAL PRIMARY KEY,
-=======
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
->>>>>>> 0d848342bf44aa8185bfe05a6ce57230135301ca
                     season_id INTEGER,
                     url TEXT NOT NULL,
                     title TEXT NOT NULL,
                     position INTEGER NOT NULL,
                     FOREIGN KEY(season_id) REFERENCES seasons(id) ON DELETE CASCADE
-<<<<<<< HEAD
                 )
             ''')
             # --- Таблица admins ---
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS admins (
                     user_id BIGINT PRIMARY KEY
-=======
->>>>>>> 0d848342bf44aa8185bfe05a6ce57230135301ca
                 )
             ''')
             self.conn.commit()
@@ -181,7 +120,7 @@ class Database:
             cursor.close()
             return exists
         except Exception as e:
-            logger.error(f"Ошибка при проверке существования пользователя {user_id}: {e}")
+            logger.error(f"Ошибка при проверке пользователя {user_id}: {e}")
             return False
 
     def update(self, user_id, name, phone, preferred_time="07:00", is_group=False):
@@ -231,15 +170,6 @@ class Database:
             logger.error(f"Ошибка при получении настроек видео для группы {chat_id}: {e}")
             return None
 
-<<<<<<< HEAD
-    def get_all_groups_with_settings(self):
-        try:
-            cursor = self.conn.cursor()
-            cursor.execute('''
-                SELECT chat_id, centris_enabled, centris_season, centris_start_video, golden_enabled, golden_start_video
-                FROM group_video_settings
-            ''')
-=======
     def get_all_users(self):
         try:
             cursor = self.conn.cursor()
@@ -268,7 +198,6 @@ class Database:
         try:
             cursor = self.conn.cursor()
             cursor.execute("SELECT user_id, is_group FROM users WHERE is_subscribed = 1")
->>>>>>> 0d848342bf44aa8185bfe05a6ce57230135301ca
             result = cursor.fetchall()
             cursor.close()
             return [tuple(row) for row in result]
@@ -405,7 +334,6 @@ class Database:
             logger.error(f"Ошибка при получении статуса подписки для группы {chat_id}: {e}")
             return False
 
-<<<<<<< HEAD
     # --- Методы для seasons и videos ---
     def add_season_with_videos(self, project, season_name, links, titles):
         try:
@@ -414,23 +342,6 @@ class Database:
             season_id = cursor.fetchone()[0] # Получаем ID из последней вставки
             for pos, (url, title) in enumerate(zip(links, titles)):
                 cursor.execute("INSERT INTO videos (season_id, url, title, position) VALUES (%s, %s, %s, %s)", (season_id, url, title, pos))
-=======
-    def set_group_video_settings(self, chat_id: int, centris_enabled: bool, centris_season: str, golden_enabled: bool, golden_season: str):
-        try:
-            cursor = self.conn.cursor()
-            cursor.execute(
-                """
-                INSERT INTO group_video_settings (chat_id, centris_enabled, centris_season, golden_enabled, golden_season)
-                VALUES (%s, %s, %s, %s, %s)
-                ON CONFLICT (chat_id) DO UPDATE SET
-                    centris_enabled = excluded.centrus_enabled,
-                    centris_season = excluded.centrus_season,
-                    golden_enabled = excluded.golden_enabled,
-                    golden_season = excluded.golden_season
-                """,
-                (chat_id, centris_enabled, centris_season, golden_enabled, golden_season)
-            )
->>>>>>> 0d848342bf44aa8185bfe05a6ce57230135301ca
             self.conn.commit()
             cursor.close()
             logger.info(f"Сезон '{season_name}' успешно добавлен в проект '{project}' с {len(links)} видео")
@@ -441,7 +352,6 @@ class Database:
     def get_seasons_by_project(self, project):
         try:
             cursor = self.conn.cursor()
-<<<<<<< HEAD
             if project == "centr":
                 cursor.execute("""
                     SELECT id, name FROM seasons 
@@ -461,34 +371,14 @@ class Database:
         except Exception as e:
             logger.error(f"Ошибка при получении сезонов проекта '{project}': {e}")
             return []
-=======
-            cursor.execute("SELECT centris_enabled, centris_season, golden_enabled, golden_season FROM group_video_settings WHERE chat_id = %s", (chat_id,))
-            result = cursor.fetchone()
-            cursor.close()
-            return (result[0], result[1], result[2], result[3]) if result else (None, None, None, None)
-        except Exception as e:
-            logger.error(f"Ошибка при получении настроек видео для группы {chat_id}: {e}")
-            return (None, None, None, None)
->>>>>>> 0d848342bf44aa8185bfe05a6ce57230135301ca
 
     def get_seasons_with_videos_by_project(self, project):
         try:
             cursor = self.conn.cursor()
-<<<<<<< HEAD
-            cursor.execute("""
-                SELECT s.id, s.name, COUNT(v.id) as video_count
-                FROM seasons s
-                LEFT JOIN videos v ON s.id = v.season_id
-                WHERE s.project = %s
-                GROUP BY s.id, s.name
-                ORDER BY s.id
-            """, (project,))
-=======
             cursor.execute('''
                 SELECT chat_id, centris_enabled, centris_season, golden_enabled, golden_season
                 FROM group_video_settings
             ''')
->>>>>>> 0d848342bf44aa8185bfe05a6ce57230135301ca
             result = cursor.fetchall()
             cursor.close()
             return [tuple(row) for row in result]
@@ -499,16 +389,8 @@ class Database:
     def get_videos_by_season(self, season_id):
         try:
             cursor = self.conn.cursor()
-<<<<<<< HEAD
             cursor.execute("SELECT url, title, position FROM videos WHERE season_id = %s ORDER BY position", (season_id,))
             result = cursor.fetchall()
-=======
-            cursor.execute('''
-                UPDATE users SET is_banned = 1, is_subscribed = 0 
-                WHERE user_id = %s AND is_group = 1
-            ''', (group_id,))
-            self.conn.commit()
->>>>>>> 0d848342bf44aa8185bfe05a6ce57230135301ca
             cursor.close()
             return [tuple(row) for row in result]
         except Exception as e:
@@ -518,16 +400,8 @@ class Database:
     def get_season_by_id(self, season_id):
         try:
             cursor = self.conn.cursor()
-<<<<<<< HEAD
             cursor.execute("SELECT id, project, name FROM seasons WHERE id = %s", (season_id,))
             result = cursor.fetchone()
-=======
-            cursor.execute('''
-                UPDATE users SET is_banned = 0, is_subscribed = 1 
-                WHERE user_id = %s AND is_group = 1
-            ''', (group_id,))
-            self.conn.commit()
->>>>>>> 0d848342bf44aa8185bfe05a6ce57230135301ca
             cursor.close()
             return tuple(result) if result else None
         except Exception as e:
@@ -537,14 +411,7 @@ class Database:
     def get_season_by_name(self, season_name):
         try:
             cursor = self.conn.cursor()
-<<<<<<< HEAD
             cursor.execute("SELECT id, project, name FROM seasons WHERE name = %s", (season_name,))
-=======
-            cursor.execute('''
-                SELECT is_banned FROM users 
-                WHERE user_id = %s AND is_group = 1
-            ''', (group_id,))
->>>>>>> 0d848342bf44aa8185bfe05a6ce57230135301ca
             result = cursor.fetchone()
             cursor.close()
             return tuple(result) if result else None
@@ -555,7 +422,6 @@ class Database:
     def get_videos_by_season_name(self, season_name):
         try:
             cursor = self.conn.cursor()
-<<<<<<< HEAD
             cursor.execute("""
                 SELECT v.url, v.title, v.position 
                 FROM videos v 
@@ -563,12 +429,6 @@ class Database:
                 WHERE s.name = %s 
                 ORDER BY v.position
             """, (season_name,))
-=======
-            cursor.execute('''
-                SELECT user_id, name FROM users 
-                WHERE is_banned = 1 AND is_group = 1
-            ''')
->>>>>>> 0d848342bf44aa8185bfe05a6ce57230135301ca
             result = cursor.fetchall()
             cursor.close()
             return [tuple(row) for row in result]
@@ -811,6 +671,15 @@ class Database:
             self.conn.rollback()
 
     # Удалены методы get_group_times и parse_time_str, связанные с индивидуальными временами рассылки
+
+    def is_admin(self, user_id):
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute("SELECT 1 FROM admins WHERE user_id = %s", (user_id,))
+            return cursor.fetchone() is not None
+        except Exception as e:
+            logger.error(f"Ошибка при проверке админа: {e}")
+            return False
 
     def is_admin(self, user_id):
         try:

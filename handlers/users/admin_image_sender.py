@@ -116,6 +116,7 @@ try:
         season_id = int(callback_query.data.replace("season_", ""))
         await state.update_data(centris_season_id=season_id)
 <<<<<<< HEAD
+<<<<<<< HEAD
         videos = db.get_videos_by_season(season_id)
         chat_id = (await state.get_data()).get("chat_id")
         viewed = db.get_group_viewed_videos(chat_id)
@@ -123,6 +124,8 @@ try:
         if not kb:
             await callback_query.message.edit_text("Barcha video ushbu sezon uchun yuborilgan!")
 =======
+=======
+>>>>>>> 0d848342bf44aa8185bfe05a6ce57230135301ca
         data = await state.get_data()
         if data.get("project") == "both":
             # После выбора Centris — предложить выбрать сезон Golden Lake
@@ -131,6 +134,9 @@ try:
         else:
             await save_group_settings(data)
             await callback_query.message.edit_text("Настройки сохранены! Рассылка активирована.")
+<<<<<<< HEAD
+>>>>>>> 0d848342bf44aa8185bfe05a6ce57230135301ca
+=======
 >>>>>>> 0d848342bf44aa8185bfe05a6ce57230135301ca
             await state.finish()
 
@@ -204,6 +210,9 @@ try:
             db.set_group_video_index_and_viewed(f"centris_{chat_id}_{centris_season_id}", None, centris_season_id, 0, [])
         if golden_enabled and golden_season_id is not None:
             db.set_group_video_index_and_viewed(f"golden_{chat_id}_{golden_season_id}", None, golden_season_id, 0, [])
+<<<<<<< HEAD
+>>>>>>> 0d848342bf44aa8185bfe05a6ce57230135301ca
+=======
 >>>>>>> 0d848342bf44aa8185bfe05a6ce57230135301ca
         from handlers.users.video_scheduler import schedule_group_jobs
         schedule_group_jobs()

@@ -128,6 +128,7 @@
 ---
 
 Если нужна расшифровка какой-то команды или логики — обратитесь к разработчику или в поддержку.
+<<<<<<< HEAD
 
 # Подробная логика команд и их работы
 
@@ -335,3 +336,5 @@
 ---
 
 Agar savollar bo‘lsa yoki yangi guruh uchun yordam kerak bo‘lsa — super-adminlarga murojaat qiling!
+=======
+>>>>>>> 0d848342bf44aa8185bfe05a6ce57230135301ca
