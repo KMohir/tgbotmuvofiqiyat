@@ -173,12 +173,12 @@ async def set_time_command(message: types.Message):
             db.add_user(message.chat.id, message.chat.title or "Группа", None, preferred_time=new_time, is_group=True, group_id=message.chat.id)
             db.set_preferred_time(message.chat.id, new_time)
             await message.reply(f"Время рассылки для этой группы установлено на {new_time}")
-    else:
-        # Меняем время для пользователя
-        if not db.user_exists(message.from_user.id):
-            db.add_user(message.from_user.id, "Не указано", "Не указано", preferred_time=new_time)
-        db.set_preferred_time(message.from_user.id, new_time)
-        await message.reply(f"Время рассылки для вас установлено на {new_time}")
+        else:
+            # Меняем время для пользователя
+            if not db.user_exists(message.from_user.id):
+                db.add_user(message.from_user.id, "Не указано", "Не указано", preferred_time=new_time)
+            db.set_preferred_time(message.from_user.id, new_time)
+            await message.reply(f"Время рассылки для вас установлено на {new_time}")
 
 # Главная клавиатура
 main_menu_keyboard =ReplyKeyboardMarkup(
@@ -327,11 +327,11 @@ async def send_video(message: types.Message, state: FSMContext):
         project = data.get("project")
         videos = data.get("videos", [])
         season_name = data.get("season_name")
-        
+
         if message.text == "Orqaga qaytish":
             await back_to_season_menu(message, state)
             return
-        
+
         # Ищем видео по названию
         video_url = None
         video_position = None
@@ -340,7 +340,7 @@ async def send_video(message: types.Message, state: FSMContext):
                 video_url = url
                 video_position = position
                 break
-        
+
         if video_url:
             message_id = int(video_url.split("/")[-1])
             await bot.copy_message(
@@ -349,19 +349,9 @@ async def send_video(message: types.Message, state: FSMContext):
                 message_id=message_id,
                 protect_content=True
             )
-
             # Если это группа — отмечаем видео как просмотренное
             if message.chat.type in [types.ChatType.GROUP, types.ChatType.SUPERGROUP]:
-                # Создаем уникальный идентификатор для группы и сезона
-                if project == "centris":
-                    group_key = f"centris_{message.chat.id}_{season_name}"
-                elif project == "olden_lake":
-                    group_key = f"golden_{message.chat.id}"
-                else:
-                    group_key = f"{project}_{message.chat.id}"
-                
-                # Отмечаем видео как просмотренное
-                db.mark_group_video_as_viewed(group_key, video_position)
+                db.mark_group_video_as_viewed(message.chat.id, video_position)
         else:
             await message.answer("Video topilmadi.")
     except Exception as exx:

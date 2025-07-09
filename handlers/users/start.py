@@ -62,7 +62,7 @@ try:
                     await message.answer("Guruh uchun FSM holatlari bekor qilindi, /start buyrug'i admin tomonidan bajarildi.")
                 if not db.user_exists(message.chat.id):
                     db.add_user(message.chat.id, message.chat.title or "Группа", None, is_group=True, group_id=message.chat.id)
-                await message.answer("Бот активирован в группе!\nВсе участники могут пользоваться функциями без регистрации.", reply_markup=main_menu_keyboard)
+                await message.answer("Bot guruhda faollashtirildi! Barcha ishtirokchilar ro‘yxatdan o‘tmasdan funksiyalardan foydalanishlari mumkin.", reply_markup=main_menu_keyboard)
                 return
 
             # В личке — прежняя логика
@@ -155,15 +155,15 @@ try:
                 caption = get_video_caption()
                 try:
 
-                        await bot.copy_message(
-                            chat_id=message.chat.id,
-                            from_chat_id=-1002550852551,
-                            message_id=135,
-                            caption='',
-                            parse_mode="HTML",
-                            reply_markup=get_lang_for_button(message),
-                            protect_content=True
-                        )
+                    await bot.copy_message(
+                        chat_id=message.chat.id,
+                        from_chat_id=-1002550852551,
+                        message_id=135,
+                        caption='',
+                        parse_mode="HTML",
+                        reply_markup=get_lang_for_button(message),
+                        protect_content=True
+                    )
                 except Exception as e:
                     logger.error(f"Ошибка при отправке видео после регистрации {message.from_user.id}: {e}")
                     await message.answer("Video yuborishda xato yuz berdi. Iltimos, keyinroq urinib ko'ring.")

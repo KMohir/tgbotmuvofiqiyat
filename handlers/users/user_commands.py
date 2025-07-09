@@ -87,7 +87,7 @@ try:
     async def add_admin_command(message: types.Message):
         args = message.get_args().split()
         if not args or not args[0].isdigit():
-            await message.reply("Используйте: /add_admin <user_id>")
+            await message.reply("Используйте: /add_admin [user_id]")
             return
         user_id = int(args[0])
         if db.is_admin(user_id):
@@ -101,7 +101,7 @@ try:
     async def remove_admin_command(message: types.Message):
         args = message.get_args().split()
         if not args or not args[0].isdigit():
-            await message.reply("Используйте: /remove_admin <user_id>")
+            await message.reply("Используйте: /remove_admin [user_id]")
             return
         user_id = int(args[0])
         if not db.is_admin(user_id):
@@ -127,6 +127,109 @@ try:
             else:
                 text += f"{user_id}\n"
         await message.reply(text)
+
+
+    @dp.message_handler(commands=['set_group_video'])
+    async def set_group_video_command(message: types.Message, state: FSMContext):
+        args = message.get_args().split()
+        if not args:
+            # Запустить мастер с клавиатурой выбора проекта
+            from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+            from handlers.users.admin_image_sender import GroupVideoStates
+            kb = InlineKeyboardMarkup(row_width=2)
+            kb.add(
+                InlineKeyboardButton("Centris Towers", callback_data="project_centr"),
+                InlineKeyboardButton("Golden Lake", callback_data="project_golden"),
+                InlineKeyboardButton("Оба", callback_data="project_both")
+            )
+            await message.answer("Выберите проект для группы:", reply_markup=kb)
+            await state.set_state(GroupVideoStates.waiting_for_project.state)
+            await state.update_data(chat_id=message.chat.id)
+            return
+        if len(args) != 2 or args[0] not in ['centris', 'golden'] or not args[1].isdigit():
+            await message.reply("Используйте: /set_group_video centris [номер_сезона] или /set_group_video golden [номер_сезона]")
+            return
+        project, season_number = args[0], args[1]
+        if project == 'centris':
+            db.set_group_video_settings(
+                message.chat.id,
+                centris_enabled=True,
+                centris_season=season_number,
+                centris_start_video=0,
+                golden_enabled=False,
+                golden_start_video=0
+            )
+            await message.reply(f"В группе включена рассылка Centris Towers, сезон №{season_number}")
+        else:
+            db.set_group_video_settings(
+                message.chat.id,
+                centris_enabled=False,
+                centris_season=None,
+                golden_enabled=True,
+                golden_season=season_number
+            )
+            await message.reply(f"В группе включена рассылка Golden Lake, сезон №{season_number}")
+
+    @dp.message_handler(commands=['disable_group_video'])
+    @admin_required()
+    async def disable_group_video_command(message: types.Message):
+        args = message.get_args().split()
+        if len(args) != 1 or args[0] not in ['centris', 'golden']:
+            await message.reply("Используйте: /disable_group_video centris или /disable_group_video golden")
+            return
+        project = args[0]
+        settings = db.get_group_video_settings(message.chat.id)
+        if project == 'centris':
+            db.set_group_video_settings(
+                chat_id=message.chat.id,
+                centris_enabled=False,
+                centris_season=None,
+                golden_enabled=settings[2],
+                golden_season=settings[3]
+            )
+            await message.reply("Рассылка Centris Towers отключена для этой группы.")
+        else:
+            db.set_group_video_settings(
+                chat_id=message.chat.id,
+                centris_enabled=settings[0],
+                centris_season=settings[1],
+                golden_enabled=False,
+                golden_season=None
+            )
+            await message.reply("Рассылка Golden Lake отключена для этой группы.")
+
+
+    @dp.message_handler(commands=['set_centr_time'])
+    @admin_required()
+    async def set_centr_time_command(message: types.Message):
+        args = message.get_args().split()
+        if not (1 <= len(args) <= 2):
+            await message.reply("Используйте: /set_centr_time <08:00> [20:00]")
+            return
+        centris_time_1 = args[0]
+        centris_time_2 = args[1] if len(args) == 2 else None
+        cursor = db.conn.cursor()
+        if centris_time_2:
+            cursor.execute("UPDATE group_video_settings SET centris_time_1 = %s, centris_time_2 = %s WHERE chat_id = %s", (centris_time_1, centris_time_2, message.chat.id))
+        else:
+            cursor.execute("UPDATE group_video_settings SET centris_time_1 = %s, centris_time_2 = NULL WHERE chat_id = %s", (centris_time_1, message.chat.id))
+        db.conn.commit()
+        cursor.close()
+        await message.reply(f"Время рассылки Centris Towers обновлено: {centris_time_1}" + (f" и {centris_time_2}" if centris_time_2 else ""))
+
+    @dp.message_handler(commands=['set_golden_time'])
+    @admin_required()
+    async def set_golden_time_command(message: types.Message):
+        args = message.get_args().split()
+        if len(args) != 1:
+            await message.reply("Используйте: /set_golden_time <11:00>")
+            return
+        golden_time = args[0]
+        cursor = db.conn.cursor()
+        cursor.execute("UPDATE group_video_settings SET golden_time = %s WHERE chat_id = %s", (golden_time, message.chat.id))
+        db.conn.commit()
+        cursor.close()
+        await message.reply(f"Время рассылки Golden Lake обновлено: {golden_time}")
 
 
 except Exception as exx:

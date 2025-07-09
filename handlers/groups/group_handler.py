@@ -1,8 +1,10 @@
 from aiogram import types
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.dispatcher.filters import Command
 from data.config import ADMINS
 from loader import dp, db
 import logging
+from aiogram.utils.exceptions import ChatAdminRequired
 
 
 @dp.my_chat_member_handler()
@@ -118,3 +120,124 @@ async def handle_group_decision(callback_query: types.CallbackQuery):
             logging.error(f"Ошибка при выходе из запрещенной группы {group_id}: {e}")
 
     await callback_query.answer() 
+
+
+@dp.message_handler(Command('group_subscribe'), chat_type=[types.ChatType.GROUP, types.ChatType.SUPERGROUP])
+async def group_subscribe(message: types.Message):
+    user_id = message.from_user.id
+    chat_id = message.chat.id
+    member = await message.bot.get_chat_member(chat_id, user_id)
+    from data.config import ADMINS
+    if member.is_chat_admin() or user_id in ADMINS:
+        db.set_subscription_status(chat_id, True)
+        await message.reply('Группа успешно подписана на рассылку!')
+    else:
+        await message.reply('У вас нет прав для выполнения этой команды. Только администраторы группы или супер-админы могут это делать.')
+
+@dp.message_handler(Command('group_unsubscribe'), chat_type=[types.ChatType.GROUP, types.ChatType.SUPERGROUP])
+async def group_unsubscribe(message: types.Message):
+    user_id = message.from_user.id
+    chat_id = message.chat.id
+    member = await message.bot.get_chat_member(chat_id, user_id)
+    from data.config import ADMINS
+    if member.is_chat_admin() or user_id in ADMINS:
+        db.set_subscription_status(chat_id, False)
+        await message.reply('Группа отписана от рассылки!')
+    else:
+        await message.reply('У вас нет прав для выполнения этой команды. Только администраторы группы или супер-админы могут это делать.')
+
+# Ручная команда для мгновенной отправки тестового видео
+@dp.message_handler(Command('send_test_video'), chat_type=[types.ChatType.GROUP, types.ChatType.SUPERGROUP])
+async def send_test_video(message: types.Message):
+    user_id = message.from_user.id
+    chat_id = message.chat.id
+    member = await message.bot.get_chat_member(chat_id, user_id)
+    from data.config import ADMINS
+    if member.is_chat_admin() or user_id in ADMINS:
+        from handlers.users.video_scheduler import send_group_video_new
+        # Получаем стартовые значения для Centris
+        centris_start_season_id, centris_start_video = db.get_group_video_start(chat_id, 'centris')
+        golden_start_season_id, golden_start_video = db.get_group_video_start(chat_id, 'golden')
+        sent = False
+        if centris_start_season_id:
+            await send_group_video_new(chat_id, 'centris', centris_start_season_id, centris_start_video)
+            sent = True
+        if golden_start_season_id:
+            await send_group_video_new(chat_id, 'golden_lake', golden_start_season_id, golden_start_video)
+            sent = True
+        if sent:
+            await message.reply('Тестовое видео отправлено!')
+        else:
+            await message.reply('Нет настроек для отправки тестового видео.')
+    else:
+        await message.reply('У вас нет прав для выполнения этой команды. Только администраторы группы или супер-админы могут это делать.') 
+
+@dp.message_handler(Command('migrate_group_video_settings'), chat_type=[types.ChatType.GROUP, types.ChatType.SUPERGROUP])
+async def migrate_group_video_settings(message: types.Message):
+    user_id = message.from_user.id
+    from data.config import ADMINS
+    if user_id not in ADMINS:
+        await message.reply('Только супер-админ может использовать эту команду.')
+        return
+    updated = 0
+    groups = db.get_all_groups_with_settings()
+    for group in groups:
+        chat_id = group[0]
+        centris_season = group[2]
+        centris_start_video = group[3]
+        if centris_season:
+            db.set_group_video_start(chat_id, 'centris', int(centris_season), int(centris_start_video))
+            updated += 1
+    await message.reply(f'Миграция завершена! Обновлено групп: {updated}') 
+
+@dp.message_handler(Command('group_settings'), chat_type=[types.ChatType.GROUP, types.ChatType.SUPERGROUP])
+async def group_settings(message: types.Message):
+    chat_id = message.chat.id
+    settings = db.get_group_video_settings(chat_id)
+    centris_start_season_id, centris_start_video = db.get_group_video_start(chat_id, 'centris')
+    golden_start_season_id, golden_start_video = db.get_group_video_start(chat_id, 'golden')
+    is_subscribed = db.get_subscription_status(chat_id)
+    text = (
+        f"<b>Текущие настройки группы:</b>\n"
+        f"centris_enabled: {settings[0] if settings else '-'}\n"
+        f"centris_season: {settings[1] if settings else '-'}\n"
+        f"centris_start_video: {settings[2] if settings else '-'}\n"
+        f"golden_enabled: {settings[3] if settings else '-'}\n"
+        f"golden_start_video: {settings[4] if settings else '-'}\n"
+        f"centris_start_season_id: {centris_start_season_id}\n"
+        f"centris_start_video (новое): {centris_start_video}\n"
+        f"golden_start_season_id: {golden_start_season_id}\n"
+        f"golden_start_video (новое): {golden_start_video}\n"
+        f"is_subscribed: {is_subscribed}"
+    )
+    await message.reply(text, parse_mode='HTML') 
+
+@dp.message_handler(Command('set_centr_season'), chat_type=[types.ChatType.GROUP, types.ChatType.SUPERGROUP])
+async def set_centr_season(message: types.Message):
+    user_id = message.from_user.id
+    from data.config import ADMINS
+    if user_id not in ADMINS:
+        await message.reply('Только супер-админ может использовать эту команду.')
+        return
+    args = message.get_args().strip()
+    if not args.isdigit():
+        await message.reply('Укажите id сезона, например: /set_centr_season 2')
+        return
+    season_id = int(args)
+    db.set_group_video_start(message.chat.id, 'centris', season_id, db.get_group_video_start(message.chat.id, 'centris')[1])
+    await message.reply(f'centris_start_season_id установлен: {season_id}') 
+
+@dp.message_handler(Command('set_golden_season'), chat_type=[types.ChatType.GROUP, types.ChatType.SUPERGROUP])
+async def set_golden_season(message: types.Message):
+    user_id = message.from_user.id
+    from data.config import ADMINS
+    if user_id not in ADMINS:
+        await message.reply('Только супер-админ может использовать эту команду.')
+        return
+    args = message.get_args().strip()
+    if not args.isdigit():
+        await message.reply('Укажите id сезона, например: /set_golden_season 2')
+        return
+    season_id = int(args)
+    db.set_group_video_start(message.chat.id, 'golden', season_id, db.get_group_video_start(message.chat.id, 'golden')[1])
+    await message.reply(f'golden_start_season_id установлен: {season_id}') 

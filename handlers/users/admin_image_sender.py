@@ -100,7 +100,7 @@ try:
             season_id, season_name = seasons[0]
             videos = db.get_videos_by_season(season_id)
             chat_id = (await state.get_data()).get("chat_id")
-            viewed = db.get_group_viewed_videos(f"golden_{chat_id}")
+            viewed = db.get_group_viewed_videos(chat_id)
             kb = get_video_keyboard_from_db(videos, viewed)
             if not kb:
                 await callback_query.message.edit_text("Barcha Golden Lake videolari yuborilgan!")
@@ -116,7 +116,7 @@ try:
         await state.update_data(centris_season_id=season_id)
         videos = db.get_videos_by_season(season_id)
         chat_id = (await state.get_data()).get("chat_id")
-        viewed = db.get_group_viewed_videos(f"centris_{chat_id}_{season_id}")
+        viewed = db.get_group_viewed_videos(chat_id)
         kb = get_video_keyboard_from_db(videos, viewed)
         if not kb:
             await callback_query.message.edit_text("Barcha video ushbu sezon uchun yuborilgan!")
@@ -141,7 +141,7 @@ try:
             season_id, season_name = seasons[0]
             videos = db.get_videos_by_season(season_id)
             chat_id = data.get("chat_id")
-            viewed = db.get_group_viewed_videos(f"golden_{chat_id}")
+            viewed = db.get_group_viewed_videos(chat_id)
             kb = get_video_keyboard_from_db(videos, viewed)
             if not kb:
                 await callback_query.message.edit_text("Barcha Golden Lake videolari yuborilgan!")
@@ -180,15 +180,8 @@ try:
             golden_enabled,
             golden_start_video
         )
-        # --- Сброс просмотренных видео для выбранного сезона и группы ---
-        if centris_enabled and centris_season_id is not None:
-            db.set_group_video_index_and_viewed(f"centris_{chat_id}_{centris_season_id}", None, centris_season_id, centris_start_video, [])
-        if golden_enabled:
-            # Для Golden Lake всегда первый сезон
-            seasons = db.get_seasons_by_project("golden")
-            if seasons:
-                golden_season_id = seasons[0][0]
-                db.set_group_video_index_and_viewed(f"golden_{chat_id}_{golden_season_id}", None, golden_season_id, golden_start_video, [])
+        # --- Сброс просмотренных видео для группы ---
+        db.reset_group_viewed_videos(chat_id)
         from handlers.users.video_scheduler import schedule_group_jobs
         schedule_group_jobs()
 
@@ -388,10 +381,7 @@ try:
     @dp.message_handler(Command('reset_group_videos'), user_id=ADMINS)
     async def reset_group_videos_command(message: types.Message, state: FSMContext):
         chat_id = message.chat.id
-        # Сбросить просмотренные для Centris Towers всех сезонов и Golden Lake
-        for season in ["1-sezon", "2-sezon", "3-sezon", "4-sezon", "5-sezon"]:
-            db.set_group_video_index_and_viewed(f"centris_{chat_id}_{season}", None, season, 0, [])
-        db.set_group_video_index_and_viewed(f"golden_{chat_id}", None, None, 0, [])
+        db.reset_group_viewed_videos(chat_id)
         await message.answer("Прогресс группы сброшен. Теперь можно выбрать стартовое видео заново.")
 
     @dp.message_handler(Command('add_season'), user_id=ADMINS)
@@ -875,6 +865,22 @@ try:
                 
         except Exception as e:
             await message.answer(f"❌ Ошибка при исправлении порядка сезонов: {e}")
+
+    @dp.message_handler(commands=['fix_season_project'], user_id=ADMINS)
+    async def fix_season_project_command(message: types.Message):
+        try:
+            args = message.text.split()
+            if len(args) != 3:
+                await message.answer("Использование: /fix_season_project <season_id> <project>")
+                return
+            season_id = int(args[1])
+            new_project = args[2]
+            if db.update_season_project(season_id, new_project):
+                await message.answer(f"Project сезона {season_id} успешно изменён на '{new_project}'")
+            else:
+                await message.answer("Ошибка при обновлении project сезона.")
+        except Exception as e:
+            await message.answer(f"Ошибка: {e}")
 
 except Exception as exx:
     from datetime import datetime
