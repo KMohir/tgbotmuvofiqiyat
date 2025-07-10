@@ -6,6 +6,16 @@ from logging.handlers import RotatingFileHandler
 from dotenv import load_dotenv
 import os
 
+# Пример .env:
+# DB_HOST=localhost
+# DB_PORT=5432
+# DB_USER=postgres
+# DB_PASSWORD=ваш_пароль
+# DB_NAME=centris
+#
+# Для работы требуется python-dotenv
+# pip install python-dotenv
+
 # Настройка ротации логов
 log_handler = RotatingFileHandler('bot.log', maxBytes=5*1024*1024, backupCount=3, encoding='utf-8')
 log_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
@@ -20,10 +30,11 @@ class Database:
         try:
             # Подключение к PostgreSQL
             self.conn = psycopg2.connect(
-                host=os.getenv('PG_HOST', 'localhost'),
-                dbname=os.getenv('PG_DB', 'project_db'),
-                user=os.getenv('PG_USER', 'postgres'),
-                password=os.getenv('PG_PASSWORD', '7777')
+                host=os.getenv('DB_HOST'),
+                dbname=os.getenv('DB_NAME'),
+                user=os.getenv('DB_USER'),
+                password=os.getenv('DB_PASSWORD'),
+                port=os.getenv('DB_PORT', '5432')
             )
             self.conn.autocommit = True
             self.create_tables()
