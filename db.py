@@ -2,7 +2,13 @@ import psycopg2
 import psycopg2.extras
 import json
 import logging
-from logging.handlers import RotatingFileHandler
+# from logging.handlers import RotatingFileHandler
+# log_handler = RotatingFileHandler('bot.log', maxBytes=5*1024*1024, backupCount=3, encoding='utf-8')
+log_handler = logging.FileHandler('bot.log', encoding='utf-8')
+log_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+logger = logging.getLogger()
+logger.setLevel(logging.ERROR)
+logger.addHandler(log_handler)
 from dotenv import load_dotenv
 import os
 
@@ -17,11 +23,11 @@ import os
 # pip install python-dotenv
 
 # Настройка ротации логов
-log_handler = RotatingFileHandler('bot.log', maxBytes=5*1024*1024, backupCount=3, encoding='utf-8')
-log_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
-logger = logging.getLogger()
-logger.setLevel(logging.ERROR)
-logger.addHandler(log_handler)
+# log_handler = RotatingFileHandler('bot.log', maxBytes=5*1024*1024, backupCount=3, encoding='utf-8')
+# log_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+# logger = logging.getLogger()
+# logger.setLevel(logging.ERROR)
+# logger.addHandler(log_handler)
 
 load_dotenv()
 
