@@ -42,7 +42,53 @@ class Database:
             logger.error(f"Ошибка при инициализации базы данных: {e}")
             raise
 
+    def migrate_seasons_table(self):
+        try:
+            cursor = self.conn.cursor()
+            # Проверяем, есть ли автоинкремент у id
+            cursor.execute("""
+                SELECT column_default FROM information_schema.columns
+                WHERE table_name='seasons' AND column_name='id'
+            """
+            )
+            default = cursor.fetchone()
+            if not default or not default[0] or 'nextval' not in str(default[0]):
+                logger.error("Поле id в seasons не автоинкрементируется. Запускаю миграцию...")
+                cursor.execute("ALTER TABLE seasons RENAME TO seasons_old;")
+                cursor.execute("""
+                    CREATE TABLE seasons (
+                        id SERIAL PRIMARY KEY,
+                        project TEXT NOT NULL,
+                        name TEXT NOT NULL
+                    )
+                """)
+                cursor.execute("INSERT INTO seasons (project, name) SELECT project, name FROM seasons_old;")
+                # Обновляем все season_id в videos на новые id
+                cursor.execute("""
+                    UPDATE videos v
+                    SET season_id = s.id
+                    FROM seasons s
+                    WHERE s.name = (SELECT name FROM seasons_old so WHERE so.id = v.season_id)
+                """)
+                try:
+                    cursor.execute("DROP TABLE seasons_old;")
+                except Exception as e:
+                    logger.error(f"Ошибка при удалении seasons_old: {e}. Пробую удалить внешний ключ и завершить миграцию.")
+                    cursor.execute("ALTER TABLE videos DROP CONSTRAINT IF EXISTS videos_season_id_fkey;")
+                    cursor.execute("DROP TABLE seasons_old;")
+                    cursor.execute("ALTER TABLE videos ADD CONSTRAINT videos_season_id_fkey FOREIGN KEY (season_id) REFERENCES seasons(id) ON DELETE CASCADE;")
+                self.conn.commit()
+                logger.info("Миграция таблицы seasons завершена!")
+            # --- Миграция project: centr -> centris ---
+            cursor.execute("UPDATE seasons SET project = 'centris' WHERE project = 'centr';")
+            self.conn.commit()
+            cursor.close()
+        except Exception as e:
+            logger.error(f"Ошибка при миграции таблицы seasons: {e}")
+            self.conn.rollback()
+
     def create_tables(self):
+        self.migrate_seasons_table()
         try:
             cursor = self.conn.cursor()
             # --- Таблица users ---
@@ -116,7 +162,7 @@ class Database:
                 INSERT INTO users (user_id, name, phone, preferred_time, is_group, group_id)
                 VALUES (%s, %s, %s, %s, %s, %s)
                 ON CONFLICT (user_id) DO NOTHING
-            ''', (user_id, name, phone, preferred_time, is_group, group_id))
+            ''', (user_id, name, phone, preferred_time, int(is_group), group_id))
             self.conn.commit()
             cursor.close()
         except Exception as e:
@@ -140,7 +186,7 @@ class Database:
             cursor.execute('''
                 UPDATE users SET name = %s, phone = %s, preferred_time = %s, is_group = %s
                 WHERE user_id = %s
-            ''', (name, phone, preferred_time, is_group, user_id))
+            ''', (name, phone, preferred_time, int(is_group), user_id))
             self.conn.commit()
             cursor.close()
             logger.info(f"Данные пользователя {user_id} успешно обновлены")
@@ -347,9 +393,13 @@ class Database:
 
     # --- Методы для seasons и videos ---
     def add_season_with_videos(self, project, season_name, links, titles):
+        if not links or not titles or len(links) != len(titles):
+            logger.error(f"Попытка добавить сезон '{season_name}' без видео или с некорректными списками! links={len(links)}, titles={len(titles)}")
+            return
         try:
             cursor = self.conn.cursor()
-            cursor.execute("INSERT INTO seasons (project, name) VALUES (%s, %s)", (project, season_name))
+            # id автоинкрементируется, не указываем его явно
+            cursor.execute("INSERT INTO seasons (project, name) VALUES (%s, %s) RETURNING id", (project, season_name))
             season_id = cursor.fetchone()[0] # Получаем ID из последней вставки
             for pos, (url, title) in enumerate(zip(links, titles)):
                 cursor.execute("INSERT INTO videos (season_id, url, title, position) VALUES (%s, %s, %s, %s)", (season_id, url, title, pos))
@@ -363,7 +413,7 @@ class Database:
     def get_seasons_by_project(self, project):
         try:
             cursor = self.conn.cursor()
-            if project == "centr":
+            if project == "centris":
                 cursor.execute("""
                     SELECT id, name FROM seasons 
                     WHERE project = %s 
@@ -386,10 +436,14 @@ class Database:
     def get_seasons_with_videos_by_project(self, project):
         try:
             cursor = self.conn.cursor()
-            cursor.execute('''
-                SELECT chat_id, centris_enabled, centris_season, golden_enabled, golden_season
-                FROM group_video_settings
-            ''')
+            cursor.execute("""
+                SELECT s.id, s.name, COUNT(v.id) as video_count
+                FROM seasons s
+                LEFT JOIN videos v ON s.id = v.season_id
+                WHERE s.project = %s
+                GROUP BY s.id, s.name
+                ORDER BY s.id
+            """, (project,))
             result = cursor.fetchall()
             cursor.close()
             return [tuple(row) for row in result]
@@ -460,6 +514,20 @@ class Database:
         except Exception as e:
             logger.error(f"Ошибка при получении видео с ID сезона {season_id}: {e}")
             return []
+
+    def get_video_by_id(self, video_id):
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute(
+                "SELECT id, season_id, url, title, position FROM videos WHERE id = %s",
+                (video_id,)
+            )
+            result = cursor.fetchone()
+            cursor.close()
+            return tuple(result) if result else None
+        except Exception as e:
+            logger.error(f"Ошибка при получении видео по id {video_id}: {e}")
+            return None
 
     # --- Методы для работы с администраторами ---
     def add_admin(self, user_id):
@@ -700,6 +768,20 @@ class Database:
         except Exception as e:
             logger.error(f"Ошибка при проверке админа: {e}")
             return False
+
+    def get_all_groups_with_settings(self):
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute('''
+                SELECT chat_id, centris_enabled, centris_start_season_id, golden_enabled, golden_start_season_id
+                FROM group_video_settings
+            ''')
+            result = cursor.fetchall()
+            cursor.close()
+            return result
+        except Exception as e:
+            logger.error(f"Ошибка при получении настроек всех групп: {e}")
+            return []
 
 # Создание экземпляра базы данных
 db = Database()

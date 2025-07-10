@@ -211,7 +211,7 @@ def get_season_keyboard(project=None):
             keyboard.add(KeyboardButton(season_name))
     else:
         # Получаем сезоны Centris Towers из базы данных
-        centris_seasons = db.get_seasons_by_project("centr")
+        centris_seasons = db.get_seasons_by_project("centris")
         for season_id, season_name in centris_seasons:
             keyboard.add(KeyboardButton(season_name))
     
@@ -273,7 +273,7 @@ async def season_selection(message: types.Message, state: FSMContext):
     season_id, season_project, season_name = season_data
     
     # Проверяем, что сезон принадлежит выбранному проекту
-    if project == "centris" and season_project != "centr":
+    if project == "centris" and season_project != "centris":
         await message.answer("Этот сезон не принадлежит проекту Centris Towers.")
         return
     elif project == "olden_lake" and season_project != "golden":

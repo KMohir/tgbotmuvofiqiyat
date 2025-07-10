@@ -163,7 +163,7 @@ async def send_test_video(message: types.Message):
             await send_group_video_new(chat_id, 'centris', centris_start_season_id, centris_start_video)
             sent = True
         if golden_start_season_id:
-            await send_group_video_new(chat_id, 'golden_lake', golden_start_season_id, golden_start_video)
+            await send_group_video_new(chat_id, 'golden', golden_start_season_id, golden_start_video)
             sent = True
         if sent:
             await message.reply('Тестовое видео отправлено!')
@@ -205,9 +205,9 @@ async def group_settings(message: types.Message):
         f"golden_enabled: {settings[3] if settings else '-'}\n"
         f"golden_start_video: {settings[4] if settings else '-'}\n"
         f"centris_start_season_id: {centris_start_season_id}\n"
-        f"centris_start_video (новое): {centris_start_video}\n"
+        f"centris_start_video: {centris_start_video}\n"
         f"golden_start_season_id: {golden_start_season_id}\n"
-        f"golden_start_video (новое): {golden_start_video}\n"
+        f"golden_start_video: {golden_start_video}\n"
         f"is_subscribed: {is_subscribed}"
     )
     await message.reply(text, parse_mode='HTML') 

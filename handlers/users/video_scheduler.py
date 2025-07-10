@@ -1,4 +1,4 @@
-from tgbotmuvofiqiyat.handlers import groups
+from handlers import groups
 
 from aiogram import types
 import asyncio
@@ -99,7 +99,7 @@ async def send_group_video_new(chat_id: int, project: str, season_id: int = None
 
         # Получаем все сезоны проекта
         if project == "centris":
-            all_seasons = db.get_seasons_by_project("centr")
+            all_seasons = db.get_seasons_by_project("centris")
         elif project == "golden_lake":
             all_seasons = db.get_seasons_by_project("golden")
         else:
@@ -169,7 +169,9 @@ async def send_group_video_new(chat_id: int, project: str, season_id: int = None
                 logger.info(f"Видео позиция {position} уже просмотрено, пропускаем")
         logger.info(f"Нет новых видео для отправки во всех сезонах проекта {project}")
         return False
-
+    except Exception as e:
+        logger.error(f"Ошибка в send_group_video_new: {e}")
+        return False
 
 # --- Планировщик для групп (старая логика) ---
 async def send_group_video_by_settings(chat_id: int):

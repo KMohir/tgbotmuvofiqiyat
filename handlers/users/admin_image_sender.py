@@ -45,7 +45,7 @@ try:
     def get_project_keyboard():
         kb = InlineKeyboardMarkup(row_width=2)
         kb.add(
-            InlineKeyboardButton("Centris Towers", callback_data="project_centr"),
+            InlineKeyboardButton("Centris Towers", callback_data="project_centris"),
             InlineKeyboardButton("Golden Lake", callback_data="project_golden"),
             InlineKeyboardButton("Оба", callback_data="project_both")
         )
@@ -87,29 +87,20 @@ try:
     @dp.callback_query_handler(lambda c: c.data.startswith("project_"), state=GroupVideoStates.waiting_for_project.state)
     async def process_project_selection(callback_query: types.CallbackQuery, state: FSMContext):
         project = callback_query.data.replace("project_", "")
+        if project == "centr":
+            project = "centris"
         await state.update_data(project=project)
-        if project in ["centr", "both"]:
-            await callback_query.message.edit_text("Centris Towers учун сезонни танланг:", reply_markup=get_season_keyboard("centr"))
+        if project in ["centris", "both"]:
+            await callback_query.message.edit_text("Centris Towers учун сезонни танланг:", reply_markup=get_season_keyboard("centris"))
             await state.set_state(GroupVideoStates.waiting_for_centr_season.state)
         elif project == "golden":
-            # Получаем первый сезон Golden Lake
             seasons = db.get_seasons_by_project("golden")
             if not seasons:
                 await callback_query.message.edit_text("Нет сезонов Golden Lake.")
                 await state.finish()
                 return
-            season_id, season_name = seasons[0]
-            videos = db.get_videos_by_season(season_id)
-            chat_id = (await state.get_data()).get("chat_id")
-            viewed = db.get_group_viewed_videos(chat_id)
-            kb = get_video_keyboard_from_db(videos, viewed)
-            if not kb:
-                await callback_query.message.edit_text("Barcha Golden Lake videolari yuborilgan!")
-                await state.finish()
-                return
-            await state.update_data(golden_season_id=season_id)
-            await callback_query.message.edit_text("Golden Lake учун стартовое видео танланг:", reply_markup=kb)
-            await state.set_state(GroupVideoStates.waiting_for_golden_video.state)
+            await callback_query.message.edit_text("Golden Lake учун сезонни танланг:", reply_markup=get_season_keyboard("golden"))
+            await state.set_state(GroupVideoStates.waiting_for_golden_season.state)
 
     @dp.callback_query_handler(lambda c: c.data.startswith("season_"), state=GroupVideoStates.waiting_for_centr_season.state)
     async def process_centr_season(callback_query: types.CallbackQuery, state: FSMContext):
@@ -123,24 +114,23 @@ try:
             await callback_query.message.edit_text("Barcha video ushbu sezon uchun yuborilgan!")
             await state.finish()
             return
-        data = await state.get_data()
-        if data.get("project") == "both":
-            # После выбора Centris — предложить выбрать сезон Golden Lake
-            await callback_query.message.edit_text("Golden Lake учун сезонни танланг:")
-            await state.set_state(GroupVideoStates.waiting_for_golden_season.state)
-        else:
-            await save_group_settings(data)
-            await callback_query.message.edit_text("Настройки сохранены! Рассылка активирована.")
-            await state.finish()
+        await callback_query.message.edit_text("Centris Towers учун стартовое видео танланг:", reply_markup=kb)
+        await state.set_state(GroupVideoStates.waiting_for_centr_video.state)
 
     @dp.callback_query_handler(lambda c: c.data.startswith("season_"), state=GroupVideoStates.waiting_for_golden_season.state)
     async def process_golden_season(callback_query: types.CallbackQuery, state: FSMContext):
         season_id = int(callback_query.data.replace("season_", ""))
         await state.update_data(golden_season_id=season_id)
-        data = await state.get_data()
-        await save_group_settings(data)
-        await callback_query.message.edit_text("Настройки сохранены! Рассылка активирована.")
-        await state.finish()
+        videos = db.get_videos_by_season(season_id)
+        chat_id = (await state.get_data()).get("chat_id")
+        viewed = db.get_group_viewed_videos(chat_id)
+        kb = get_video_keyboard_from_db(videos, viewed)
+        if not kb:
+            await callback_query.message.edit_text("Barcha video ushbu sezon uchun yuborilgan!")
+            await state.finish()
+            return
+        await callback_query.message.edit_text("Golden Lake учун стартовое видео танланг:", reply_markup=kb)
+        await state.set_state(GroupVideoStates.waiting_for_golden_video.state)
 
     @dp.callback_query_handler(lambda c: c.data.startswith("video_"), state=GroupVideoStates.waiting_for_centr_video.state)
     async def process_centr_video(callback_query: types.CallbackQuery, state: FSMContext):
@@ -148,24 +138,8 @@ try:
         await state.update_data(centris_start_video=video_idx)
         data = await state.get_data()
         if data.get("project") == "both":
-            # Golden Lake — аналогично, только первый сезон
-            seasons = db.get_seasons_by_project("golden")
-            if not seasons:
-                await callback_query.message.edit_text("Нет сезонов Golden Lake.")
-                await state.finish()
-                return
-            season_id, season_name = seasons[0]
-            videos = db.get_videos_by_season(season_id)
-            chat_id = data.get("chat_id")
-            viewed = db.get_group_viewed_videos(chat_id)
-            kb = get_video_keyboard_from_db(videos, viewed)
-            if not kb:
-                await callback_query.message.edit_text("Barcha Golden Lake videolari yuborilgan!")
-                await state.finish()
-                return
-            await state.update_data(golden_season_id=season_id)
-            await callback_query.message.edit_text("Golden Lake учун стартовое видео танланг:", reply_markup=kb)
-            await state.set_state(GroupVideoStates.waiting_for_golden_video.state)
+            await callback_query.message.edit_text("Golden Lake учун сезонни танланг:", reply_markup=get_season_keyboard("golden"))
+            await state.set_state(GroupVideoStates.waiting_for_golden_season.state)
         else:
             await save_group_settings(data)
             await callback_query.message.edit_text("Настройки сохранены! Рассылка активирована.")
@@ -183,22 +157,27 @@ try:
     async def save_group_settings(data):
         chat_id = data.get("chat_id")
         project = data.get("project")
-        centris_enabled = project in ["centr", "both"]
+        centris_enabled = project in ["centris", "both"]
         golden_enabled = project in ["golden", "both"]
         centris_season_id = data.get("centris_season_id") if centris_enabled else None
+        centris_start_video = data.get("centris_start_video", 0)
         golden_season_id = data.get("golden_season_id") if golden_enabled else None
+        golden_start_video = data.get("golden_start_video", 0)
         db.set_group_video_settings(
             chat_id,
-            centris_enabled,
+            int(centris_enabled),
             centris_season_id,
-            golden_enabled,
-            golden_season_id
+            centris_start_video,
+            int(golden_enabled),
+            golden_start_video
         )
-        # --- Сброс просмотренных видео для выбранного сезона и группы ---
+        # --- Сохраняем стартовые сезоны и видео явно ---
         if centris_enabled and centris_season_id is not None:
-            db.set_group_video_index_and_viewed(f"centris_{chat_id}_{centris_season_id}", None, centris_season_id, 0, [])
+            db.set_group_video_start(chat_id, 'centris', centris_season_id, centris_start_video)
+            db.reset_group_viewed_videos(chat_id)
         if golden_enabled and golden_season_id is not None:
-            db.set_group_video_index_and_viewed(f"golden_{chat_id}_{golden_season_id}", None, golden_season_id, 0, [])
+            db.set_group_video_start(chat_id, 'golden', golden_season_id, golden_start_video)
+            db.reset_group_viewed_videos(chat_id)
         from handlers.users.video_scheduler import schedule_group_jobs
         schedule_group_jobs()
 
@@ -450,7 +429,7 @@ try:
     async def list_seasons_command(message: types.Message):
         try:
             # Получаем сезоны с количеством видео для Centris Towers
-            centris_seasons = db.get_seasons_with_videos_by_project("centr")
+            centris_seasons = db.get_seasons_with_videos_by_project("centris")
             # Получаем сезоны с количеством видео для Golden Lake
             golden_seasons = db.get_seasons_with_videos_by_project("golden")
             
@@ -478,7 +457,7 @@ try:
     async def edit_season_command(message: types.Message, state: FSMContext):
         try:
             # Получаем все сезоны с количеством видео
-            centris_seasons = db.get_seasons_with_videos_by_project("centr")
+            centris_seasons = db.get_seasons_with_videos_by_project("centris")
             golden_seasons = db.get_seasons_with_videos_by_project("golden")
             
             if not centris_seasons and not golden_seasons:
@@ -790,7 +769,7 @@ try:
         """Миграция старых сезонов в базу данных"""
         try:
             # Проверяем, есть ли уже сезоны в базе
-            centris_seasons = db.get_seasons_by_project("centr")
+            centris_seasons = db.get_seasons_by_project("centris")
             golden_seasons = db.get_seasons_by_project("golden")
             
             if centris_seasons or golden_seasons:
@@ -799,12 +778,12 @@ try:
             
             # Добавляем старые сезоны Centris Towers
             old_centris_seasons = [
-                ("centr", "Яқинлар 1.0 I I Иброҳим Мамасаидов", VIDEO_LIST_1, CAPTION_LIST_1),
-                ("centr", "Яқинлар 2.0 I I Иброҳим Мамасаидов", VIDEO_LIST_2, CAPTION_LIST_2),
-                ("centr", "Яқинлар 3.0 I I Иброҳим Мамасаидов", VIDEO_LIST_3, CAPTION_LIST_3),
-                ("centr", "Яқинлар 4.0 I I Иброҳим Мамасаидов", VIDEO_LIST_4, CAPTION_LIST_4),
-                ("centr", "Яқинлар 5.0 I I Иброҳим Мамасаидов", VIDEO_LIST_5, CAPTION_LIST_5),
-                ("centr", "Яқинлар I Ташриф Centris Towers", VIDEO_LIST_6, CAPTION_LIST_6),
+                ("centris", "Яқинлар 1.0 I I Иброҳим Мамасаидов", VIDEO_LIST_1, CAPTION_LIST_1),
+                ("centris", "Яқинлар 2.0 I I Иброҳим Мамасаидов", VIDEO_LIST_2, CAPTION_LIST_2),
+                ("centris", "Яқинлар 3.0 I I Иброҳим Мамасаидов", VIDEO_LIST_3, CAPTION_LIST_3),
+                ("centris", "Яқинлар 4.0 I I Иброҳим Мамасаидов", VIDEO_LIST_4, CAPTION_LIST_4),
+                ("centris", "Яқинлар 5.0 I I Иброҳим Мамасаидов", VIDEO_LIST_5, CAPTION_LIST_5),
+                ("centris", "Яқинлар I Ташриф Centris Towers", VIDEO_LIST_6, CAPTION_LIST_6),
             ]
             
             # Добавляем старые сезоны Golden Lake
@@ -836,7 +815,7 @@ try:
         """Исправить порядок сезонов, чтобы 'Яқинлар I Ташриф Centris Towers' был последним"""
         try:
             # Получаем все сезоны Centris Towers
-            centris_seasons = db.get_seasons_by_project("centr")
+            centris_seasons = db.get_seasons_by_project("centris")
             
             if not centris_seasons:
                 await message.answer("Нет сезонов Centris Towers для исправления порядка.")
@@ -874,7 +853,7 @@ try:
                 # Добавляем сезон заново
                 urls = [data[0] for data in video_data]
                 titles = [data[1] for data in video_data]
-                db.add_season_with_videos("centr", tour_season_name, urls, titles)
+                db.add_season_with_videos("centris", tour_season_name, urls, titles)
                 
                 await message.answer("✅ Порядок сезонов исправлен! Сезон 'Яқинлар I Ташриф Centris Towers' теперь будет последним.")
             else:
