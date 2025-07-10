@@ -9,10 +9,11 @@ logger = logging.getLogger(__name__)
 
 load_dotenv()
 
-PG_HOST = os.getenv('PG_HOST', 'localhost')
-PG_DB = os.getenv('PG_DB', 'project_db')
-PG_USER = os.getenv('PG_USER', 'postgres')
-PG_PASSWORD = os.getenv('PG_PASSWORD', '7777')
+PG_HOST = os.getenv('DB_HOST', 'localhost')
+PG_DB = os.getenv('DB_NAME', 'project_db')
+PG_USER = os.getenv('DB_USER', 'postgres')
+PG_PASSWORD = os.getenv('DB_PASS', '7777')
+PG_PORT = os.getenv('DB_PORT', '5432')
 
 
 def column_exists(cursor, table, column):
