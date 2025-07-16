@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
 from handlers.users.video_lists import VIDEO_LIST_1, VIDEO_LIST_2, VIDEO_LIST_3, VIDEO_LIST_4, VIDEO_LIST_5, VIDEO_LIST_GOLDEN_1
-from data.config import ADMINS
+from data.config import ADMINS, SUPER_ADMIN_ID
 
 try:
     from aiogram import types
@@ -43,13 +43,11 @@ try:
 
     # --- Клавиатуры ---
     def get_project_keyboard():
-        kb = InlineKeyboardMarkup(row_width=2)
-        kb.add(
+        return InlineKeyboardMarkup(row_width=1).add(
             InlineKeyboardButton("Centris Towers", callback_data="project_centris"),
             InlineKeyboardButton("Golden Lake", callback_data="project_golden"),
-            InlineKeyboardButton("Оба", callback_data="project_both")
+            InlineKeyboardButton("Centris/Golden", callback_data="project_cg")
         )
-        return kb
 
     def get_season_keyboard(project):
         kb = InlineKeyboardMarkup(row_width=2)
@@ -67,7 +65,7 @@ try:
                 has_unwatched = True
         return kb if has_unwatched else None
 
-    @dp.message_handler(Command('set_start_video'), user_id=ADMINS)
+    @dp.message_handler(Command('set_start_video'), user_id=ADMINS + [SUPER_ADMIN_ID])
     async def set_start_video_command(message: types.Message, state: FSMContext):
         await message.answer(
             "Har kungi video yuborishni qaysi videodan boshlashni belgilang.\n"
@@ -75,7 +73,7 @@ try:
         )
         await state.set_state("waiting_for_video_number")
 
-    @dp.message_handler(Command('set_group_video'), user_id=ADMINS)
+    @dp.message_handler(Command('set_group_video'), user_id=ADMINS + [SUPER_ADMIN_ID])
     async def set_group_video_command(message: types.Message, state: FSMContext):
         if message.chat.type not in [types.ChatType.GROUP, types.ChatType.SUPERGROUP]:
             await message.answer("Bu buyruq faqat guruhlarda ishlaydi.")
@@ -87,20 +85,21 @@ try:
     @dp.callback_query_handler(lambda c: c.data.startswith("project_"), state=GroupVideoStates.waiting_for_project.state)
     async def process_project_selection(callback_query: types.CallbackQuery, state: FSMContext):
         project = callback_query.data.replace("project_", "")
-        if project == "centr":
-            project = "centris"
-        await state.update_data(project=project)
-        if project in ["centris", "both"]:
+        await state.update_data(project=project)  # Явно сохраняем выбранный проект
+        if project == "centris":
             await callback_query.message.edit_text("Centris Towers учун сезонни танланг:", reply_markup=get_season_keyboard("centris"))
             await state.set_state(GroupVideoStates.waiting_for_centr_season.state)
         elif project == "golden":
             seasons = db.get_seasons_by_project("golden")
             if not seasons:
                 await callback_query.message.edit_text("Нет сезонов Golden Lake.")
-                await state.finish()
                 return
             await callback_query.message.edit_text("Golden Lake учун сезонни танланг:", reply_markup=get_season_keyboard("golden"))
             await state.set_state(GroupVideoStates.waiting_for_golden_season.state)
+        elif project == "cg":
+            await callback_query.message.edit_text("Centris Towers учун сезонни танланг:", reply_markup=get_season_keyboard("centris"))
+            await state.set_state(GroupVideoStates.waiting_for_centr_season.state)
+            await state.update_data(both_selected=True)
 
     @dp.callback_query_handler(lambda c: c.data.startswith("season_"), state=GroupVideoStates.waiting_for_centr_season.state)
     async def process_centr_season(callback_query: types.CallbackQuery, state: FSMContext):
@@ -137,7 +136,7 @@ try:
         video_idx = int(callback_query.data.replace("video_", ""))
         await state.update_data(centris_start_video=video_idx)
         data = await state.get_data()
-        if data.get("project") == "both":
+        if data.get("project") == "cg":
             await callback_query.message.edit_text("Golden Lake учун сезонни танланг:", reply_markup=get_season_keyboard("golden"))
             await state.set_state(GroupVideoStates.waiting_for_golden_season.state)
         else:
@@ -157,8 +156,8 @@ try:
     async def save_group_settings(data):
         chat_id = data.get("chat_id")
         project = data.get("project")
-        centris_enabled = project in ["centris", "both"]
-        golden_enabled = project in ["golden", "both"]
+        centris_enabled = project in ["centris", "cg"]
+        golden_enabled = project in ["golden", "cg"]
         centris_season_id = data.get("centris_season_id") if centris_enabled else None
         centris_start_video = data.get("centris_start_video", 0)
         golden_season_id = data.get("golden_season_id") if golden_enabled else None
@@ -183,7 +182,7 @@ try:
 
     @dp.message_handler(state="waiting_for_video_number")
     async def process_video_number(message: types.Message, state: FSMContext):
-        if message.from_user.id not in ADMINS:
+        if message.from_user.id != SUPER_ADMIN_ID and message.from_user.id not in ADMINS:
             await message.answer("Sizda bu buyruqni bajarish uchun ruxsat yo'q.")
             await state.finish()
             return
@@ -202,7 +201,7 @@ try:
         
         await state.finish()
 
-    @dp.message_handler(Command('send_media'), user_id=ADMINS)
+    @dp.message_handler(Command('send_media'), user_id=ADMINS + [SUPER_ADMIN_ID])
     async def send_media_command(message: types.Message, state: FSMContext):
         await message.answer(
             "Iltimos, barcha foydalanuvchilarga jo'natmoqchi bo'lgan rasmlar yoki videolarni yuboring. "
@@ -212,7 +211,7 @@ try:
 
     @dp.message_handler(content_types=[types.ContentType.PHOTO, types.ContentType.VIDEO], state="waiting_for_media")
     async def process_media(message: types.Message, state: FSMContext):
-        if message.from_user.id not in ADMINS:
+        if message.from_user.id != SUPER_ADMIN_ID and message.from_user.id not in ADMINS:
             await message.answer("Sizda bu buyruqni bajarish uchun ruxsat yo'q.")
             await state.finish()
             return
@@ -234,7 +233,7 @@ try:
 
     @dp.message_handler(Command('done'), state="waiting_for_media")
     async def finish_media_collection(message: types.Message, state: FSMContext):
-        if message.from_user.id not in ADMINS:
+        if message.from_user.id != SUPER_ADMIN_ID and message.from_user.id not in ADMINS:
             await message.answer("Sizda bu buyruqni bajarish uchun ruxsat yo'q.")
             await state.finish()
             return
@@ -257,7 +256,7 @@ try:
 
     @dp.message_handler(Command('skip'), state="waiting_for_caption")
     async def skip_caption(message: types.Message, state: FSMContext):
-        if message.from_user.id not in ADMINS:
+        if message.from_user.id != SUPER_ADMIN_ID and message.from_user.id not in ADMINS:
             await message.answer("Sizda bu buyruqni bajarish uchun ruxsat yo'q.")
             await state.finish()
             return
@@ -266,7 +265,7 @@ try:
 
     @dp.message_handler(state="waiting_for_caption")
     async def process_caption(message: types.Message, state: FSMContext):
-        if message.from_user.id not in ADMINS:
+        if message.from_user.id != SUPER_ADMIN_ID and message.from_user.id not in ADMINS:
             await message.answer("Sizda bu buyruqni bajarish uchun ruxsat yo'q.")
             await state.finish()
             return
@@ -323,7 +322,7 @@ try:
         await message.answer("Iltimos, rasm yoki video yuboring yoki /done buyrug'i bilan kirishni yakunlang.")
         await state.set_state("waiting_for_media")
 
-    @dp.message_handler(Command('get_all_users'), user_id=ADMINS)
+    @dp.message_handler(Command('get_all_users'), user_id=ADMINS + [SUPER_ADMIN_ID])
     async def get_all_users_command(message: types.Message):
         users_data = db.get_all_users_data()
         if not users_data:
@@ -350,7 +349,7 @@ try:
         else:
             await message.answer(response)
 
-    @dp.message_handler(Command('banned_groups'), user_id=ADMINS)
+    @dp.message_handler(Command('banned_groups'), user_id=ADMINS + [SUPER_ADMIN_ID])
     async def banned_groups_command(message: types.Message):
         banned_groups = db.get_banned_groups()
         if not banned_groups:
@@ -365,7 +364,7 @@ try:
 
         await message.answer(response)
 
-    @dp.message_handler(Command('unban_group'), user_id=ADMINS)
+    @dp.message_handler(Command('unban_group'), user_id=ADMINS + [SUPER_ADMIN_ID])
     async def unban_group_command(message: types.Message):
         try:
             group_id = int(message.text.split()[1])
@@ -374,13 +373,13 @@ try:
         except (IndexError, ValueError):
             await message.answer("Использование: /unban_group <ID_группы>")
 
-    @dp.message_handler(Command('reset_group_videos'), user_id=ADMINS)
+    @dp.message_handler(Command('reset_group_videos'), user_id=ADMINS + [SUPER_ADMIN_ID])
     async def reset_group_videos_command(message: types.Message, state: FSMContext):
         chat_id = message.chat.id
         db.reset_group_viewed_videos(chat_id)
         await message.answer("Прогресс группы сброшен. Теперь можно выбрать стартовое видео заново.")
 
-    @dp.message_handler(Command('add_season'), user_id=ADMINS)
+    @dp.message_handler(Command('add_season'), user_id=ADMINS + [SUPER_ADMIN_ID])
     async def add_season_command(message: types.Message, state: FSMContext):
         kb = InlineKeyboardMarkup(row_width=2)
         kb.add(
@@ -425,7 +424,7 @@ try:
         await message.answer(f"Сезон '{season_name}' успешно добавлен в проект '{project}'.")
         await state.finish()
 
-    @dp.message_handler(Command('list_seasons'), user_id=ADMINS)
+    @dp.message_handler(Command('list_seasons'), user_id=ADMINS + [SUPER_ADMIN_ID])
     async def list_seasons_command(message: types.Message):
         try:
             # Получаем сезоны с количеством видео для Centris Towers
@@ -453,7 +452,7 @@ try:
         except Exception as e:
             await message.answer(f"Ошибка при получении списка сезонов: {e}")
 
-    @dp.message_handler(Command('edit_season'), user_id=ADMINS)
+    @dp.message_handler(Command('edit_season'), user_id=ADMINS + [SUPER_ADMIN_ID])
     async def edit_season_command(message: types.Message, state: FSMContext):
         try:
             # Получаем все сезоны с количеством видео
@@ -689,7 +688,7 @@ try:
         await callback_query.message.edit_text("❌ Удаление отменено.")
         await callback_query.answer()
 
-    @dp.message_handler(Command('delete_season'), user_id=ADMINS)
+    @dp.message_handler(Command('delete_season'), user_id=ADMINS + [SUPER_ADMIN_ID])
     async def delete_season_command(message: types.Message):
         try:
             # Парсим ID сезона из команды
@@ -727,7 +726,7 @@ try:
         except Exception as e:
             await message.answer(f"Ошибка: {e}")
 
-    @dp.message_handler(Command('season_help'), user_id=ADMINS)
+    @dp.message_handler(Command('season_help'), user_id=ADMINS + [SUPER_ADMIN_ID])
     async def season_help_command(message: types.Message):
         help_text = """
 📋 **Команды для управления сезонами:**
@@ -764,7 +763,7 @@ try:
         """
         await message.answer(help_text)
 
-    @dp.message_handler(Command('migrate_old_seasons'), user_id=ADMINS)
+    @dp.message_handler(Command('migrate_old_seasons'), user_id=ADMINS + [SUPER_ADMIN_ID])
     async def migrate_old_seasons_command(message: types.Message):
         """Миграция старых сезонов в базу данных"""
         try:
@@ -810,7 +809,7 @@ try:
         except Exception as e:
             await message.answer(f"❌ Ошибка при миграции: {e}")
 
-    @dp.message_handler(Command('fix_season_order'), user_id=ADMINS)
+    @dp.message_handler(Command('fix_season_order'), user_id=ADMINS + [SUPER_ADMIN_ID])
     async def fix_season_order_command(message: types.Message):
         """Исправить порядок сезонов, чтобы 'Яқинлар I Ташриф Centris Towers' был последним"""
         try:
@@ -862,7 +861,7 @@ try:
         except Exception as e:
             await message.answer(f"❌ Ошибка при исправлении порядка сезонов: {e}")
 
-    @dp.message_handler(commands=['fix_season_project'], user_id=ADMINS)
+    @dp.message_handler(commands=['fix_season_project'], user_id=ADMINS + [SUPER_ADMIN_ID])
     async def fix_season_project_command(message: types.Message):
         try:
             args = message.text.split()
@@ -886,4 +885,4 @@ except Exception as exx:
 
     # Форматировать дату и время
     formatted_date_time = now.strftime("%Y-%m-%d %H:%M:%S")
-    print('admin image sender ',  f"{time }formatted_date_time",f"error {exx}" )
+    print('admin image sender', formatted_date_time, f"error {exx}")

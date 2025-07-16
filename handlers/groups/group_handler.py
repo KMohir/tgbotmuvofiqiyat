@@ -1,18 +1,20 @@
 from aiogram import types
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.dispatcher.filters import Command
-from data.config import ADMINS
+from data.config import ADMINS, SUPER_ADMIN_ID
 from loader import dp, db
 import logging
 from aiogram.utils.exceptions import ChatAdminRequired
+from aiogram.dispatcher.handler import CancelHandler
 
 
 @dp.my_chat_member_handler()
 async def my_chat_member_handler(message: types.ChatMemberUpdated):
     # Проверяем, что событие произошло в группе или супергруппе
     if message.chat.type in [types.ChatType.GROUP, types.ChatType.SUPERGROUP]:
-        # Новый статус бота - "участник" (member) или "администратор" (administrator)
-        if message.new_chat_member.status in [types.ChatMemberStatus.MEMBER, types.ChatMemberStatus.ADMINISTRATOR]:
+        # Отправлять уведомление только если бот был добавлен впервые
+        if message.old_chat_member.status in [types.ChatMemberStatus.LEFT, types.ChatMemberStatus.KICKED] and \
+           message.new_chat_member.status in [types.ChatMemberStatus.MEMBER, types.ChatMemberStatus.ADMINISTRATOR]:
             group_id = message.chat.id
             group_title = message.chat.title
             added_by = message.from_user.id
@@ -82,7 +84,8 @@ async def handle_group_decision(callback_query: types.CallbackQuery):
     logging.info(f"ADMINS: {ADMINS}, тип: {type(ADMINS)}")
     logging.info(f"Проверка: {user_id} in {ADMINS} = {user_id in ADMINS}")
     
-    if user_id not in ADMINS:
+    # Разрешить действие и супер-админу, и обычным админам
+    if user_id != SUPER_ADMIN_ID and user_id not in ADMINS:
         logging.warning(f"Пользователь {user_id} не найден в списке админов {ADMINS}")
         await callback_query.answer("У вас нет прав для выполнения этого действия", show_alert=True)
         return
@@ -120,6 +123,14 @@ async def handle_group_decision(callback_query: types.CallbackQuery):
             logging.error(f"Ошибка при выходе из запрещенной группы {group_id}: {e}")
 
     await callback_query.answer() 
+
+
+# Универсальный препроцессор для всех сообщений в группах
+@dp.message_handler(chat_type=[types.ChatType.GROUP, types.ChatType.SUPERGROUP])
+async def group_protect_filter(message: types.Message):
+    if db.is_group_banned(message.chat.id):
+        # Не отвечаем и не обрабатываем сообщения, если группа не разрешена
+        raise CancelHandler()
 
 
 @dp.message_handler(Command('group_subscribe'), chat_type=[types.ChatType.GROUP, types.ChatType.SUPERGROUP])

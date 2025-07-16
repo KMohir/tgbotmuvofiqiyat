@@ -12,7 +12,7 @@ try:
     from aiogram.types import InputFile
     from db import db
     from loader import dp
-    from data.config import ADMINS
+    from data.config import ADMINS, SUPER_ADMIN_ID
 
 
     @dp.message_handler(commands=['get_registration_time'], state="*")
@@ -60,17 +60,17 @@ try:
 
     # Декоратор для проверки прав админа
     async def is_admin(user_id):
-        return user_id == SUPER_ADMIN_ID or db.is_admin(user_id)
+        return int(user_id) == int(SUPER_ADMIN_ID) or db.is_admin(int(user_id))
 
     # Новая функция проверки супер-админа
     async def is_superadmin(user_id):
-        return user_id == SUPER_ADMIN_ID
+        return int(user_id) == int(SUPER_ADMIN_ID)
 
     def admin_required(superadmin_only=False):
         def decorator(func):
             @wraps(func)
             async def wrapper(message: types.Message, *args, **kwargs):
-                user_id = message.from_user.id
+                user_id = int(message.from_user.id)
                 if superadmin_only:
                     if not await is_superadmin(user_id):
                         await message.reply("Только главный админ может использовать эту команду.")
@@ -83,12 +83,9 @@ try:
             return wrapper
         return decorator
 
-    def is_superadmin(user_id):
-        return user_id in ADMINS
-
     @dp.message_handler(commands=['add_admin'])
     async def add_admin_command(message: types.Message):
-        if not is_superadmin(message.from_user.id):
+        if not await is_superadmin(int(message.from_user.id)):
             await message.reply("Только супер-админ может добавлять админов.")
             return
         args = message.get_args().split()
@@ -106,7 +103,7 @@ try:
 
     @dp.message_handler(commands=['remove_admin'])
     async def remove_admin_command(message: types.Message):
-        if not is_superadmin(message.from_user.id):
+        if not await is_superadmin(int(message.from_user.id)):
             await message.reply("Только супер-админ может удалять админов.")
             return
         args = message.get_args().split()
@@ -124,7 +121,7 @@ try:
 
     @dp.message_handler(commands=['list_admins'])
     async def list_admins_command(message: types.Message):
-        if not (is_superadmin(message.from_user.id) or db.is_admin(message.from_user.id)):
+        if not (await is_superadmin(int(message.from_user.id)) or db.is_admin(int(message.from_user.id))):
             await message.reply("У вас нет прав для этой команды.")
             return
         admins = db.get_all_admins()
@@ -248,4 +245,4 @@ except Exception as exx:
 
     # Форматировать дату и время
     formatted_date_time = now.strftime("%Y-%m-%d %H:%M:%S")
-    print('user commands ',  f"{time }formatted_date_time",f"error {exx}" )
+    print('user commands', formatted_date_time, f"error {exx}")

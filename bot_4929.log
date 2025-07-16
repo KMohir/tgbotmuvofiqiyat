@@ -1,0 +1,1 @@
+start.py [LINE:105] #ERROR    [2025-07-16 16:46:44,824]  Ошибка в обработчике /start: local variable 'SUPER_ADMIN_ID' referenced before assignment

@@ -320,6 +320,18 @@ async def centris_towers_command(message: types.Message, state: FSMContext):
 async def olden_lake_command(message: types.Message):
     await olden_lake_menu(message)
 
+@dp.message_handler(Command("golden_lake"))
+async def golden_lake_command(message: types.Message, state: FSMContext):
+    # Если есть функция golden_lake_menu, вызываем её. Если нет — создаём аналогично centris_towers_menu.
+    try:
+        await olden_lake_menu(message, state)
+    except NameError:
+        # Если golden_lake_menu не определена, реализуем здесь
+        await state.update_data(project="golden")
+        await message.answer("Sezonni tanlang:", reply_markup=get_season_keyboard("golden"))
+        await message.answer("Qaysi sezonni ko'rmoqchisiz?")
+        await state.set_state(VideoStates.season_select.state)
+
 @dp.message_handler(state=VideoStates.video_select)
 async def send_video(message: types.Message, state: FSMContext):
     try:

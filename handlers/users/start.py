@@ -14,7 +14,8 @@ try:
     from translation import _
     import time
     from aiogram.dispatcher.storage import DELTA
-    from data.config import SUPER_ADMIN_ID
+    from data.config import SUPER_ADMIN_ID, ADMINS
+    from aiogram.dispatcher.handler import CancelHandler
 
     # Настройка логирования
     logger = logging.getLogger(__name__)
@@ -48,6 +49,92 @@ try:
         )
         return caption
 
+    # --- Фильтр для лички ---
+    @dp.message_handler(chat_type=types.ChatType.PRIVATE)
+    async def private_protect_filter(message: types.Message):
+        user_id = int(message.from_user.id)
+        print(f"[PRIVATE] ADMINS={ADMINS}, SUPER_ADMIN_ID={SUPER_ADMIN_ID}, user_id={user_id}, type(user_id)={type(user_id)}")
+
+        # Всегда разрешаем суперадмину любые команды
+        if message.text and message.text.startswith('/') and user_id == int(SUPER_ADMIN_ID):
+            print(f"[PRIVATE] Суперадмин {user_id} отправил команду {message.text}, пропускаем")
+            return
+
+        if user_id == int(SUPER_ADMIN_ID):
+            print(f"[PRIVATE] SUPER_ADMIN user_id={user_id} разрешён")
+            return
+
+        if user_id in [int(admin_id) for admin_id in ADMINS]:
+            print(f"[PRIVATE] ADMIN user_id={user_id} разрешён")
+            return
+
+        if db.is_admin(user_id):
+            print(f"[PRIVATE] DB ADMIN user_id={user_id} разрешён")
+            return
+
+        print(f"[PRIVATE] BLOCKED user_id={user_id}")
+        raise CancelHandler()
+
+    @dp.callback_query_handler(lambda c: c.message.chat.type == types.ChatType.PRIVATE)
+    async def private_protect_callback_filter(callback_query: types.CallbackQuery):
+        user_id = int(callback_query.from_user.id)
+        logging.info(f"PRIVATE CALLBACK FILTER: user_id={user_id}")
+        if user_id == int(SUPER_ADMIN_ID):
+            logging.info(f"PRIVATE CALLBACK ALLOWED: SUPER_ADMIN user_id={user_id}")
+            return
+        if user_id in [int(admin_id) for admin_id in ADMINS]:
+            logging.info(f"PRIVATE CALLBACK ALLOWED: ADMIN user_id={user_id}")
+            return
+        if db.is_admin(user_id):
+            logging.info(f"PRIVATE CALLBACK ALLOWED: DB ADMIN user_id={user_id}")
+            return
+        logging.warning(f"PRIVATE CALLBACK BLOCKED: user_id={user_id}")
+        raise CancelHandler()
+
+    # --- Фильтр для групп ---
+    @dp.message_handler(chat_type=[types.ChatType.GROUP, types.ChatType.SUPERGROUP])
+    async def group_protect_filter(message: types.Message):
+        user_id = int(message.from_user.id)
+        chat_id = message.chat.id
+        print(f"[GROUP] ADMINS={ADMINS}, SUPER_ADMIN_ID={SUPER_ADMIN_ID}, user_id={user_id}, chat_id={chat_id}")
+
+        if user_id == int(SUPER_ADMIN_ID):
+            print(f"[GROUP] SUPER_ADMIN user_id={user_id} разрешён")
+            return
+
+        if user_id in [int(admin_id) for admin_id in ADMINS]:
+            print(f"[GROUP] ADMIN user_id={user_id} разрешён")
+            return
+
+        if db.is_admin(user_id):
+            print(f"[GROUP] DB ADMIN user_id={user_id} разрешён")
+            return
+
+        if db.is_group_banned(chat_id):
+            print(f"[GROUP] BLOCKED chat_id={chat_id}")
+            raise CancelHandler()
+
+        print(f"[GROUP] ALLOWED chat_id={chat_id}")
+
+    @dp.callback_query_handler(lambda c: c.message.chat.type in [types.ChatType.GROUP, types.ChatType.SUPERGROUP])
+    async def group_protect_callback_filter(callback_query: types.CallbackQuery):
+        user_id = int(callback_query.from_user.id)
+        chat_id = callback_query.message.chat.id
+        logging.info(f"GROUP CALLBACK FILTER: chat_id={chat_id}, user_id={user_id}")
+        if user_id == int(SUPER_ADMIN_ID):
+            logging.info(f"GROUP CALLBACK ADMIN ALLOWED: SUPER_ADMIN user_id={user_id}")
+            return
+        if user_id in [int(admin_id) for admin_id in ADMINS]:
+            logging.info(f"GROUP CALLBACK ADMIN ALLOWED: ADMIN user_id={user_id}")
+            return
+        if db.is_admin(user_id):
+            logging.info(f"GROUP CALLBACK ADMIN ALLOWED: DB ADMIN user_id={user_id}")
+            return
+        if db.is_group_banned(chat_id):
+            logging.warning(f"GROUP CALLBACK BLOCKED: chat_id={chat_id}")
+            raise CancelHandler()
+        logging.info(f"GROUP CALLBACK ALLOWED: chat_id={chat_id}")
+
     @dp.message_handler(CommandStart())
     async def bot_start(message: types.Message, state: FSMContext):
         try:
@@ -62,12 +149,19 @@ try:
                 logger.error(f"FSM сброшен: chat_id={message.chat.id}, user_id={message.from_user.id}")
                 # Сообщение пользователю не отправляем
 
-            # Если команда из группы — не спрашивать имя, не запускать регистрацию
+            # Если команда из группы — не запускать регистрацию, если группа не разрешена
             if message.chat.type in [types.ChatType.GROUP, types.ChatType.SUPERGROUP]:
+                if db.is_group_banned(message.chat.id):
+                    return  # Не отвечаем, если группа не разрешена
                 if not db.user_exists(message.chat.id):
                     db.add_user(message.chat.id, message.chat.title or "Группа", None, is_group=True, group_id=message.chat.id)
                 await message.answer("Bot guruhda faollashtirildi! Barcha ishtirokchilar ro‘yxatdan o‘tmasdan funksiyalardan foydalanishlari mumkin.", reply_markup=main_menu_keyboard)
                 return
+
+            # В личке бот работает только для супер-админа и админов
+            user_id = message.from_user.id
+            if user_id != SUPER_ADMIN_ID and user_id not in ADMINS and not db.is_admin(user_id):
+                return  # Не отвечаем обычным пользователям в личке
 
             # В личке — прежняя логика
             if not db.user_exists(message.from_user.id):
@@ -191,4 +285,4 @@ except Exception as exx:
 
     # Форматировать дату и время
     formatted_date_time = now.strftime("%Y-%m-%d %H:%M:%S")
-    print('start ',  f"{time }formatted_date_time",f"error {exx}" )
+    print('start', formatted_date_time, f"error {exx}")

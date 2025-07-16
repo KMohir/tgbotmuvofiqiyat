@@ -1,0 +1,4 @@
+start.py [LINE:60] #ERROR    [2025-07-10 18:40:16,090]  Попытка сброса FSM: chat_id=5657091547, user_id=5657091547
+start.py [LINE:62] #ERROR    [2025-07-10 18:40:16,091]  FSM сброшен: chat_id=5657091547, user_id=5657091547
+start.py [LINE:60] #ERROR    [2025-07-10 18:40:58,604]  Попытка сброса FSM: chat_id=5657091547, user_id=5657091547
+start.py [LINE:62] #ERROR    [2025-07-10 18:40:58,605]  FSM сброшен: chat_id=5657091547, user_id=5657091547

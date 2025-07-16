@@ -76,13 +76,12 @@ class Database:
                     FROM seasons s
                     WHERE s.name = (SELECT name FROM seasons_old so WHERE so.id = v.season_id)
                 """)
-                try:
-                    cursor.execute("DROP TABLE seasons_old;")
-                except Exception as e:
-                    logger.error(f"Ошибка при удалении seasons_old: {e}. Пробую удалить внешний ключ и завершить миграцию.")
-                    cursor.execute("ALTER TABLE videos DROP CONSTRAINT IF EXISTS videos_season_id_fkey;")
-                    cursor.execute("DROP TABLE seasons_old;")
-                    cursor.execute("ALTER TABLE videos ADD CONSTRAINT videos_season_id_fkey FOREIGN KEY (season_id) REFERENCES seasons(id) ON DELETE CASCADE;")
+                # --- Удаляем внешний ключ, если есть ---
+                cursor.execute("ALTER TABLE videos DROP CONSTRAINT IF EXISTS videos_season_id_fkey;")
+                # --- Удаляем старую таблицу ---
+                cursor.execute("DROP TABLE IF EXISTS seasons_old;")
+                # --- Восстанавливаем внешний ключ ---
+                cursor.execute("ALTER TABLE videos ADD CONSTRAINT videos_season_id_fkey FOREIGN KEY (season_id) REFERENCES seasons(id) ON DELETE CASCADE;")
                 self.conn.commit()
                 logger.info("Миграция таблицы seasons завершена!")
             # --- Миграция project: centr -> centris ---
@@ -399,6 +398,7 @@ class Database:
 
     # --- Методы для seasons и videos ---
     def add_season_with_videos(self, project, season_name, links, titles):
+        logger.info(f"add_season_with_videos: project={project}, season_name={season_name}, links_count={len(links)}, titles_count={len(titles)}")
         if not links or not titles or len(links) != len(titles):
             logger.error(f"Попытка добавить сезон '{season_name}' без видео или с некорректными списками! links={len(links)}, titles={len(titles)}")
             return
@@ -407,6 +407,7 @@ class Database:
             # id автоинкрементируется, не указываем его явно
             cursor.execute("INSERT INTO seasons (project, name) VALUES (%s, %s) RETURNING id", (project, season_name))
             season_id = cursor.fetchone()[0] # Получаем ID из последней вставки
+            logger.info(f"add_season_with_videos: добавлен сезон id={season_id}, project={project}, name={season_name}")
             for pos, (url, title) in enumerate(zip(links, titles)):
                 cursor.execute("INSERT INTO videos (season_id, url, title, position) VALUES (%s, %s, %s, %s)", (season_id, url, title, pos))
             self.conn.commit()
@@ -417,6 +418,7 @@ class Database:
             self.conn.rollback()
 
     def get_seasons_by_project(self, project):
+        logger.info(f"get_seasons_by_project: project={project}")
         try:
             cursor = self.conn.cursor()
             if project == "centris":
@@ -433,6 +435,7 @@ class Database:
             else:
                 cursor.execute("SELECT id, name FROM seasons WHERE project = %s ORDER BY id", (project,))
             result = cursor.fetchall()
+            logger.info(f"get_seasons_by_project: найдено сезонов={len(result)} для project={project}")
             cursor.close()
             return [tuple(row) for row in result]
         except Exception as e:

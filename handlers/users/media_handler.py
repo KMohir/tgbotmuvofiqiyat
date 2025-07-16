@@ -25,4 +25,4 @@ except Exception as exx:
 
     # Форматировать дату и время
     formatted_date_time = now.strftime("%Y-%m-%d %H:%M:%S")
-    print('media handlar ',  f"{time }formatted_date_time",f"error {exx}" )
+    print('media handlar', formatted_date_time, f"error {exx}")
