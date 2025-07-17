@@ -5,20 +5,19 @@ from aiogram.filters import BaseFilter
 API_TOKEN = "ВАШ_ТОКЕН_БОТА"  # Вставьте сюда свой токен
 SUPER_ADMIN_ID = 123456789     # Вставьте сюда свой user_id
 
-# Фильтр доступа
+# Фильтр доступа только для лички
 class AccessFilter(BaseFilter):
     async def __call__(self, message: types.Message) -> bool:
         if message.chat.type == "private":
             return message.from_user.id == SUPER_ADMIN_ID
-        elif message.chat.type in ("group", "supergroup"):
-            return True  # Для теста разрешаем все группы
-        return False
+        # В группах фильтр всегда пропускает
+        return True
 
 # Debug-хендлер для всех сообщений
 async def debug_handler(message: types.Message):
     print(f"[DEBUG] chat_id={message.chat.id} user_id={message.from_user.id} text={message.text}")
 
-# Хендлер для команд с фильтром
+# Хендлер для команд с фильтром (в группах доступно всем)
 async def command_handler(message: types.Message):
     await message.reply("Команда доступна!")
 
