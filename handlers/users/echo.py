@@ -29,35 +29,36 @@ try:
         ImageCollection.waiting_for_images.state,
     ]
 
-    @dp.message_handler(lambda message: message.text and not message.text.startswith('/') and message.text not in [
-        "Centris towers", "Golden lake", 
-        "Яқинлар 1.0 I I Иброҳим Мамасаидов", "Яқинлар 2.0 I I Иброҳим Мамасаидов", 
-        "Яқинлар 3.0 I I Иброҳим Мамасаидов", "Яқинлар 4.0 I I Иброҳим Мамасаидов"
-    ], state=None, chat_type=types.ChatType.PRIVATE)
-    async def bot_echo(message: types.Message):
-        if not db.user_exists(message.from_user.id):
-            await message.answer("Iltimos, /start buyrug'i bilan ro'yxatdan o'ting.")
-            return
-        await message.answer("Iltimos operator javobini kuting!")
+    # --- Отключены echo-хендлеры, чтобы не мешать обработке команд и нужных сообщений ---
+    # @dp.message_handler(lambda message: message.text and not message.text.startswith('/') and message.text not in [
+    #     "Centris towers", "Golden lake", 
+    #     "Яқинлар 1.0 I I Иброҳим Мамасаидов", "Яқинлар 2.0 I I Иброҳим Мамасаидов", 
+    #     "Яқинлар 3.0 I I Иброҳим Мамасаидов", "Яқинлар 4.0 I I Иброҳим Мамасаидов"
+    # ], state=None, chat_type=types.ChatType.PRIVATE)
+    # async def bot_echo(message: types.Message):
+    #     if not db.user_exists(message.from_user.id):
+    #         await message.answer("Iltimos, /start buyrug'i bilan ro'yxatdan o'ting.")
+    #         return
+    #     await message.answer("Iltimos operator javobini kuting!")
 
-    @dp.message_handler(
-        lambda message: not message.text.startswith('/') and message.text not in [
-            "Centris towers", "Golden lake", 
-            "Яқинлар 1.0 I I Иброҳим Мамасаидов", "Яқинлар 2.0 I I Иброҳим Мамасаидов", 
-            "Яқинлар 3.0 I I Иброҳим Мамасаидов", "Яқинлар 4.0 I I Иброҳим Мамасаидов"
-        ],
-        state="*",
-        content_types=types.ContentTypes.ANY,
-        chat_type=types.ChatType.PRIVATE
-    )
-    async def bot_echo_all(message: types.Message, state: FSMContext):
-        if not db.user_exists(message.from_user.id):
-            await message.answer("Iltimos, /start buyrug'i bilan ro'yxatdan o'ting.")
-            return
-        current_state = await state.get_state()
-        if current_state in EXCLUDED_STATES:
-            return
-        await message.answer("Pastdagi tugmani bosing")
+    # @dp.message_handler(
+    #     lambda message: not message.text.startswith('/') and message.text not in [
+    #         "Centris towers", "Golden lake", 
+    #         "Яқинлар 1.0 I I Иброҳим Мамасаидов", "Яқинлар 2.0 I I Иброҳим Мамасаидов", 
+    #         "Яқинлар 3.0 I I Иброҳим Мамасаидов", "Яқинлар 4.0 I I Иброҳим Мамасаидов"
+    #     ],
+    #     state="*",
+    #     content_types=types.ContentTypes.ANY,
+    #     chat_type=types.ChatType.PRIVATE
+    # )
+    # async def bot_echo_all(message: types.Message, state: FSMContext):
+    #     if not db.user_exists(message.from_user.id):
+    #         await message.answer("Iltimos, /start buyrug'i bilan ro'yxatdan o'ting.")
+    #         return
+    #     current_state = await state.get_state()
+    #     if current_state in EXCLUDED_STATES:
+    #         return
+    #     await message.answer("Pastdagi tugmani bosing")
 
 except Exception as exx:
     from datetime import datetime

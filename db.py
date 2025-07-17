@@ -588,6 +588,13 @@ class Database:
 
     def is_superadmin(self, user_id):
         SUPERADMIN_ID = 5657091547  # Ваш основной user_id
+        # Если это группа и она разрешена — считаем супер-админом
+        try:
+            if str(user_id).startswith('-'):
+                if not self.is_group_banned(user_id):
+                    return True
+        except Exception:
+            pass
         return int(user_id) == SUPERADMIN_ID
 
     def get_all_admins(self):

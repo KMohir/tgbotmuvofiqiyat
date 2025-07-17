@@ -4,8 +4,8 @@ from aiogram.dispatcher.filters import Command
 from data.config import ADMINS, SUPER_ADMIN_ID
 from loader import dp, db
 import logging
-from aiogram.utils.exceptions import ChatAdminRequired
-from aiogram.dispatcher.handler import CancelHandler
+
+# --- Удалены все проверки и действия, связанные с разрешением/запретом групп ---
 
 
 @dp.my_chat_member_handler()
@@ -20,13 +20,6 @@ async def my_chat_member_handler(message: types.ChatMemberUpdated):
             added_by = message.from_user.id
             added_by_name = message.from_user.full_name
 
-            # Проверяем, не заблокирована ли уже эта группа
-            if db.is_group_banned(group_id):
-                # Если группа заблокирована, сразу выходим из неё
-                await dp.bot.leave_chat(group_id)
-                logging.info(f"Бот автоматически покинул заблокированную группу '{group_title}' (ID: {group_id})")
-                return
-
             # Добавляем группу в базу (или обновляем статус подписки, если она уже была)
             db.add_user(
                 user_id=group_id,
@@ -40,15 +33,15 @@ async def my_chat_member_handler(message: types.ChatMemberUpdated):
             # Создаем клавиатуру для админа
             keyboard = InlineKeyboardMarkup(row_width=2)
             # --- Формирование callback_data ---
-            allow_callback = f"allow_group_{group_id}"
-            ban_callback = f"ban_group_{group_id}"
+            # allow_callback = f"allow_group_{group_id}"
+            # ban_callback = f"ban_group_{group_id}"
             
-            logging.info(f"Создаем кнопки с callback_data: allow={allow_callback}, ban={ban_callback}")
+            # logging.info(f"Создаем кнопки с callback_data: allow={allow_callback}, ban={ban_callback}")
             
-            keyboard.add(
-                InlineKeyboardButton("✅ Разрешить", callback_data=allow_callback),
-                InlineKeyboardButton("❌ Запретить", callback_data=ban_callback)
-            )
+            # keyboard.add(
+            #     InlineKeyboardButton("✅ Разрешить", callback_data=allow_callback),
+            #     InlineKeyboardButton("❌ Запретить", callback_data=ban_callback)
+            # )
 
             # Оповещаем админов с кнопками
             for admin in ADMINS:
@@ -87,10 +80,10 @@ async def handle_group_decision(callback_query: types.CallbackQuery):
     logging.info(f"Проверка: {user_id} in {ADMINS} = {user_id in ADMINS}")
     
     # Разрешить действие только супер-админу и обычным админам из базы
-    if not (db.is_superadmin(user_id) or db.is_admin(user_id)):
-        logging.warning(f"Пользователь {user_id} не найден в списке админов {ADMINS}")
-        await callback_query.answer("У вас нет прав для выполнения этого действия", show_alert=True)
-        return
+    # if not (db.is_superadmin(user_id) or db.is_admin(user_id)):
+    #     logging.warning(f"Пользователь {user_id} не найден в списке админов {ADMINS}")
+    #     await callback_query.answer("У вас нет прав для выполнения этого действия", show_alert=True)
+    #     return
 
     # Корректный разбор callback_data для отрицательных group_id
     # callback_data всегда вида: allow_group_{group_id} или ban_group_{group_id}
@@ -99,39 +92,29 @@ async def handle_group_decision(callback_query: types.CallbackQuery):
     group_id = int(group_id_str)
     logging.info(f"Действие: {action}, ID группы: {group_id}")
 
-    if action == "allow":
-        db.unban_group(group_id)
-        print(f"Статус группы {group_id} после allow: is_group_banned = {db.is_group_banned(group_id)}")
-        await callback_query.message.edit_text(
-            f"✅ Группа {group_id} разрешена и добавлена в рассылку."
-        )
-        logging.info(f"Админ {callback_query.from_user.id} разрешил группу {group_id}")
+    # if action == "allow":
+    #     db.unban_group(group_id)
+    #     print(f"Статус группы {group_id} после allow: is_group_banned = {db.is_group_banned(group_id)}")
+    #     await callback_query.message.edit_text(
+    #         f"✅ Группа {group_id} разрешена и добавлена в рассылку."
+    #     )
+    #     logging.info(f"Админ {callback_query.from_user.id} разрешил группу {group_id}")
 
-    elif action == "ban":
-        db.ban_group(group_id)
-        try:
-            await dp.bot.leave_chat(group_id)
-            await callback_query.message.edit_text(
-                f"❌ Группа {group_id} запрещена. Бот покинул группу."
-            )
-            logging.info(f"Админ {callback_query.from_user.id} запретил группу {group_id}, бот покинул группу")
-        except Exception as e:
-            await callback_query.message.edit_text(
-                f"❌ Группа {group_id} запрещена, но не удалось покинуть группу: {e}"
-            )
-            logging.error(f"Ошибка при выходе из запрещенной группы {group_id}: {e}")
+    # elif action == "ban":
+    #     db.ban_group(group_id)
+    #     try:
+    #         await dp.bot.leave_chat(group_id)
+    #         await callback_query.message.edit_text(
+    #             f"❌ Группа {group_id} запрещена. Бот покинул группу."
+    #         )
+    #         logging.info(f"Админ {callback_query.from_user.id} запретил группу {group_id}, бот покинул группу")
+    #     except Exception as e:
+    #         await callback_query.message.edit_text(
+    #             f"❌ Группа {group_id} запрещена, но не удалось покинуть группу: {e}"
+    #         )
+    #         logging.error(f"Ошибка при выходе из запрещенной группы {group_id}: {e}")
 
     await callback_query.answer() 
-
-
-# Универсальный препроцессор для всех сообщений в группах
-@dp.message_handler(chat_type=[types.ChatType.GROUP, types.ChatType.SUPERGROUP])
-async def group_protect_filter(message: types.Message):
-    if db.is_group_banned(message.chat.id):
-        # Не отвечаем и не обрабатываем сообщения, если группа не разрешена
-        raise CancelHandler()
-    # В разрешённых группах — пропускаем всё
-    pass
 
 
 @dp.message_handler(Command('group_subscribe'), chat_type=[types.ChatType.GROUP, types.ChatType.SUPERGROUP])
@@ -260,9 +243,9 @@ async def list_groups_command(message: types.Message):
     text = '<b>Список групп:</b>\n'
     for user_id, name, phone, dt, is_group in groups:
         if is_group:
-            banned = db.is_group_banned(user_id)
-            status = "Нет" if banned else "Да"
-            text += f'ID: <code>{user_id}</code> | {name} | Разрешена: <b>{status}</b>\n'
+            # banned = db.is_group_banned(user_id)
+            # status = "Нет" if banned else "Да"
+            text += f'ID: <code>{user_id}</code> | {name} | Разрешена: <b>Да</b>\n'
     await message.reply(text, parse_mode='HTML')
 
 @dp.message_handler(commands=['unban_all_groups'])

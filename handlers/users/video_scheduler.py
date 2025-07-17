@@ -49,9 +49,6 @@ def get_all_group_videos(project):
 # --- Функция рассылки для групп (старая логика) ---
 async def send_group_video(chat_id: int, project: str, season: str, video_index: int):
     try:
-        if db.is_group_banned(chat_id):
-            logger.info(f"Пропускаем отправку видео в заблокированную группу {chat_id}")
-            return False
         all_videos = get_all_group_videos(project)
         viewed = db.get_group_viewed_videos(chat_id)
         # Найти следующее непросмотренное видео
@@ -85,10 +82,6 @@ def get_videos_for_group(project, season_id):
 # --- Новая функция рассылки для групп ---
 async def send_group_video_new(chat_id: int, project: str, season_id: int = None, start_video: int = None):
     try:
-        if db.is_group_banned(chat_id):
-            logger.error(f"Группа {chat_id} заблокирована, рассылка не производится")
-            return False
-
         # Получаем стартовые значения из базы
         season_db, video_db = db.get_group_video_start(chat_id, project)
         season_id = season_id if season_id is not None else season_db

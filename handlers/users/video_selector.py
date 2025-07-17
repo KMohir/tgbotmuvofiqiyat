@@ -230,7 +230,7 @@ class VideoStates(StatesGroup):
 project_select = State()  # Новое состояние для выбора проекта
 
 # Centris towers — для всех
-@dp.message_handler(text="Centris towers", chat_type=[types.ChatType.GROUP, types.ChatType.SUPERGROUP, types.ChatType.PRIVATE], state="*")
+@dp.message_handler(Text(equals="Centris towers", ignore_case=True), chat_type=[types.ChatType.GROUP, types.ChatType.SUPERGROUP, types.ChatType.PRIVATE], state="*")
 @dp.message_handler(commands=["centris_towers", "centris_towers@CentrisTowersbot"], chat_type=[types.ChatType.GROUP, types.ChatType.SUPERGROUP, types.ChatType.PRIVATE], state="*")
 async def centris_towers_menu(message: types.Message, state: FSMContext):
     await state.update_data(project="centris")
@@ -239,7 +239,7 @@ async def centris_towers_menu(message: types.Message, state: FSMContext):
     await state.set_state(VideoStates.season_select.state)
 
 # Golden lake — для всех
-@dp.message_handler(text="Golden lake", chat_type=[types.ChatType.GROUP, types.ChatType.SUPERGROUP, types.ChatType.PRIVATE], state="*")
+@dp.message_handler(Text(equals="Golden lake", ignore_case=True), chat_type=[types.ChatType.GROUP, types.ChatType.SUPERGROUP, types.ChatType.PRIVATE], state="*")
 @dp.message_handler(commands=["golden_lake", "golden_lake@CentrisTowersbot"], chat_type=[types.ChatType.GROUP, types.ChatType.SUPERGROUP, types.ChatType.PRIVATE], state="*")
 async def golden_lake_menu(message: types.Message, state: FSMContext):
     await state.update_data(project="golden")

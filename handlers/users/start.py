@@ -81,14 +81,16 @@ try:
         await message.reply("Вам недоступны команды. Только супер-админ может использовать команды в личке.")
         raise CancelHandler()
 
+    # --- Удалены все проверки на запрет группы ---
+
     # --- Фильтр для групп ---
     @dp.message_handler(chat_type=[types.ChatType.GROUP, types.ChatType.SUPERGROUP])
     async def group_protect_filter(message: types.Message):
         chat_id = message.chat.id
         # Если группа забанена — никто не может использовать команды
-        if db.is_group_banned(chat_id):
-            await message.reply("Группа не разрешена для работы с ботом. Обратитесь к супер-админу.")
-            raise CancelHandler()
+        # if db.is_group_banned(chat_id):
+        #     await message.reply("Группа не разрешена для работы с ботом. Обратитесь к супер-админу.")
+        #     raise CancelHandler()
         # В разрешённых группах — пропускаем всё без ограничений
         pass
 
@@ -112,6 +114,8 @@ try:
     #         raise CancelHandler()
     #     logging.info(f"GROUP CALLBACK ALLOWED: chat_id={chat_id}")
 
+    # --- Удалён тестовый echo-хендлер, теперь бот реагирует только на команды и нужные сообщения ---
+
     @dp.message_handler(CommandStart())
     async def bot_start(message: types.Message, state: FSMContext):
         print('bot_start вызван')
@@ -128,13 +132,13 @@ try:
                 # Сообщение пользователю не отправляем
 
             # Если команда из группы — не запускать регистрацию, если группа не разрешена
-            if message.chat.type in [types.ChatType.GROUP, types.ChatType.SUPERGROUP]:
-                if db.is_group_banned(message.chat.id):
-                    return  # Не отвечаем, если группа не разрешена
-                if not db.user_exists(message.chat.id):
-                    db.add_user(message.chat.id, message.chat.title or "Группа", None, is_group=True, group_id=message.chat.id)
-                await message.answer("Bot guruhda faollashtirildi! Barcha ishtirokchilar ro‘yxatdan o‘tmasdan funksiyalardan foydalanishlari mumkin.", reply_markup=main_menu_keyboard)
-                return
+            # if message.chat.type in [types.ChatType.GROUP, types.ChatType.SUPERGROUP]:
+            #     if db.is_group_banned(message.chat.id):
+            #         return  # Не отвечаем, если группа не разрешена
+            #     if not db.user_exists(message.chat.id):
+            #         db.add_user(message.chat.id, message.chat.title or "Группа", None, is_group=True, group_id=message.chat.id)
+            #     await message.answer("Bot guruhda faollashtirildi! Barcha ishtirokchilar ro‘yxatdan o‘tmasdan funksiyalardan foydalanishlari mumkin.", reply_markup=main_menu_keyboard)
+            #     return
 
             # В личке бот работает только для супер-админа и админов
             user_id = message.from_user.id
