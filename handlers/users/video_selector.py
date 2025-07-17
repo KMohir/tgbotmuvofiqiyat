@@ -234,17 +234,17 @@ class VideoStates(StatesGroup):
     video_select = State()
 project_select = State()  # Новое состояние для выбора проекта
 
-@dp.message_handler(text="Centris towers")
+@dp.message_handler(text="Centris towers", chat_type=[types.ChatType.GROUP, types.ChatType.SUPERGROUP, types.ChatType.PRIVATE])
 async def centris_towers_menu(message: types.Message, state: FSMContext):
     await state.update_data(project="centris")  # Сохраняем выбранный проект
     await message.answer("Sezonni tanlang:", reply_markup=get_season_keyboard())
     await message.answer("Qaysi sezonni ko'rmoqchisiz?")
     await state.set_state(VideoStates.season_select.state)
 
-@dp.message_handler(text="Golden lake")
-async def olden_lake_menu(message: types.Message, state: FSMContext):
-    await state.update_data(project="olden_lake")
-    await message.answer("Sezonni tanlang:", reply_markup=get_season_keyboard(project="olden_lake"))
+@dp.message_handler(text="Golden lake", chat_type=[types.ChatType.GROUP, types.ChatType.SUPERGROUP, types.ChatType.PRIVATE])
+async def golden_lake_menu(message: types.Message, state: FSMContext):
+    await state.update_data(project="golden")
+    await message.answer("Sezonni tanlang:", reply_markup=get_season_keyboard("golden"))
     await message.answer("Qaysi sezonni ko'rmoqchisiz?")
     await state.set_state(VideoStates.season_select.state)
 

@@ -3,6 +3,7 @@ from loader import dp
 import middlewares, filters, handlers
 from utils.misc.set_bot_commands import set_default_commands
 from utils.notify_admins import on_startup_notify
+from handlers.users import admin_image_sender
 from handlers.users.video_scheduler import scheduler, init_scheduler
 from db import db
 import asyncio
@@ -17,6 +18,8 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 db.create_tables()  # Автоматически создать все таблицы, если их нет
+
+print("dp в app.py:", id(dp))
 
 async def on_startup(dispatcher):
     # Уведомляет про запуск

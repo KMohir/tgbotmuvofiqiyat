@@ -50,93 +50,71 @@ try:
         return caption
 
     # --- Фильтр для лички ---
-    @dp.message_handler(chat_type=types.ChatType.PRIVATE)
+    @dp.message_handler(lambda m: not m.text or not m.text.startswith('/'), chat_type=types.ChatType.PRIVATE)
     async def private_protect_filter(message: types.Message):
         user_id = int(message.from_user.id)
-        print(f"[PRIVATE] ADMINS={ADMINS}, SUPER_ADMIN_ID={SUPER_ADMIN_ID}, user_id={user_id}, type(user_id)={type(user_id)}")
+        # Супер-админ всегда может использовать любые сообщения
+        if db.is_superadmin(user_id):
+            return
+        # Для остальных — можно блокировать или просто pass
+        pass
 
-        # Всегда разрешаем суперадмину любые команды
-        if message.text and message.text.startswith('/') and user_id == int(SUPER_ADMIN_ID):
-            print(f"[PRIVATE] Суперадмин {user_id} отправил команду {message.text}, пропускаем")
-            return
+    # --- Фильтр для callback_query в личке ---
+    # @dp.callback_query_handler(lambda c: c.message.chat.type == types.ChatType.PRIVATE)
+    # async def private_protect_callback_filter(callback_query: types.CallbackQuery):
+    #     user_id = int(callback_query.from_user.id)
+    #     logging.info(f"PRIVATE CALLBACK FILTER: user_id={user_id}")
+    #     if user_id == int(SUPER_ADMIN_ID):
+    #         logging.info(f"PRIVATE CALLBACK ALLOWED: SUPER_ADMIN user_id={user_id}")
+    #         return
+    #     if user_id in [int(admin_id) for admin_id in ADMINS]:
+    #         logging.info(f"PRIVATE CALLBACK ALLOWED: ADMIN user_id={user_id}")
+    #         return
+    #     if db.is_admin(user_id):
+    #         logging.info(f"PRIVATE CALLBACK ALLOWED: DB ADMIN user_id={user_id}")
+    #         return
+    #     logging.warning(f"PRIVATE CALLBACK BLOCKED: user_id={user_id}")
+    #     raise CancelHandler()
 
-        if user_id == int(SUPER_ADMIN_ID):
-            print(f"[PRIVATE] SUPER_ADMIN user_id={user_id} разрешён")
-            return
-
-        if user_id in [int(admin_id) for admin_id in ADMINS]:
-            print(f"[PRIVATE] ADMIN user_id={user_id} разрешён")
-            return
-
-        if db.is_admin(user_id):
-            print(f"[PRIVATE] DB ADMIN user_id={user_id} разрешён")
-            return
-
-        print(f"[PRIVATE] BLOCKED user_id={user_id}")
-        raise CancelHandler()
-
-    @dp.callback_query_handler(lambda c: c.message.chat.type == types.ChatType.PRIVATE)
-    async def private_protect_callback_filter(callback_query: types.CallbackQuery):
-        user_id = int(callback_query.from_user.id)
-        logging.info(f"PRIVATE CALLBACK FILTER: user_id={user_id}")
-        if user_id == int(SUPER_ADMIN_ID):
-            logging.info(f"PRIVATE CALLBACK ALLOWED: SUPER_ADMIN user_id={user_id}")
-            return
-        if user_id in [int(admin_id) for admin_id in ADMINS]:
-            logging.info(f"PRIVATE CALLBACK ALLOWED: ADMIN user_id={user_id}")
-            return
-        if db.is_admin(user_id):
-            logging.info(f"PRIVATE CALLBACK ALLOWED: DB ADMIN user_id={user_id}")
-            return
-        logging.warning(f"PRIVATE CALLBACK BLOCKED: user_id={user_id}")
+    @dp.message_handler(lambda m: m.text and m.text.startswith('/') and not db.is_superadmin(m.from_user.id), chat_type=types.ChatType.PRIVATE)
+    async def block_private_commands_for_non_superadmin(message: types.Message):
+        await message.reply("Вам недоступны команды. Только супер-админ может использовать команды в личке.")
         raise CancelHandler()
 
     # --- Фильтр для групп ---
     @dp.message_handler(chat_type=[types.ChatType.GROUP, types.ChatType.SUPERGROUP])
     async def group_protect_filter(message: types.Message):
-        user_id = int(message.from_user.id)
         chat_id = message.chat.id
-        print(f"[GROUP] ADMINS={ADMINS}, SUPER_ADMIN_ID={SUPER_ADMIN_ID}, user_id={user_id}, chat_id={chat_id}")
-
-        if user_id == int(SUPER_ADMIN_ID):
-            print(f"[GROUP] SUPER_ADMIN user_id={user_id} разрешён")
-            return
-
-        if user_id in [int(admin_id) for admin_id in ADMINS]:
-            print(f"[GROUP] ADMIN user_id={user_id} разрешён")
-            return
-
-        if db.is_admin(user_id):
-            print(f"[GROUP] DB ADMIN user_id={user_id} разрешён")
-            return
-
+        # Если группа забанена — никто не может использовать команды
         if db.is_group_banned(chat_id):
-            print(f"[GROUP] BLOCKED chat_id={chat_id}")
+            await message.reply("Группа не разрешена для работы с ботом. Обратитесь к супер-админу.")
             raise CancelHandler()
+        # В разрешённых группах — пропускаем всё без ограничений
+        pass
 
-        print(f"[GROUP] ALLOWED chat_id={chat_id}")
-
-    @dp.callback_query_handler(lambda c: c.message.chat.type in [types.ChatType.GROUP, types.ChatType.SUPERGROUP])
-    async def group_protect_callback_filter(callback_query: types.CallbackQuery):
-        user_id = int(callback_query.from_user.id)
-        chat_id = callback_query.message.chat.id
-        logging.info(f"GROUP CALLBACK FILTER: chat_id={chat_id}, user_id={user_id}")
-        if user_id == int(SUPER_ADMIN_ID):
-            logging.info(f"GROUP CALLBACK ADMIN ALLOWED: SUPER_ADMIN user_id={user_id}")
-            return
-        if user_id in [int(admin_id) for admin_id in ADMINS]:
-            logging.info(f"GROUP CALLBACK ADMIN ALLOWED: ADMIN user_id={user_id}")
-            return
-        if db.is_admin(user_id):
-            logging.info(f"GROUP CALLBACK ADMIN ALLOWED: DB ADMIN user_id={user_id}")
-            return
-        if db.is_group_banned(chat_id):
-            logging.warning(f"GROUP CALLBACK BLOCKED: chat_id={chat_id}")
-            raise CancelHandler()
-        logging.info(f"GROUP CALLBACK ALLOWED: chat_id={chat_id}")
+    # --- Фильтр для callback_query в группах ---
+    # @dp.callback_query_handler(lambda c: c.message.chat.type in [types.ChatType.GROUP, types.ChatType.SUPERGROUP])
+    # async def group_protect_callback_filter(callback_query: types.CallbackQuery):
+    #     user_id = int(callback_query.from_user.id)
+    #     chat_id = callback_query.message.chat.id
+    #     logging.info(f"GROUP CALLBACK FILTER: chat_id={chat_id}, user_id={user_id}")
+    #     if user_id == int(SUPER_ADMIN_ID):
+    #         logging.info(f"GROUP CALLBACK ADMIN ALLOWED: SUPER_ADMIN user_id={user_id}")
+    #         return
+    #     if user_id in [int(admin_id) for admin_id in ADMINS]:
+    #         logging.info(f"GROUP CALLBACK ADMIN ALLOWED: ADMIN user_id={user_id}")
+    #         return
+    #     if db.is_admin(user_id):
+    #         logging.info(f"GROUP CALLBACK ADMIN ALLOWED: DB ADMIN user_id={user_id}")
+    #         return
+    #     if db.is_group_banned(chat_id):
+    #         logging.warning(f"GROUP CALLBACK BLOCKED: chat_id={chat_id}")
+    #         raise CancelHandler()
+    #     logging.info(f"GROUP CALLBACK ALLOWED: chat_id={chat_id}")
 
     @dp.message_handler(CommandStart())
     async def bot_start(message: types.Message, state: FSMContext):
+        print('bot_start вызван')
         try:
             if is_spam(message.from_user.id):
                 logger.warning(f"Обнаружен спам от пользователя {message.from_user.id}")

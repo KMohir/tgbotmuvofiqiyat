@@ -10,6 +10,7 @@ try:
     import asyncio
     from db import db
     from loader import dp, bot
+    print("dp в admin_image_sender.py:", id(dp))
     from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
     from aiogram.dispatcher.filters.state import State, StatesGroup
 
@@ -381,6 +382,7 @@ try:
 
     @dp.message_handler(Command('add_season'), user_id=ADMINS + [SUPER_ADMIN_ID])
     async def add_season_command(message: types.Message, state: FSMContext):
+        print('add_season_command вызван')
         kb = InlineKeyboardMarkup(row_width=2)
         kb.add(
             InlineKeyboardButton("Centris Towers", callback_data="add_project_centr"),

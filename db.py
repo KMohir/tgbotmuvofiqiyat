@@ -545,9 +545,11 @@ class Database:
             cursor.execute("INSERT INTO admins (user_id) VALUES (%s)", (user_id,))
             self.conn.commit()
             cursor.close()
+            return True
         except Exception as e:
             logger.error(f"Ошибка при добавлении администратора {user_id}: {e}")
             self.conn.rollback()
+            return False
 
     def remove_admin(self, user_id):
         try:
@@ -791,6 +793,20 @@ class Database:
         except Exception as e:
             logger.error(f"Ошибка при получении настроек всех групп: {e}")
             return []
+
+    def unban_all_groups(self):
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute('''
+                UPDATE users SET is_banned = 0, is_subscribed = 1 
+                WHERE is_group = 1
+            ''')
+            self.conn.commit()
+            cursor.close()
+            logger.info(f"Все группы разблокированы")
+        except Exception as e:
+            logger.error(f"Ошибка при разблокировке всех групп: {e}")
+            self.conn.rollback()
 
 # Создание экземпляра базы данных
 db = Database()

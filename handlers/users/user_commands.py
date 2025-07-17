@@ -59,24 +59,17 @@ try:
 
 
     # Декоратор для проверки прав админа
-    async def is_admin(user_id):
-        return int(user_id) == int(SUPER_ADMIN_ID) or db.is_admin(int(user_id))
-
-    # Новая функция проверки супер-админа
-    async def is_superadmin(user_id):
-        return int(user_id) == int(SUPER_ADMIN_ID)
-
     def admin_required(superadmin_only=False):
         def decorator(func):
             @wraps(func)
             async def wrapper(message: types.Message, *args, **kwargs):
                 user_id = int(message.from_user.id)
                 if superadmin_only:
-                    if not await is_superadmin(user_id):
+                    if not db.is_superadmin(user_id):
                         await message.reply("Только главный админ может использовать эту команду.")
                         return
                 else:
-                    if not await is_admin(user_id):
+                    if not db.is_admin(user_id):
                         await message.reply("У вас нет прав администратора.")
                         return
                 return await func(message, *args, **kwargs)
@@ -85,43 +78,46 @@ try:
 
     @dp.message_handler(commands=['add_admin'])
     async def add_admin_command(message: types.Message):
-        if not await is_superadmin(int(message.from_user.id)):
+        user_id = int(message.from_user.id)
+        if not db.is_superadmin(user_id):
             await message.reply("Только супер-админ может добавлять админов.")
             return
         args = message.get_args().split()
         if not args or not args[0].isdigit():
             await message.reply("Используйте: /add_admin [user_id]")
             return
-        user_id = int(args[0])
-        if db.is_admin(user_id):
+        new_admin_id = int(args[0])
+        if db.is_admin(new_admin_id):
             await message.reply("Этот пользователь уже админ.")
             return
-        if db.add_admin(user_id):
-            await message.reply(f"Пользователь {user_id} добавлен в админы.")
+        if db.add_admin(new_admin_id):
+            await message.reply(f"Пользователь {new_admin_id} добавлен в админы.")
         else:
             await message.reply("Ошибка при добавлении админа.")
 
     @dp.message_handler(commands=['remove_admin'])
     async def remove_admin_command(message: types.Message):
-        if not await is_superadmin(int(message.from_user.id)):
+        user_id = int(message.from_user.id)
+        if not db.is_superadmin(user_id):
             await message.reply("Только супер-админ может удалять админов.")
             return
         args = message.get_args().split()
         if not args or not args[0].isdigit():
             await message.reply("Используйте: /remove_admin [user_id]")
             return
-        user_id = int(args[0])
-        if not db.is_admin(user_id):
+        remove_admin_id = int(args[0])
+        if not db.is_admin(remove_admin_id):
             await message.reply("Этот пользователь не является админом.")
             return
-        if db.remove_admin(user_id):
-            await message.reply(f"Пользователь {user_id} удалён из админов.")
+        if db.remove_admin(remove_admin_id):
+            await message.reply(f"Пользователь {remove_admin_id} удалён из админов.")
         else:
             await message.reply("Ошибка при удалении админа.")
 
     @dp.message_handler(commands=['list_admins'])
     async def list_admins_command(message: types.Message):
-        if not (await is_superadmin(int(message.from_user.id)) or db.is_admin(int(message.from_user.id))):
+        user_id = int(message.from_user.id)
+        if not (db.is_superadmin(user_id) or db.is_admin(user_id)):
             await message.reply("У вас нет прав для этой команды.")
             return
         admins = db.get_all_admins()
@@ -129,8 +125,8 @@ try:
             await message.reply("Список админов пуст.")
             return
         text = "Список обычных админов:\n"
-        for user_id in admins:
-            text += f"{user_id}\n"
+        for admin_id, is_super in admins:
+            text += f"{admin_id}{' (супер-админ)' if is_super else ''}\n"
         await message.reply(text)
 
 
@@ -176,7 +172,6 @@ try:
             await message.reply(f"В группе включена рассылка Golden Lake, сезон №{season_number}")
 
     @dp.message_handler(commands=['disable_group_video'])
-    @admin_required()
     async def disable_group_video_command(message: types.Message):
         args = message.get_args().split()
         if len(args) != 1 or args[0] not in ['centris', 'golden']:
@@ -205,7 +200,6 @@ try:
 
 
     @dp.message_handler(commands=['set_centr_time'])
-    @admin_required()
     async def set_centr_time_command(message: types.Message):
         args = message.get_args().split()
         if not (1 <= len(args) <= 2):
@@ -223,7 +217,6 @@ try:
         await message.reply(f"Время рассылки Centris Towers обновлено: {centris_time_1}" + (f" и {centris_time_2}" if centris_time_2 else ""))
 
     @dp.message_handler(commands=['set_golden_time'])
-    @admin_required()
     async def set_golden_time_command(message: types.Message):
         args = message.get_args().split()
         if len(args) != 1:

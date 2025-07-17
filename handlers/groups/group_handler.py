@@ -39,6 +39,7 @@ async def my_chat_member_handler(message: types.ChatMemberUpdated):
 
             # Создаем клавиатуру для админа
             keyboard = InlineKeyboardMarkup(row_width=2)
+            # --- Формирование callback_data ---
             allow_callback = f"allow_group_{group_id}"
             ban_callback = f"ban_group_{group_id}"
             
@@ -77,6 +78,7 @@ async def my_chat_member_handler(message: types.ChatMemberUpdated):
 
 @dp.callback_query_handler(lambda c: c.data.startswith(('allow_group_', 'ban_group_')))
 async def handle_group_decision(callback_query: types.CallbackQuery):
+    print("handle_group_decision вызван", callback_query.data, callback_query.from_user.id)
     logging.info(f"Обработчик callback_query вызван с данными: {callback_query.data}")
     
     user_id = callback_query.from_user.id
@@ -84,31 +86,28 @@ async def handle_group_decision(callback_query: types.CallbackQuery):
     logging.info(f"ADMINS: {ADMINS}, тип: {type(ADMINS)}")
     logging.info(f"Проверка: {user_id} in {ADMINS} = {user_id in ADMINS}")
     
-    # Разрешить действие и супер-админу, и обычным админам
-    if user_id != SUPER_ADMIN_ID and user_id not in ADMINS:
+    # Разрешить действие только супер-админу и обычным админам из базы
+    if not (db.is_superadmin(user_id) or db.is_admin(user_id)):
         logging.warning(f"Пользователь {user_id} не найден в списке админов {ADMINS}")
         await callback_query.answer("У вас нет прав для выполнения этого действия", show_alert=True)
         return
 
-    # Правильно разбираем callback_data для отрицательных ID групп
-    parts = callback_query.data.split('_')
-    logging.info(f"Разбор callback_data: {callback_query.data}")
-    logging.info(f"Части после split('_'): {parts}")
-    
-    action = parts[0]  # allow или ban (первая часть)
-    group_id = int('_'.join(parts[2:]))  # Объединяем остальные части для отрицательного ID
+    # Корректный разбор callback_data для отрицательных group_id
+    # callback_data всегда вида: allow_group_{group_id} или ban_group_{group_id}
+    prefix, _, group_id_str = callback_query.data.partition('_group_')
+    action = prefix  # allow или ban
+    group_id = int(group_id_str)
     logging.info(f"Действие: {action}, ID группы: {group_id}")
 
     if action == "allow":
-        # Разрешаем группу
         db.unban_group(group_id)
+        print(f"Статус группы {group_id} после allow: is_group_banned = {db.is_group_banned(group_id)}")
         await callback_query.message.edit_text(
             f"✅ Группа {group_id} разрешена и добавлена в рассылку."
         )
         logging.info(f"Админ {callback_query.from_user.id} разрешил группу {group_id}")
 
     elif action == "ban":
-        # Запрещаем группу и выходим из неё
         db.ban_group(group_id)
         try:
             await dp.bot.leave_chat(group_id)
@@ -131,6 +130,8 @@ async def group_protect_filter(message: types.Message):
     if db.is_group_banned(message.chat.id):
         # Не отвечаем и не обрабатываем сообщения, если группа не разрешена
         raise CancelHandler()
+    # В разрешённых группах — пропускаем всё
+    pass
 
 
 @dp.message_handler(Command('group_subscribe'), chat_type=[types.ChatType.GROUP, types.ChatType.SUPERGROUP])
@@ -252,3 +253,24 @@ async def set_golden_season(message: types.Message):
     season_id = int(args)
     db.set_group_video_start(message.chat.id, 'golden', season_id, db.get_group_video_start(message.chat.id, 'golden')[1])
     await message.reply(f'golden_start_season_id установлен: {season_id}') 
+
+@dp.message_handler(commands=['list_groups'])
+async def list_groups_command(message: types.Message):
+    groups = db.get_all_users()
+    text = '<b>Список групп:</b>\n'
+    for user_id, name, phone, dt, is_group in groups:
+        if is_group:
+            banned = db.is_group_banned(user_id)
+            status = "Нет" if banned else "Да"
+            text += f'ID: <code>{user_id}</code> | {name} | Разрешена: <b>{status}</b>\n'
+    await message.reply(text, parse_mode='HTML')
+
+@dp.message_handler(commands=['unban_all_groups'])
+async def unban_all_groups_command(message: types.Message):
+    db.unban_all_groups()
+    await message.reply('Бан снят со всех групп. Все группы теперь разрешены!')
+
+@dp.message_handler(chat_type=[types.ChatType.GROUP, types.ChatType.SUPERGROUP])
+async def debug_group_message(message: types.Message):
+    print(f"[DEBUG] Получено сообщение в группе: chat_id={message.chat.id}, user_id={message.from_user.id}, text={message.text}")
+    # Не отвечаем в чат, только логируем 
