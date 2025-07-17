@@ -92,7 +92,7 @@ def get_lesson_keyboard():
 
     return markup
 
-@dp.message_handler(commands=['start'])
+@dp.message_handler(commands=["start", "start@CentrisTowersbot"], chat_type=[types.ChatType.GROUP, types.ChatType.SUPERGROUP, types.ChatType.PRIVATE])
 async def cmd_start(message: types.Message, state: FSMContext):
     user_id = message.from_user.id
     # Добавляем пользователя в базу данных, если его нет
@@ -229,29 +229,33 @@ class VideoStates(StatesGroup):
     video_select = State()
 project_select = State()  # Новое состояние для выбора проекта
 
+# Centris towers — для всех
 @dp.message_handler(text="Centris towers", chat_type=[types.ChatType.GROUP, types.ChatType.SUPERGROUP, types.ChatType.PRIVATE], state="*")
-@dp.message_handler(commands=["centris_towers"], chat_type=[types.ChatType.GROUP, types.ChatType.SUPERGROUP, types.ChatType.PRIVATE], state="*")
+@dp.message_handler(commands=["centris_towers", "centris_towers@CentrisTowersbot"], chat_type=[types.ChatType.GROUP, types.ChatType.SUPERGROUP, types.ChatType.PRIVATE], state="*")
 async def centris_towers_menu(message: types.Message, state: FSMContext):
     await state.update_data(project="centris")
     await message.answer("Sezonni tanlang:", reply_markup=get_season_keyboard())
     await message.answer("Qaysi sezonni ko'rmoqchisiz?")
     await state.set_state(VideoStates.season_select.state)
 
+# Golden lake — для всех
 @dp.message_handler(text="Golden lake", chat_type=[types.ChatType.GROUP, types.ChatType.SUPERGROUP, types.ChatType.PRIVATE], state="*")
-@dp.message_handler(commands=["golden_lake"], chat_type=[types.ChatType.GROUP, types.ChatType.SUPERGROUP, types.ChatType.PRIVATE], state="*")
+@dp.message_handler(commands=["golden_lake", "golden_lake@CentrisTowersbot"], chat_type=[types.ChatType.GROUP, types.ChatType.SUPERGROUP, types.ChatType.PRIVATE], state="*")
 async def golden_lake_menu(message: types.Message, state: FSMContext):
     await state.update_data(project="golden")
     await message.answer("Sezonni tanlang:", reply_markup=get_season_keyboard("golden"))
     await message.answer("Qaysi sezonni ko'rmoqchisiz?")
     await state.set_state(VideoStates.season_select.state)
 
+# Centris Towers bilan bog'lanish — для всех
 @dp.message_handler(text="Centris Towers bilan bog'lanish", chat_type=[types.ChatType.GROUP, types.ChatType.SUPERGROUP, types.ChatType.PRIVATE], state="*")
-@dp.message_handler(commands=["contact"], chat_type=[types.ChatType.GROUP, types.ChatType.SUPERGROUP, types.ChatType.PRIVATE], state="*")
+@dp.message_handler(commands=["contact", "contact@CentrisTowersbot"], chat_type=[types.ChatType.GROUP, types.ChatType.SUPERGROUP, types.ChatType.PRIVATE], state="*")
 async def centris_contact(message: types.Message, state: FSMContext):
     await message.answer("Centris Towers bilan bog'lanish uchun: @Takhmina_CentrisTowers yoki +998958095995")
 
+# Bino bilan tanishish — для всех
 @dp.message_handler(text="Bino bilan tanishish", chat_type=[types.ChatType.GROUP, types.ChatType.SUPERGROUP, types.ChatType.PRIVATE], state="*")
-@dp.message_handler(commands=["about"], chat_type=[types.ChatType.GROUP, types.ChatType.SUPERGROUP, types.ChatType.PRIVATE], state="*")
+@dp.message_handler(commands=["about", "about@CentrisTowersbot"], chat_type=[types.ChatType.GROUP, types.ChatType.SUPERGROUP, types.ChatType.PRIVATE], state="*")
 async def about_building(message: types.Message, state: FSMContext):
     await message.answer("Centris Towers binolari haqida ko'proq ma'lumot olish uchun quyidagi tugmani bosing:")
     # Здесь можно добавить отправку ссылки, фото или инлайн-кнопки с подробностями
@@ -284,7 +288,7 @@ async def season_selection(message: types.Message, state: FSMContext):
     if project == "centris" and season_project != "centris":
         await message.answer("Этот сезон не принадлежит проекту Centris Towers.")
         return
-    elif project == "olden_lake" and season_project != "golden":
+    elif project == "golden" and season_project != "golden":
         await message.answer("Этот сезон не принадлежит проекту Golden Lake.")
         return
     
@@ -308,8 +312,8 @@ async def season_selection(message: types.Message, state: FSMContext):
 async def back_to_season_menu(message: types.Message, state: FSMContext):
     data = await state.get_data()
     project = data.get("project")
-    if project == "olden_lake":
-        await message.answer("Sezonni tanlang:", reply_markup=get_season_keyboard(project="olden_lake"))
+    if project == "golden":
+        await message.answer("Sezonni tanlang:", reply_markup=get_season_keyboard(project="golden"))
     else:
         await message.answer("Sezonni tanlang:", reply_markup=get_season_keyboard())
     await message.answer("Qaysi sezonni ko'rmoqchisiz?")
@@ -326,12 +330,12 @@ async def centris_towers_command(message: types.Message, state: FSMContext):
 
 @dp.message_handler(Command("olden_lake"))
 async def olden_lake_command(message: types.Message):
-    await olden_lake_menu(message)
+    await golden_lake_menu(message)
 
 @dp.message_handler(Command("golden_lake"))
 async def golden_lake_command(message: types.Message, state: FSMContext):
     try:
-        await olden_lake_menu(message, state)
+        await golden_lake_menu(message, state)
     except NameError:
         await state.update_data(project="golden")
         await message.answer("Sezonni tanlang:", reply_markup=get_season_keyboard("golden"))
