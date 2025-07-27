@@ -68,6 +68,10 @@ CAPTION_LIST_3 = [
     "Дубай ва Озарбайжонга пул тикиш тўғрими?"
 ]
 
+# Используем CAPTION_LIST_1 вместо неопределенной CAPTION_LIST
+CAPTION_LIST = CAPTION_LIST_1
+VIDEO_LIST = VIDEO_LIST_1
+
 # Извлечение тем уроков из CAPTION_LIST для кнопок
 def extract_lesson_topics():
     topics = []
@@ -251,7 +255,83 @@ async def golden_lake_menu(message: types.Message, state: FSMContext):
 @dp.message_handler(text="Centris Towers bilan bog'lanish", chat_type=[types.ChatType.GROUP, types.ChatType.SUPERGROUP, types.ChatType.PRIVATE], state="*")
 @dp.message_handler(commands=["contact", "contact@CentrisTowersbot"], chat_type=[types.ChatType.GROUP, types.ChatType.SUPERGROUP, types.ChatType.PRIVATE], state="*")
 async def centris_contact(message: types.Message, state: FSMContext):
-    await message.answer("Centris Towers bilan bog'lanish uchun: @Takhmina_CentrisTowers yoki +998958095995")
+    # Пути к изображениям
+    IMAGE_PATH1 = 'contact1.jpg'  # Изображение для Нарзиева Самира
+    IMAGE_PATH2 = 'contact2.jpg'  # Изображение для Гугай Алены
+    IMAGE_PATH3 = 'contact3.jpg'  # Изображение для Хакимовой Тахмины
+
+    # Текст для Нарзиева Самира (на узбекском)
+    caption1 = """Centris Towers  
+    Нарзиев Самир  
+    Менеджер  
+    
+    Murojaat uchun:  
+    mob: +998501554444 📱  
+    telegram: @centris1  
+    ofis: +9989555154444 📞  
+    
+    📍 Toshkent sh., Nuroniylar ko'chasi, 2. (<a href="https://maps.app.goo.gl/aVBM7bMWRSXZasWy5">Xaritada ko'rish</a>)  
+    
+    <a href="http://t.me/centris1">Telegram</a> • <a href="https://www.instagram.com/centris.towers/">Instagram</a> • <a href="https://www.facebook.com/centristowers">Facebook</a> • <a href="https://centristowers.uz/">Website</a> • <a href="https://youtube.com/@centrisdevelopment?si=d9FnNGjGb2MesuRY">Youtube</a>"""
+
+    # Текст для Гугай Алены (на узбекском)
+    caption2 = """Centris Towers  
+    Гугай Алена  
+    Sotuv bo'yicha katta menejer  
+    
+    Ma'lumot uchun:  
+    mob: +998958085995 📱  
+    telegram: @Alyona_CentrisTowers  
+    ofis: +9989555154444 📞  
+    
+    📍 Toshkent sh., Nuroniylar ko'chasi, 2. (<a href="https://maps.app.goo.gl/aVBM7bMWRSXZasWy5">Xaritada ko'rish</a>)  
+    
+    <a href="http://t.me/centris1">Telegram</a> • <a href="https://www.instagram.com/centris.towers/">Instagram</a> • <a href="https://www.facebook.com/centristowers">Facebook</a> • <a href="https://centristowers.uz/">Website</a> • <a href="https://youtube.com/@centrisdevelopment?si=d9FnNGjGb2MesuRY">Youtube</a>"""
+
+    # Текст для Хакимовой Тахмины (на узбекском)
+    caption3 = """Centris Towers  
+    Khakimova Takhmina  
+    Sotuv menejeri  
+    
+    Murojaat uchun:  
+    mob: +998958095995 📱  
+    telegram: @Takhmina_CentrisTowers  
+    ofis: +9989555154444 📞  
+    
+    📍 Toshkent sh., Nuroniylar ko'chasi, 2. (<a href="https://maps.app.goo.gl/aVBM7bMWRSXZasWy5">Xaritada ko'rish</a>)  
+    
+    <a href="http://t.me/centris1">Telegram</a> • <a href="https://www.instagram.com/centris.towers/">Instagram</a> • <a href="https://www.facebook.com/centristowers">Facebook</a> • <a href="https://centristowers.uz/">Website</a> • <a href="https://youtube.com/@centrisdevelopment?si=d9FnNGjGb2MesuRY">Youtube</a>"""
+
+    # Отправка изображений с подписями
+    try:
+        # Отправка для Нарзиева Самира
+        with open(IMAGE_PATH1, 'rb') as photo:
+            await message.answer_photo(
+                photo=photo,
+                caption=caption1,
+                parse_mode='HTML'
+            )
+
+        # Отправка для Гугай Алены
+        with open(IMAGE_PATH2, 'rb') as photo:
+            await message.answer_photo(
+                photo=photo,
+                caption=caption2,
+                parse_mode='HTML'
+            )
+
+        # Отправка для Хакимовой Тахмины
+        with open(IMAGE_PATH3, 'rb') as photo:
+            await message.answer_photo(
+                photo=photo,
+                caption=caption3,
+                parse_mode='HTML',
+                reply_markup=main_menu_keyboard
+            )
+    except FileNotFoundError:
+        await message.answer("Bir yoki bir nechta rasm topilmadi. Fayl yo'llarini tekshiring.", reply_markup=main_menu_keyboard)
+    except Exception as e:
+        await message.answer(f"Rasmlarni yuborishda xatolik yuz berdi: {str(e)}", reply_markup=main_menu_keyboard)
 
 # Bino bilan tanishish — для всех
 @dp.message_handler(text="Bino bilan tanishish", chat_type=[types.ChatType.GROUP, types.ChatType.SUPERGROUP, types.ChatType.PRIVATE], state="*")
@@ -328,19 +408,9 @@ async def back_to_main_menu(message: types.Message, state: FSMContext):
 async def centris_towers_command(message: types.Message, state: FSMContext):
     await centris_towers_menu(message, state)
 
-@dp.message_handler(Command("olden_lake"))
-async def olden_lake_command(message: types.Message):
-    await golden_lake_menu(message)
-
 @dp.message_handler(Command("golden_lake"))
 async def golden_lake_command(message: types.Message, state: FSMContext):
-    try:
-        await golden_lake_menu(message, state)
-    except NameError:
-        await state.update_data(project="golden")
-        await message.answer("Sezonni tanlang:", reply_markup=get_season_keyboard("golden"))
-        await message.answer("Qaysi sezonni ko'rmoqchisiz?")
-        await state.set_state(VideoStates.season_select.state)
+    await golden_lake_menu(message, state)
 
 @dp.message_handler(state=VideoStates.video_select)
 async def send_video(message: types.Message, state: FSMContext):

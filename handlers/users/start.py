@@ -50,7 +50,9 @@ try:
         return caption
 
     # --- Фильтр для лички ---
-    @dp.message_handler(lambda m: not m.text or not m.text.startswith('/'), chat_type=types.ChatType.PRIVATE)
+    @dp.message_handler(lambda m: not m.text or not m.text.startswith('/') and m.text not in [
+        "Centris towers", "Golden lake", "Centris Towers bilan bog'lanish", "Bino bilan tanishish"
+    ], chat_type=types.ChatType.PRIVATE)
     async def private_protect_filter(message: types.Message):
         user_id = int(message.from_user.id)
         # Супер-админ всегда может использовать любые сообщения
