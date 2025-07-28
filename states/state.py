@@ -36,3 +36,19 @@ class TimeSelection(StatesGroup):
 
 class ImageCollection(StatesGroup):
     waiting_for_images = State()
+
+# === СОСТОЯНИЯ БЕЗОПАСНОСТИ ===
+
+class SecurityStates(StatesGroup):
+    waiting_name = State()
+    waiting_phone = State()
+
+class GroupManagement(StatesGroup):
+    waiting_group_id = State()
+    waiting_group_title = State()
+
+class AdminSecurityStates(StatesGroup):
+    waiting_user_id_approve = State()
+    waiting_user_id_deny = State()
+    waiting_group_id_add = State()
+    waiting_group_id_remove = State()

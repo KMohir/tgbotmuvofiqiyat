@@ -44,6 +44,7 @@ class Database:
             )
             self.conn.autocommit = True
             self.create_tables()
+            self.create_security_tables()  # Создать таблицы безопасности
         except Exception as e:
             logger.error(f"Ошибка при инициализации базы данных: {e}")
             raise
@@ -197,6 +198,22 @@ class Database:
             logger.info(f"Данные пользователя {user_id} успешно обновлены")
         except Exception as e:
             logger.error(f"Ошибка при обновлении пользователя {user_id}: {e}")
+            self.conn.rollback()
+
+    def update_last_sent(self, user_id, last_sent_datetime):
+        """Обновить время последней отправки видео пользователю"""
+        try:
+            cursor = self.conn.cursor()
+            # Конвертируем datetime в строку для сохранения в text поле
+            last_sent_str = last_sent_datetime.strftime("%Y-%m-%d %H:%M:%S") if last_sent_datetime else None
+            cursor.execute('''
+                UPDATE users SET last_sent = %s WHERE user_id = %s
+            ''', (last_sent_str, user_id))
+            self.conn.commit()
+            cursor.close()
+            logger.info(f"Время последней отправки обновлено для пользователя {user_id}: {last_sent_str}")
+        except Exception as e:
+            logger.error(f"Ошибка при обновлении last_sent для пользователя {user_id}: {e}")
             self.conn.rollback()
 
     def close(self):
@@ -814,6 +831,332 @@ class Database:
         except Exception as e:
             logger.error(f"Ошибка при разблокировке всех групп: {e}")
             self.conn.rollback()
+
+    # === МЕТОДЫ БЕЗОПАСНОСТИ ===
+
+    def add_user_registration(self, user_id: int, name: str, phone: str) -> bool:
+        """Добавить пользователя в процесс регистрации"""
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute("""
+                INSERT INTO user_security (user_id, name, phone, status, reg_date)
+                VALUES (%s, %s, %s, 'pending', CURRENT_TIMESTAMP)
+                ON CONFLICT (user_id) 
+                DO UPDATE SET name = EXCLUDED.name, phone = EXCLUDED.phone, status = 'pending'
+            """, (user_id, name, phone))
+            self.conn.commit()
+            logger.info(f"Foydalanuvchi {user_id} ro'yxatdan o'tish jarayoniga qo'shildi")
+            return True
+        except Exception as e:
+            logger.error(f"Foydalanuvchi {user_id} ni qo'shishda xatolik: {e}")
+            return False
+
+    def get_user_security_status(self, user_id: int) -> str:
+        """Получить статус безопасности пользователя"""
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute("SELECT status FROM user_security WHERE user_id = %s", (user_id,))
+            result = cursor.fetchone()
+            return result[0] if result else None
+        except Exception as e:
+            logger.error(f"Foydalanuvchi {user_id} statusini olishda xatolik: {e}")
+            return None
+
+    def get_user_security_data(self, user_id: int) -> dict:
+        """Получить данные пользователя из системы безопасности"""
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute("""
+                SELECT user_id, name, phone, status, reg_date, approved_by, approved_date
+                FROM user_security WHERE user_id = %s
+            """, (user_id,))
+            result = cursor.fetchone()
+            if result:
+                return {
+                    'user_id': result[0],
+                    'name': result[1],
+                    'phone': result[2],
+                    'status': result[3],
+                    'reg_date': result[4],
+                    'approved_by': result[5],
+                    'approved_date': result[6]
+                }
+            return None
+        except Exception as e:
+            logger.error(f"Foydalanuvchi {user_id} ma'lumotlarini olishda xatolik: {e}")
+            return None
+
+    def approve_user(self, user_id: int, admin_id: int) -> bool:
+        """Одобрить пользователя"""
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute("""
+                UPDATE user_security 
+                SET status = 'approved', approved_by = %s, approved_date = CURRENT_TIMESTAMP
+                WHERE user_id = %s AND status = 'pending'
+            """, (admin_id, user_id))
+            self.conn.commit()
+            if cursor.rowcount > 0:
+                logger.info(f"Foydalanuvchi {user_id} admin {admin_id} tomonidan tasdiqlandi")
+                return True
+            return False
+        except Exception as e:
+            logger.error(f"Foydalanuvchi {user_id} ni tasdiqlashda xatolik: {e}")
+            return False
+
+    def deny_user(self, user_id: int, admin_id: int) -> bool:
+        """Отклонить пользователя"""
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute("""
+                UPDATE user_security 
+                SET status = 'denied', approved_by = %s, approved_date = CURRENT_TIMESTAMP
+                WHERE user_id = %s AND status = 'pending'
+            """, (admin_id, user_id))
+            self.conn.commit()
+            if cursor.rowcount > 0:
+                logger.info(f"Foydalanuvchi {user_id} admin {admin_id} tomonidan rad etildi")
+                return True
+            return False
+        except Exception as e:
+            logger.error(f"Foydalanuvchi {user_id} ni rad etishda xatolik: {e}")
+            return False
+
+    def get_pending_users(self) -> list:
+        """Получить список пользователей ожидающих одобрения"""
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute("""
+                SELECT user_id, name, phone, reg_date 
+                FROM user_security 
+                WHERE status = 'pending' 
+                ORDER BY reg_date ASC
+            """)
+            return cursor.fetchall()
+        except Exception as e:
+            logger.error(f"Kutayotgan foydalanuvchilarni olishda xatolik: {e}")
+            return []
+
+    def get_all_security_users(self) -> list:
+        """Получить всех пользователей системы безопасности"""
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute("""
+                SELECT user_id, name, phone, status, reg_date, approved_by, approved_date
+                FROM user_security 
+                ORDER BY reg_date DESC
+            """)
+            results = cursor.fetchall()
+            return [
+                {
+                    'user_id': row[0], 'name': row[1], 'phone': row[2],
+                    'status': row[3], 'reg_date': row[4], 'approved_by': row[5], 'approved_date': row[6]
+                }
+                for row in results
+            ]
+        except Exception as e:
+            logger.error(f"Barcha xavfsizlik foydalanuvchilarini olishda xatolik: {e}")
+            return []
+
+    def is_user_approved(self, user_id: int) -> bool:
+        """Проверить одобрен ли пользователь"""
+        try:
+            status = self.get_user_security_status(user_id)
+            return status == 'approved'
+        except Exception as e:
+            logger.error(f"Foydalanuvchi {user_id} tasdiqlashini tekshirishda xatolik: {e}")
+            return False
+
+    # === МЕТОДЫ WHITELIST ГРУПП ===
+
+    def add_group_to_whitelist(self, chat_id: int, title: str, admin_id: int) -> bool:
+        """Добавить группу в whitelist"""
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute("""
+                INSERT INTO group_whitelist (chat_id, title, status, added_date, added_by)
+                VALUES (%s, %s, 'active', CURRENT_TIMESTAMP, %s)
+                ON CONFLICT (chat_id) 
+                DO UPDATE SET title = EXCLUDED.title, status = 'active', 
+                              added_date = CURRENT_TIMESTAMP, added_by = EXCLUDED.added_by
+            """, (chat_id, title, admin_id))
+            self.conn.commit()
+            logger.info(f"Guruh {chat_id} whitelist ga qo'shildi")
+            return True
+        except Exception as e:
+            logger.error(f"Guruh {chat_id} ni whitelist ga qo'shishda xatolik: {e}")
+            return False
+
+    def remove_group_from_whitelist(self, chat_id: int) -> bool:
+        """Удалить группу из whitelist"""
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute("DELETE FROM group_whitelist WHERE chat_id = %s", (chat_id,))
+            self.conn.commit()
+            if cursor.rowcount > 0:
+                logger.info(f"Guruh {chat_id} whitelist dan o'chirildi")
+                return True
+            return False
+        except Exception as e:
+            logger.error(f"Guruh {chat_id} ni whitelist dan o'chirishda xatolik: {e}")
+            return False
+
+    def is_group_whitelisted(self, chat_id: int) -> bool:
+        """Проверить находится ли группа в whitelist"""
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute("""
+                SELECT status FROM group_whitelist 
+                WHERE chat_id = %s AND status = 'active'
+            """, (chat_id,))
+            result = cursor.fetchone()
+            return result is not None
+        except Exception as e:
+            logger.error(f"Guruh {chat_id} uchun whitelist ni tekshirishda xatolik: {e}")
+            return False
+
+    def get_whitelisted_groups(self) -> list:
+        """Получить список групп в whitelist"""
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute("""
+                SELECT chat_id, title, added_date, added_by
+                FROM group_whitelist 
+                WHERE status = 'active'
+                ORDER BY added_date DESC
+            """)
+            results = cursor.fetchall()
+            return [
+                {
+                    'chat_id': row[0], 'title': row[1], 
+                    'added_date': row[2], 'added_by': row[3]
+                }
+                for row in results
+            ]
+        except Exception as e:
+            logger.error(f"Whitelist guruhlarini olishda xatolik: {e}")
+            return []
+
+    def get_group_whitelist_data(self, chat_id: int) -> dict:
+        """Получить данные группы из whitelist"""
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute("""
+                SELECT chat_id, title, status, added_date, added_by
+                FROM group_whitelist WHERE chat_id = %s
+            """, (chat_id,))
+            result = cursor.fetchone()
+            if result:
+                return {
+                    'chat_id': result[0], 'title': result[1], 'status': result[2],
+                    'added_date': result[3], 'added_by': result[4]
+                }
+            return None
+        except Exception as e:
+            logger.error(f"Guruh {chat_id} ma'lumotlarini olishda xatolik: {e}")
+            return None
+
+    # === МИГРАЦИЯ ДАННЫХ ===
+    
+    def migrate_existing_groups_to_whitelist(self) -> int:
+        """Мигрировать существующие группы в whitelist"""
+        try:
+            cursor = self.conn.cursor()
+            
+            # Получить все группы с настройками видео
+            cursor.execute("""
+                SELECT DISTINCT chat_id FROM group_video_settings 
+                WHERE subscribed = true
+            """)
+            groups = cursor.fetchall()
+            
+            migrated_count = 0
+            for (chat_id,) in groups:
+                # Добавить в whitelist если еще нет
+                cursor.execute("""
+                    INSERT INTO group_whitelist (chat_id, title, status, added_date, added_by)
+                    VALUES (%s, 'Migrated Group', 'active', CURRENT_TIMESTAMP, 0)
+                    ON CONFLICT (chat_id) DO NOTHING
+                """, (chat_id,))
+                if cursor.rowcount > 0:
+                    migrated_count += 1
+            
+            self.conn.commit()
+            logger.info(f"{migrated_count} ta guruh whitelist ga ko'chirildi")
+            return migrated_count
+            
+        except Exception as e:
+            logger.error(f"Guruhlarni whitelist ga ko'chirishda xatolik: {e}")
+            return 0
+
+    def migrate_existing_users_to_approved(self) -> int:
+        """Мигрировать существующих пользователей как одобренных"""
+        try:
+            cursor = self.conn.cursor()
+            
+            # Получить всех существующих пользователей
+            cursor.execute("SELECT DISTINCT user_id FROM users")
+            users = cursor.fetchall()
+            
+            migrated_count = 0
+            for (user_id,) in users:
+                # Добавить как одобренного если еще нет
+                cursor.execute("""
+                    INSERT INTO user_security (user_id, name, phone, status, reg_date, approved_by)
+                    VALUES (%s, 'Migrated User', 'Unknown', 'approved', CURRENT_TIMESTAMP, 0)
+                    ON CONFLICT (user_id) DO NOTHING
+                """, (user_id,))
+                if cursor.rowcount > 0:
+                    migrated_count += 1
+            
+            self.conn.commit()
+            logger.info(f"{migrated_count} ta foydalanuvchi tasdiqlangan holatga ko'chirildi")
+            return migrated_count
+            
+        except Exception as e:
+            logger.error(f"Foydalanuvchilarni ko'chirishda xatolik: {e}")
+            return 0
+
+    # === СОЗДАНИЕ ТАБЛИЦ БЕЗОПАСНОСТИ ===
+    
+    def create_security_tables(self):
+        """Создать таблицы безопасности если их нет"""
+        try:
+            cursor = self.conn.cursor()
+            
+            # Таблица пользователей безопасности
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS user_security (
+                    id SERIAL PRIMARY KEY,
+                    user_id BIGINT UNIQUE,
+                    name TEXT,
+                    phone TEXT,
+                    status TEXT DEFAULT 'pending',
+                    reg_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    approved_by BIGINT,
+                    approved_date TIMESTAMP
+                );
+            """)
+            
+            # Таблица whitelist групп
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS group_whitelist (
+                    id SERIAL PRIMARY KEY,
+                    chat_id BIGINT UNIQUE,
+                    title TEXT,
+                    status TEXT DEFAULT 'active',
+                    added_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    added_by BIGINT
+                );
+            """)
+            
+            self.conn.commit()
+            logger.info("Xavfsizlik jadvallari yaratildi")
+            
+        except Exception as e:
+            logger.error(f"Xavfsizlik jadvallarini yaratishda xatolik: {e}")
+
+# create_security_tables метод уже определен в классе Database
 
 # Создание экземпляра базы данных
 db = Database()

@@ -118,61 +118,66 @@ try:
 
     # --- Удалён тестовый echo-хендлер, теперь бот реагирует только на команды и нужные сообщения ---
 
+    # @dp.message_handler(CommandStart())
+    # async def bot_start(message: types.Message, state: FSMContext):
+    #     print('bot_start вызван')
+    #     try:
+    #         if is_spam(message.from_user.id):
+    #             logger.warning(f"Обнаружен спам от пользователя {message.from_user.id}")
+    #             return
+
+    #         # Логируем попытку сброса FSM
+    #         if message.from_user.id == SUPER_ADMIN_ID or db.is_admin(message.from_user.id):
+    #             logger.error(f"Попытка сброса FSM: chat_id={message.chat.id}, user_id={message.from_user.id}")
+    #             await state.finish()
+    #             logger.error(f"FSM сброшен: chat_id={message.chat.id}, user_id={message.from_user.id}")
+    #             # Сообщение пользователю не отправляем
+
+    #         # Если команда из группы — не запускать регистрацию, если группа не разрешена
+    #         # if message.chat.type in [types.ChatType.GROUP, types.ChatType.SUPERGROUP]:
+    #         #     if db.is_group_banned(message.chat.id):
+    #         #         return  # Не отвечаем, если группа не разрешена
+    #         #     if not db.user_exists(message.chat.id):
+    #         #         db.add_user(message.chat.id, message.chat.title or "Группа", None, is_group=True, group_id=message.chat.id)
+    #         #     await message.answer("Bot guruhda faollashtirildi! Barcha ishtirokchilar ro‘yxatdan o‘tmasdan funksiyalardan foydalanishlari mumkin.", reply_markup=main_menu_keyboard)
+    #         #     return
+
+    #         # В личке бот работает только для супер-админа и админов
+    #         user_id = message.from_user.id
+    #         if user_id != SUPER_ADMIN_ID and user_id not in ADMINS and not db.is_admin(user_id):
+    #             return  # Не отвечаем обычным пользователям в личке
+
+    #         # В личке — прежняя логика
+    #         if not db.user_exists(message.from_user.id):
+    #             await bot.send_message(
+    #                 message.from_user.id,
+    #                 'Assalomu aleykum, Centris Towers yordamchi botiga hush kelibsiz!'
+    #             )
+    #             await message.answer("Ismingizni kiriting")
+    #             await RegistrationStates.name.set()
+    #         else:
+    #             try:
+    #                 await bot.copy_message(
+    #                     chat_id=message.chat.id,
+    #                     from_chat_id=-1002550852551,
+    #                     message_id=135,
+    #                     caption='',
+    #                     parse_mode="HTML",
+    #                     reply_markup=get_lang_for_button(message),
+    #                     protect_content=True
+    #                 )
+    #             except Exception as e:
+    #                 logger.error(f"Ошибка при отправке видео пользователю {message.from_user.id}: {e}")
+    #                 await message.answer("Video yuborishda xato yuz berdi. Iltimos, keyinroq urinib ko'ring.")
+
+    #     except Exception as e:
+    #         logger.error(f"Ошибка в обработчике /start: {e}")
+    #         await message.answer("Xatolik yuz berdi. Iltimos, keyinroq urinib ko'ring.")
+
     @dp.message_handler(CommandStart())
     async def bot_start(message: types.Message, state: FSMContext):
-        print('bot_start вызван')
-        try:
-            if is_spam(message.from_user.id):
-                logger.warning(f"Обнаружен спам от пользователя {message.from_user.id}")
-                return
-
-            # Логируем попытку сброса FSM
-            if message.from_user.id == SUPER_ADMIN_ID or db.is_admin(message.from_user.id):
-                logger.error(f"Попытка сброса FSM: chat_id={message.chat.id}, user_id={message.from_user.id}")
-                await state.finish()
-                logger.error(f"FSM сброшен: chat_id={message.chat.id}, user_id={message.from_user.id}")
-                # Сообщение пользователю не отправляем
-
-            # Если команда из группы — не запускать регистрацию, если группа не разрешена
-            # if message.chat.type in [types.ChatType.GROUP, types.ChatType.SUPERGROUP]:
-            #     if db.is_group_banned(message.chat.id):
-            #         return  # Не отвечаем, если группа не разрешена
-            #     if not db.user_exists(message.chat.id):
-            #         db.add_user(message.chat.id, message.chat.title or "Группа", None, is_group=True, group_id=message.chat.id)
-            #     await message.answer("Bot guruhda faollashtirildi! Barcha ishtirokchilar ro‘yxatdan o‘tmasdan funksiyalardan foydalanishlari mumkin.", reply_markup=main_menu_keyboard)
-            #     return
-
-            # В личке бот работает только для супер-админа и админов
-            user_id = message.from_user.id
-            if user_id != SUPER_ADMIN_ID and user_id not in ADMINS and not db.is_admin(user_id):
-                return  # Не отвечаем обычным пользователям в личке
-
-            # В личке — прежняя логика
-            if not db.user_exists(message.from_user.id):
-                await bot.send_message(
-                    message.from_user.id,
-                    'Assalomu aleykum, Centris Towers yordamchi botiga hush kelibsiz!'
-                )
-                await message.answer("Ismingizni kiriting")
-                await RegistrationStates.name.set()
-            else:
-                try:
-                    await bot.copy_message(
-                        chat_id=message.chat.id,
-                        from_chat_id=-1002550852551,
-                        message_id=135,
-                        caption='',
-                        parse_mode="HTML",
-                        reply_markup=get_lang_for_button(message),
-                        protect_content=True
-                    )
-                except Exception as e:
-                    logger.error(f"Ошибка при отправке видео пользователю {message.from_user.id}: {e}")
-                    await message.answer("Video yuborishda xato yuz berdi. Iltimos, keyinroq urinib ko'ring.")
-
-        except Exception as e:
-            logger.error(f"Ошибка в обработчике /start: {e}")
-            await message.answer("Xatolik yuz berdi. Iltimos, keyinroq urinib ko'ring.")
+        """Обработчик команды /start отключен - используется security.py"""
+        pass
 
     @dp.message_handler(state=RegistrationStates.name)
     async def register_name_handler(message: types.Message, state: FSMContext):

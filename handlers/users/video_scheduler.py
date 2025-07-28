@@ -81,7 +81,13 @@ def get_videos_for_group(project, season_id):
 
 # --- Новая функция рассылки для групп ---
 async def send_group_video_new(chat_id: int, project: str, season_id: int = None, start_video: int = None):
+    """Отправить новое видео в группу согласно настройкам"""
     try:
+        # ПРОВЕРКА БЕЗОПАСНОСТИ: Группа должна быть в whitelist
+        if not db.is_group_whitelisted(chat_id):
+            logger.warning(f"Guruh {chat_id} whitelist da emas, video yuborilmaydi")
+            return False
+
         # Получаем стартовые значения из базы
         season_db, video_db = db.get_group_video_start(chat_id, project)
         season_id = season_id if season_id is not None else season_db
@@ -174,6 +180,11 @@ async def send_group_video_by_settings(chat_id: int):
     - Если centris_enabled/golden_enabled — отправлять только соответствующие видео
     - Если оба True — отправлять оба потока
     """
+    # ПРОВЕРКА БЕЗОПАСНОСТИ: Группа должна быть в whitelist
+    if not db.is_group_whitelisted(chat_id):
+        logger.warning(f"Guruh {chat_id} whitelist da emas, rассылка o'tkazib yuboriladi")
+        return
+        
     settings = db.get_group_video_settings(chat_id)
     if not settings or (not settings[0] and not settings[2]):
         logger.info(f"Группа {chat_id} не настроена для рассылки видео")

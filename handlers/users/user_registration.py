@@ -33,33 +33,10 @@ try:
         return caption
 
 
-    @dp.message_handler(CommandStart())
-    async def bot_start(message: types.Message):
-        if not db.user_exists(message.from_user.id):
-            # Приветственное сообщение только на узбекском
-            await bot.send_message(
-                message.from_user.id,
-                'Assalomu aleykum, Centris Towers yordamchi botiga hush kelibsiz!'
-            )
-            # Запрашиваем имя без выбора языка
-            await message.answer("Ismingizni kiriting")
-            await RegistrationStates.name.set()
-        else:
-            try:
-                caption = get_video_caption()
-                video_path = 'Centris.mp4'
-                with open(video_path, 'rb') as video:
-                    await bot.send_video(
-                        chat_id=message.chat.id,
-                        video=video,
-                        caption=caption,
-                        parse_mode="HTML",
-                        supports_streaming=True,
-                        reply_markup=get_lang_for_button(message),
-                        protect_content=True
-                    )
-            except Exception as e:
-                logger.error(f"Ошибка при отправке видео: {e}")
+    # @dp.message_handler(CommandStart())
+    # async def bot_start(message: types.Message):
+    #     """Обработчик команды /start отключен - используется security.py"""
+    #     pass
 
 
     @dp.message_handler(state=RegistrationStates.name)

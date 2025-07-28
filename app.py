@@ -11,7 +11,7 @@ import logging
 
 # Настройка логирования
 logging.basicConfig(
-    level=logging.ERROR,
+    level=logging.ERROR,  # Вернул обратно ERROR после диагностики
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     filename='bot.log'
 )
@@ -22,45 +22,15 @@ db.create_tables()  # Автоматически создать все табл�
 print("dp в app.py:", id(dp))
 
 async def on_startup(dispatcher):
-    # Уведомляет про запуск
-    await on_startup_notify(dispatcher)
+    # Установить команды бота
     await set_default_commands(dispatcher)
 
-    # Запускаем планировщик (video_scheduler() удалён)
+    # Уведомить админов
+    await on_startup_notify(dispatcher)
 
-    # Устанавливаем команды бота
-    try:
-        await set_default_commands(dispatcher)
-        logger.info("Команды бота успешно установлены")
-    except Exception as e:
-        logger.error(f"Ошибка при установке команд: {e}")
+    # Инициализировать middleware
+    middlewares.setup(dp)
 
-    # Уведомляем администраторов
-    try:
-        await on_startup_notify(dispatcher)
-        logger.info("Администраторы успешно уведомлены")
-    except Exception as e:
-        logger.error(f"Ошибка при уведомлении администраторов: {e}")
-
-    # Инициализируем планировщик
-    try:
-        logger.info("Начало инициализации планировщика")
-        await init_scheduler()
-        logger.info("Планировщик успешно инициализирован")
-        
-        # Проверяем, запущен ли планировщик
-        if scheduler.running:
-            logger.info("Планировщик запущен")
-            # Получаем список всех задач
-            jobs = scheduler.get_jobs()
-            logger.info(f"Количество активных задач: {len(jobs)}")
-            for job in jobs:
-                logger.info(f"Задача: {job.id}, следующее выполнение: {job.next_run_time}")
-        else:
-            logger.error("Планировщик не запущен!")
-            
-    except Exception as e:
-        logger.error(f"Ошибка при инициализации планировщика: {e}")
 
 async def on_shutdown(dispatcher):
     try:
