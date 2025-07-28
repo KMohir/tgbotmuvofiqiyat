@@ -241,7 +241,7 @@ class Database:
             cursor.execute('''
                 SELECT centris_enabled, centris_season, centris_start_video, golden_enabled, golden_start_video
                 FROM group_video_settings WHERE chat_id = %s
-            ''', (chat_id,))
+            ''', (str(chat_id),))
             result = cursor.fetchone()
             cursor.close()
             return tuple(result) if result else None
@@ -287,7 +287,7 @@ class Database:
     def get_group_viewed_videos(self, chat_id):
         try:
             cursor = self.conn.cursor()
-            cursor.execute("SELECT viewed_videos FROM group_video_settings WHERE chat_id = %s", (chat_id,))
+            cursor.execute("SELECT viewed_videos FROM group_video_settings WHERE chat_id = %s", (str(chat_id),))
             result = cursor.fetchone()
             cursor.close()
             if result and result[0]:
@@ -305,7 +305,7 @@ class Database:
                 cursor = self.conn.cursor()
                 cursor.execute(
                     "UPDATE group_video_settings SET viewed_videos = %s WHERE chat_id = %s",
-                    (json.dumps(viewed_videos), chat_id)
+                    (json.dumps(viewed_videos), str(chat_id))
                 )
                 self.conn.commit()
                 cursor.close()
@@ -329,7 +329,7 @@ class Database:
             cursor = self.conn.cursor()
             cursor.execute(
                 "UPDATE group_video_settings SET viewed_videos = %s WHERE chat_id = %s",
-                (json.dumps(viewed_videos), chat_id)
+                (json.dumps(viewed_videos), str(chat_id))
             )
             self.conn.commit()
             cursor.close()
@@ -342,7 +342,7 @@ class Database:
             cursor = self.conn.cursor()
             cursor.execute(
                 "UPDATE group_video_settings SET viewed_videos = %s WHERE chat_id = %s",
-                (json.dumps([]), chat_id)
+                (json.dumps([]), str(chat_id))
             )
             self.conn.commit()
             cursor.close()
@@ -357,11 +357,11 @@ class Database:
             if project == 'centris':
                 cursor.execute('''
                     UPDATE group_video_settings SET centris_start_season_id = %s, centris_start_video = %s WHERE chat_id = %s
-                ''', (season_id, video_index, chat_id))
+                ''', (season_id, video_index, str(chat_id)))
             elif project == 'golden':
                 cursor.execute('''
                     UPDATE group_video_settings SET golden_start_season_id = %s, golden_start_video = %s WHERE chat_id = %s
-                ''', (season_id, video_index, chat_id))
+                ''', (season_id, video_index, str(chat_id)))
             self.conn.commit()
             cursor.close()
         except Exception as e:
@@ -374,11 +374,11 @@ class Database:
             if project == 'centris':
                 cursor.execute('''
                     SELECT centris_start_season_id, centris_start_video FROM group_video_settings WHERE chat_id = %s
-                ''', (chat_id,))
+                ''', (str(chat_id),))
             elif project == 'golden':
                 cursor.execute('''
                     SELECT golden_start_season_id, golden_start_video FROM group_video_settings WHERE chat_id = %s
-                ''', (chat_id,))
+                ''', (str(chat_id),))
             result = cursor.fetchone()
             cursor.close()
             return tuple(result) if result else (None, 0)
@@ -391,7 +391,7 @@ class Database:
             cursor = self.conn.cursor()
             cursor.execute(
                 'UPDATE group_video_settings SET is_subscribed = %s WHERE chat_id = %s',
-                (1 if status else 0, chat_id)
+                (1 if status else 0, str(chat_id))
             )
             self.conn.commit()
             cursor.close()
@@ -404,7 +404,7 @@ class Database:
             cursor = self.conn.cursor()
             cursor.execute(
                 'SELECT is_subscribed FROM group_video_settings WHERE chat_id = %s',
-                (chat_id,)
+                (str(chat_id),)
             )
             result = cursor.fetchone()
             cursor.close()

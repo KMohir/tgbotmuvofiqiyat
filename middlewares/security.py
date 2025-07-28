@@ -38,6 +38,10 @@ class VideoSecurityMiddleware(BaseMiddleware):
 
     async def check_private_chat_access(self, message: types.Message, user_id: int):
         """Проверка доступа в приватном чате"""
+        # Супер-админы имеют полный доступ без проверки статуса
+        if self.is_super_admin(user_id):
+            return
+            
         # Разрешить команду /start для незарегистрированных
         if message.text and message.text.startswith('/start'):
             return
