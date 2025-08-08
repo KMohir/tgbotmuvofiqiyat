@@ -96,7 +96,7 @@ def get_lesson_keyboard():
 
     return markup
 
-@dp.message_handler(commands=["start", "start@CentrisTowersbot"], chat_type=[types.ChatType.GROUP, types.ChatType.SUPERGROUP, types.ChatType.PRIVATE])
+@dp.message_handler(commands=["start", "start@CentrisTowersbot"], chat_type=[types.ChatType.GROUP, types.ChatType.SUPERGROUP])
 async def cmd_start(message: types.Message, state: FSMContext):
     user_id = message.from_user.id
     # Добавляем пользователя в базу данных, если его нет

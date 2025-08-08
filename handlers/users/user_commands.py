@@ -130,46 +130,47 @@ try:
         await message.reply(text)
 
 
-    @dp.message_handler(commands=['set_group_video'])
-    async def set_group_video_command(message: types.Message, state: FSMContext):
-        args = message.get_args().split()
-        if not args:
-            # Запустить мастер с клавиатурой выбора проекта
-            from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-            from handlers.users.admin_image_sender import GroupVideoStates
-            kb = InlineKeyboardMarkup(row_width=2)
-            kb.add(
-                InlineKeyboardButton("Centris Towers", callback_data="project_centr"),
-                InlineKeyboardButton("Golden Lake", callback_data="project_golden"),
-                InlineKeyboardButton("Оба", callback_data="project_both")
-            )
-            await message.answer("Выберите проект для группы:", reply_markup=kb)
-            await state.set_state(GroupVideoStates.waiting_for_project.state)
-            await state.update_data(chat_id=message.chat.id)
-            return
-        if len(args) != 2 or args[0] not in ['centris', 'golden'] or not args[1].isdigit():
-            await message.reply("Используйте: /set_group_video centris [номер_сезона] или /set_group_video golden [номер_сезона]")
-            return
-        project, season_number = args[0], args[1]
-        if project == 'centris':
-            db.set_group_video_settings(
-                message.chat.id,
-                centris_enabled=True,
-                centris_season=season_number,
-                centris_start_video=0,
-                golden_enabled=False,
-                golden_start_video=0
-            )
-            await message.reply(f"В группе включена рассылка Centris Towers, сезон №{season_number}")
-        else:
-            db.set_group_video_settings(
-                message.chat.id,
-                centris_enabled=False,
-                centris_season=None,
-                golden_enabled=True,
-                golden_season=season_number
-            )
-            await message.reply(f"В группе включена рассылка Golden Lake, сезон №{season_number}")
+    # Закомментировано - используется обработчик из admin_image_sender.py
+    # @dp.message_handler(commands=['set_group_video'])
+    # async def set_group_video_command(message: types.Message, state: FSMContext):
+    #     args = message.get_args().split()
+    #     if not args:
+    #         # Запустить мастер с клавиатурой выбора проекта
+    #         from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+    #         from handlers.users.admin_image_sender import GroupVideoStates
+    #         kb = InlineKeyboardMarkup(row_width=2)
+    #         kb.add(
+    #             InlineKeyboardButton("Centris Towers", callback_data="project_centr"),
+    #             InlineKeyboardButton("Golden Lake", callback_data="project_golden"),
+    #             InlineKeyboardButton("Оба", callback_data="project_both")
+    #         )
+    #         await message.answer("Выберите проект для группы:", reply_markup=kb)
+    #         await state.set_state(GroupVideoStates.waiting_for_project.state)
+    #         await state.update_data(chat_id=message.chat.id)
+    #         return
+    #     if len(args) != 2 or args[0] not in ['centris', 'golden'] or not args[1].isdigit():
+    #         await message.reply("Используйте: /set_group_video centris [номер_сезона] или /set_group_video golden [номер_сезона]")
+    #         return
+    #     project, season_number = args[0], args[1]
+    #     if project == 'centris':
+    #         db.set_group_video_settings(
+    #             message.chat.id,
+    #             centris_enabled=True,
+    #             centris_season=season_number,
+    #             centris_start_video=0,
+    #             golden_enabled=False,
+    #             golden_start_video=0
+    #         )
+    #         await message.reply(f"В группе включена рассылка Centris Towers, сезон №{season_number}")
+    #     else:
+    #         db.set_group_video_settings(
+    #             message.chat.id,
+    #             centris_enabled=False,
+    #             centris_season=None,
+    #             golden_enabled=True,
+    #             golden_season=season_number
+    #         )
+    #         await message.reply(f"В группе включена рассылка Golden Lake, сезон №{season_number}")
 
     @dp.message_handler(commands=['disable_group_video'])
     async def disable_group_video_command(message: types.Message):

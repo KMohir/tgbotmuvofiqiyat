@@ -74,14 +74,36 @@ try:
         )
         await state.set_state("waiting_for_video_number")
 
-    @dp.message_handler(Command('set_group_video'), user_id=ADMINS + [SUPER_ADMIN_ID])
+    @dp.message_handler(Command('set_group_video'), chat_type=[types.ChatType.GROUP, types.ChatType.SUPERGROUP])
     async def set_group_video_command(message: types.Message, state: FSMContext):
-        if message.chat.type not in [types.ChatType.GROUP, types.ChatType.SUPERGROUP]:
-            await message.answer("Bu buyruq faqat guruhlarda ishlaydi.")
+        """
+        Команда для настройки видео рассылки в группе.
+        Позволяет выбрать проект (Centris Towers, Golden Lake или оба) и сезон для каждого проекта.
+        Работает только в группах и только для админов.
+        """
+        # Проверяем права пользователя
+        user_id = message.from_user.id
+        if user_id not in ADMINS + [SUPER_ADMIN_ID] and not db.is_admin(user_id):
+            await message.answer("❌ Sizda bu buyruqni bajarish uchun ruxsat yo'q.\nFaqat adminlar foydalana oladi.")
             return
-        await message.answer("Группа учун проектни танланг:", reply_markup=get_project_keyboard())
+            
+        # Команда работает только в группах
+        if message.chat.type not in [types.ChatType.GROUP, types.ChatType.SUPERGROUP]:
+            await message.answer("⚠️ Bu buyruq faqat guruhlarda ishlaydi.")
+            return
+            
+        await message.answer("📹 **Guruh uchun video tarqatish sozlamalari**\n\nGuruh uchun loyihani tanlang:", 
+                           reply_markup=get_project_keyboard(),
+                           parse_mode="Markdown")
         await state.set_state(GroupVideoStates.waiting_for_project.state)
         await state.update_data(chat_id=message.chat.id)
+
+    # ТЕСТОВЫЙ ОБРАБОТЧИК ДЛЯ ПРОВЕРКИ
+    @dp.message_handler(commands=['test_command'], chat_type=[types.ChatType.GROUP, types.ChatType.SUPERGROUP])
+    async def test_command_handler(message: types.Message):
+        """Тестовый обработчик для проверки работы команд в группах"""
+        await message.answer("✅ Тестовая команда работает! Бот получает сообщения в группе.")
+        print(f"Тестовая команда получена от {message.from_user.id} в группе {message.chat.id}")
 
     @dp.callback_query_handler(lambda c: c.data.startswith("project_"), state=GroupVideoStates.waiting_for_project.state)
     async def process_project_selection(callback_query: types.CallbackQuery, state: FSMContext):

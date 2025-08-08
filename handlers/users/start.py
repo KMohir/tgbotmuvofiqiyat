@@ -78,7 +78,15 @@ try:
     #     logging.warning(f"PRIVATE CALLBACK BLOCKED: user_id={user_id}")
     #     raise CancelHandler()
 
-    @dp.message_handler(lambda m: m.text and m.text.startswith('/') and not db.is_superadmin(m.from_user.id), chat_type=types.ChatType.PRIVATE)
+    @dp.message_handler(
+        lambda m: (
+            m.text
+            and m.text.startswith('/')
+            and (m.text.split()[0] not in ['/start', '/help'])
+            and not db.is_superadmin(m.from_user.id)
+        ),
+        chat_type=types.ChatType.PRIVATE
+    )
     async def block_private_commands_for_non_superadmin(message: types.Message):
         await message.reply("Вам недоступны команды. Только супер-админ может использовать команды в личке.")
         raise CancelHandler()
@@ -174,10 +182,10 @@ try:
     #         logger.error(f"Ошибка в обработчике /start: {e}")
     #         await message.answer("Xatolik yuz berdi. Iltimos, keyinroq urinib ko'ring.")
 
-    @dp.message_handler(CommandStart())
+    @dp.message_handler(CommandStart(), chat_type=[types.ChatType.GROUP, types.ChatType.SUPERGROUP])
     async def bot_start(message: types.Message, state: FSMContext):
-        """Обработчик команды /start отключен - используется security.py"""
-        pass
+        """В группах этот хендлер ничего не делает; в личке обработку ведёт security.py"""
+        return
 
     @dp.message_handler(state=RegistrationStates.name)
     async def register_name_handler(message: types.Message, state: FSMContext):

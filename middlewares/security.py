@@ -24,6 +24,16 @@ class VideoSecurityMiddleware(BaseMiddleware):
         chat_id = message.chat.id
         chat_type = message.chat.type
 
+        # Если есть активное состояние FSM — ничего не блокируем
+        try:
+            state = data.get('state')
+            if state is not None:
+                current_state = await state.get_state()
+                if current_state:
+                    return
+        except Exception:
+            pass
+
         # Супер-админы имеют полный доступ
         if self.is_super_admin(user_id):
             return
@@ -42,8 +52,8 @@ class VideoSecurityMiddleware(BaseMiddleware):
         if self.is_super_admin(user_id):
             return
             
-        # Разрешить команду /start для незарегистрированных
-        if message.text and message.text.startswith('/start'):
+        # Разрешить /start и /help для незарегистрированных
+        if message.text and (message.text.startswith('/start') or message.text.startswith('/help')):
             return
             
         status = db.get_user_security_status(user_id)
@@ -81,8 +91,19 @@ class VideoSecurityMiddleware(BaseMiddleware):
 
     async def check_group_access(self, message: types.Message, chat_id: int):
         """Проверка доступа в группе"""
+        # Добавляем отладочную информацию
+        logger.info(f"Проверка доступа группы {chat_id}, команда: {message.text}")
+        
+        # ВРЕМЕННО: Пропускаем все команды для тестирования
+        if message.text and message.text.startswith('/'):
+            logger.info(f"Пропускаем команду: {message.text}")
+            return
+        
         # Проверить находится ли группа в whitelist
-        if not db.is_group_whitelisted(chat_id):
+        is_whitelisted = db.is_group_whitelisted(chat_id)
+        logger.info(f"Группа {chat_id} в whitelist: {is_whitelisted}")
+        
+        if not is_whitelisted:
             # Группа не в whitelist - покинуть группу
             try:
                 await message.bot.send_message(
