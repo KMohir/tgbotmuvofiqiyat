@@ -175,9 +175,49 @@ try:
     #         await message.answer("Xatolik yuz berdi. Iltimos, keyinroq urinib ko'ring.")
 
     @dp.message_handler(CommandStart())
-    async def bot_start(message: types.Message, state: FSMContext):
-        """Обработчик команды /start отключен - используется security.py"""
-        pass
+    async def bot_start(message: types.Message):
+        try:
+            if is_spam(message.from_user.id):
+                logger.warning(f"Обнаружен спам от пользователя {message.from_user.id}")
+                return
+
+            user_id = message.from_user.id
+            
+            # Проверяем, не находится ли пользователь уже в процессе регистрации
+            current_state = dp.current_state(user=user_id, chat=message.chat.id)
+            if current_state:
+                current_state_data = await current_state.get_state()
+                if current_state_data and current_state_data.startswith('RegistrationStates:'):
+                    await message.answer("⏳ **Siz allaqachon ro'yxatdan o'tish jarayonida!**\n\nIltimos, avvalgi xabarni to'ldiring.")
+                    return
+
+            if not db.user_exists(user_id):
+                logger.info(f"Foydalanuvchi {user_id} ro'yxatdan o'tishni boshladi")
+                await bot.send_message(
+                    message.from_user.id,
+                    'Assalomu aleykum, Centris Towers yordamchi botiga hush kelibsiz!'
+                )
+                await message.answer("Ismingizni kiriting")
+                await RegistrationStates.name.set()
+            else:
+                logger.info(f"Foydalanuvchi {user_id} allaqachon ro'yxatdan o'tgan")
+                try:
+                    await bot.copy_message(
+                        chat_id=message.chat.id,
+                        from_chat_id=-1002550852551,
+                        message_id=135,
+                        caption='',
+                        parse_mode="HTML",
+                        reply_markup=get_lang_for_button(message),
+                        protect_content=True
+                    )
+                except Exception as e:
+                    logger.error(f"Ошибка при отправке видео пользователю {message.from_user.id}: {e}")
+                    await message.answer("Video yuborishda xato yuz berdi. Iltimos, keyinroq urinib ko'ring.")
+
+        except Exception as e:
+            logger.error(f"Ошибка в обработчике /start: {e}")
+            await message.answer("Xatolik yuz berdi. Iltimos, keyinroq urinib ko'ring.")
 
     @dp.message_handler(state=RegistrationStates.name)
     async def register_name_handler(message: types.Message, state: FSMContext):
@@ -185,10 +225,28 @@ try:
             if is_spam(message.from_user.id):
                 return
 
-            name = message.text
+            user_id = message.from_user.id
+            
+            # Дополнительная проверка - не зарегистрирован ли уже пользователь
+            if db.user_exists(user_id):
+                logger.warning(f"Foydalanuvchi {user_id} allaqachon ro'yxatdan o'tgan, lekin name state da")
+                await message.answer("❌ **Siz allaqachon ro'yxatdan o'tgansiz!**")
+                await state.finish()
+                return
+
+            name = message.text.strip()
+            if len(name) < 2:
+                await message.answer("❌ **Ism juda qisqa**\n\nIltimos, kamida 2 ta belgi kiriting:")
+                return
+                
+            if len(name) > 100:
+                await message.answer("❌ **Ism juda uzun**\n\nIltimos, 100 belgidan kam bo'lgan ism kiriting:")
+                return
+
             async with state.proxy() as data:
                 data['name'] = name
 
+            logger.info(f"Foydalanuvchi {user_id} ismini kiritdi: {name}")
             await message.answer("Telefon raqamingizni kiriting", reply_markup=key())
             await RegistrationStates.phone.set()
         except Exception as e:
@@ -202,8 +260,18 @@ try:
             if is_spam(message.from_user.id):
                 return
 
-            contact = message.text
+            user_id = message.from_user.id
+            
+            # Дополнительная проверка - не зарегистрирован ли уже пользователь
+            if db.user_exists(user_id):
+                logger.warning(f"Foydalanuvchi {user_id} allaqachon ro'yxatdan o'tgan, lekin phone state da")
+                await message.answer("❌ **Siz allaqachon ro'yxatdan o'tgansiz!**")
+                await state.finish()
+                return
+
+            contact = message.text.strip()
             if contact.startswith('+998') and len(contact) == 13:
+                logger.info(f"Foydalanuvchi {user_id} telefon raqamini kiritdi: {contact}")
                 await save_user_data(message, state, contact)
             else:
                 await message.answer(
@@ -222,7 +290,17 @@ try:
             if is_spam(message.from_user.id):
                 return
 
+            user_id = message.from_user.id
+            
+            # Дополнительная проверка - не зарегистрирован ли уже пользователь
+            if db.user_exists(user_id):
+                logger.warning(f"Foydalanuvchi {user_id} allaqachon ro'yxatdan o'tgan, lekin phone contact state da")
+                await message.answer("❌ **Siz allaqachon ro'yxatdan o'tgansiz!**")
+                await state.finish()
+                return
+
             contact = message.contact.phone_number
+            logger.info(f"Foydalanuvchi {user_id} kontakt orqali telefon raqamini yubordi: {contact}")
             await save_user_data(message, state, contact)  # Сохраняем пользователя сразу
             await message.answer("Ro'yxatdan muvaffaqiyatli o'tdingiz!")
         except Exception as e:
@@ -232,36 +310,49 @@ try:
 
     async def save_user_data(message: Message, state: FSMContext, contact: str):
         try:
+            user_id = message.from_user.id
+            
+            # Финальная проверка - не зарегистрирован ли уже пользователь
+            if db.user_exists(user_id):
+                logger.warning(f"Foydalanuvchi {user_id} allaqachon ro'yxatdan o'tgan, save_user_data da")
+                await message.answer("❌ **Siz allaqachon ro'yxatdan o'tgansiz!**")
+                await state.finish()
+                return
+
             async with state.proxy() as data:
                 name = data.get('name')
-                if message.chat.type in [types.ChatType.GROUP, types.ChatType.SUPERGROUP]:
-                    db.add_user(message.from_user.id, name, contact, group_id=message.chat.id)
-                else:
-                    db.add_user(message.from_user.id, name, contact)
-                db.update(message.from_user.id, name, contact)    # Затем обновляем данные
-                caption = get_video_caption()
-                try:
+                
+            logger.info(f"Foydalanuvchi {user_id} ro'yxatdan o'tishni yakunladi: {name}, {contact}")
+            
+            # Сначала добавляем пользователя
+            success = db.add_user(user_id, name, contact)
+            if not success:
+                logger.warning(f"Foydalanuvchi {user_id} ni qo'shishda xatolik yoki allaqachon mavjud")
+                await message.answer("❌ **Xatolik yuz berdi yoki siz allaqachon ro'yxatdan o'tgansiz!**")
+                await state.finish()
+                return
+            
+            # Затем обновляем данные (если нужно)
+            db.update(user_id, name, contact)
+            
+            caption = get_video_caption()
+            try:
+                await bot.copy_message(
+                    chat_id=message.chat.id,
+                    from_chat_id=-1002550852551,
+                    message_id=135,
+                    caption='',
+                    parse_mode="HTML",
+                    reply_markup=get_lang_for_button(message),
+                    protect_content=True
+                )
+                logger.info(f"Foydalanuvchi {user_id} ga video yuborildi")
+            except Exception as e:
+                logger.error(f"Ошибка при отправке видео после регистрации {user_id}: {e}")
+                await message.answer("Video yuborishda xato yuz berdi. Iltimos, keyinroq urinib ko'ring.")
 
-                    await bot.copy_message(
-                        chat_id=message.chat.id,
-                        from_chat_id=-1002550852551,
-                        message_id=135,
-                        caption='',
-                        parse_mode="HTML",
-                        reply_markup=get_lang_for_button(message),
-                        protect_content=True
-                    )
-                except Exception as e:
-                    logger.error(f"Ошибка при отправке видео после регистрации {message.from_user.id}: {e}")
-                    await message.answer("Video yuborishda xato yuz berdi. Iltimos, keyinroq urinib ko'ring.")
-
-                try:
-                    print(1)
-                except Exception as e:
-                    logger.error(f"Ошибка при отправке видео пользователю {message.from_user.id}: {e}")
-                    await message.answer("Video yuborishda xato yuz berdi. Iltimos, keyinroq urinib ko'ring.")
         except Exception as e:
-            logger.error(f"Ошибка при сохранении данных пользователя {message.from_user.id}: {e}")
+            logger.error(f"Ошибка при сохранении данных пользователя {user_id}: {e}")
             await message.answer("Xatolik yuz berdi. Iltimos, qaytadan urinib ko'ring.")
         finally:
             await state.finish()
