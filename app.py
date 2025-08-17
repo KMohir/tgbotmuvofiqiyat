@@ -4,6 +4,8 @@ import middlewares, filters, handlers
 from utils.misc.set_bot_commands import set_default_commands
 from utils.notify_admins import on_startup_notify
 from handlers.users import admin_image_sender
+# Явно импортируем обработчики команд
+from handlers.users.admin_image_sender import set_group_video_command
 from handlers.users.video_scheduler import scheduler, init_scheduler
 from db import db
 import asyncio
