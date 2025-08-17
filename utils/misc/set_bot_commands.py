@@ -8,4 +8,5 @@ async def set_default_commands(dp):
         types.BotCommand("centris_towers", "Centris Towers videolar ni korish"),
         types.BotCommand("golden_lake","Golden lake videolarini korish"),
         types.BotCommand("about",'Bino bilan tanishish'),
+        types.BotCommand("set_group_video", "Guruh uchun video tarqatish sozlamalari"),
     ])
