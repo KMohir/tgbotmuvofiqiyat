@@ -282,6 +282,9 @@ user_id BIGINT PRIMARY KEY
 | `/edit_season` | Admin+ | Mavsumni tahrirlash |
 | `/delete_season <ID>` | Admin+ | Mavsumni o'chirish |
 | `/season_help` | Admin+ | Mavsum boshqaruv yordam |
+| `/refresh_seasons` | Admin+ | Klaviaturalar keshini tozalash |
+| `/force_refresh_seasons` | Admin+ | Klaviaturalarni majburiy yangilash |
+| `/cache_status` | Admin+ | Kesh holatini ko'rsatish |
 
 ---
 
@@ -354,6 +357,12 @@ user_id BIGINT PRIMARY KEY
 - **Admin panel** — sozlamalarni boshqarish
 - **Inline klaviaturalar** — guruhlarni sozlash uchun
 
+### 🔄 **Avtomatik yangilanish:**
+- **Mavsum klaviaturalari** — avtomatik yangilanadi yangi mavsum qo'shilganda
+- **Kesh tizimi** — 5 daqiqa davomida klaviaturalarni saqlaydi
+- **Real-time yangilanish** — foydalanuvchilar yangi mavsumlarni darhol ko'radi
+- **Kesh tozalash** — `/add_season` buyrug'i bilan avtomatik
+
 ### 🔧 **FSM (Holatlar mashinasi):**
 - **Foydalanuvchilarni ro'yxatdan o'tkazish** — bosqichma-bosqich jarayon
 - **Guruhlarni sozlash** — interaktiv master
@@ -410,6 +419,12 @@ tgbotmuvofiqiyat_old/
 # Sozlamalar sinovi
 /group_settings               # Guruh sozlamalarini ko'rsatish
 /set_group_video              # Sozlash masterini ishga tushirish
+
+# Mavsum boshqaruvi sinovi
+/add_season                   # Yangi mavsum qo'shish
+/list_seasons                 # Mavsumlarni ko'rsatish
+/refresh_seasons              # Klaviaturalar keshini tozalash
+/cache_status                 # Kesh holatini tekshirish
 ```
 
 ### 📊 **Jurnallashtirish:**
@@ -608,18 +623,3 @@ Loyiha ta'lim maqsadlari va Centris Towers hamda Golden Lake loyihalari bo'yicha
   ```
   /send_test_video
   ```
-
-### 7. Foydali buyruqlar ro'yxati
-- `/group_subscribe` — guruhni obunaga ulash
-- `/group_unsubscribe` — guruhni obunadan chiqarish
-- `/set_centr_season <id>` — Centris Towers uchun mavsum ID
-- `/set_golden_season <id>` — Golden Lake uchun mavsum ID
-- `/group_settings` — guruh sozlamalarini ko'rish
-- `/send_test_video` — test video yuborish
-- `/reset_progress` — jarayonni tiklash
-
----
-
-**🎉 Bot to'liq foydalanish uchun tayyor!**
-
-*Batafsil ma'lumot olish uchun bot buyruqlaridan foydalaning yoki administratorlarga murojaat qiling.*

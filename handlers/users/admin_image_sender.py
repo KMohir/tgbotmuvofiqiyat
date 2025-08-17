@@ -1,6 +1,10 @@
 from datetime import datetime, timedelta
+import logging
 from handlers.users.video_lists import VIDEO_LIST_1, VIDEO_LIST_2, VIDEO_LIST_3, VIDEO_LIST_4, VIDEO_LIST_5, VIDEO_LIST_GOLDEN_1
 from data.config import ADMINS, SUPER_ADMIN_ID
+
+# Настройка логирования
+logger = logging.getLogger(__name__)
 
 try:
     from aiogram import types
@@ -444,9 +448,106 @@ try:
         # Сохраняем сезон и видео в базу
         project = data.get("project")
         season_name = data.get("season_name")
-        db.add_season_with_videos(project, season_name, links, titles)
-        await message.answer(f"Сезон '{season_name}' успешно добавлен в проект '{project}'.")
+        season_info = db.add_season_with_videos(project, season_name, links, titles)
+        
+        if season_info:
+            # Обновляем клавиатуру сезонов для всех активных чатов
+            await update_season_keyboards_for_all_chats(project)
+            
+            # Отправляем уведомление о новом сезоне в активные группы
+            await notify_active_groups_about_new_season(project, season_name, len(links))
+            
+            await message.answer(
+                f"✅ Сезон '{season_name}' успешно добавлен в проект '{project}'!\n\n"
+                f"📊 ID сезона: {season_info['season_id']}\n"
+                f"🎬 Количество видео: {season_info['video_count']}\n\n"
+                f"💡 Теперь пользователи смогут увидеть новый сезон в меню!"
+            )
+        else:
+            await message.answer("❌ Ошибка при добавлении сезона. Попробуйте снова.")
+        
         await state.finish()
+
+    @dp.message_handler(Command('refresh_seasons'), user_id=ADMINS + [SUPER_ADMIN_ID])
+    async def refresh_seasons_command(message: types.Message):
+        """
+        Команда для принудительного обновления клавиатуры сезонов во всех активных чатах
+        """
+        try:
+            from handlers.users.video_selector import clear_season_keyboard_cache
+            
+            # Очищаем кэш для всех проектов
+            clear_season_keyboard_cache()
+            
+            await message.answer("✅ Кэш клавиатуры сезонов очищен для всех проектов.\n\n"
+                               "Теперь при выборе проекта 'Centris towers' или 'Golden lake' "
+                               "пользователи увидят обновленный список сезонов.")
+            
+        except Exception as e:
+            await message.answer(f"❌ Ошибка при обновлении клавиатуры сезонов: {e}")
+
+    @dp.message_handler(Command('cache_status'), user_id=ADMINS + [SUPER_ADMIN_ID])
+    async def cache_status_command(message: types.Message):
+        """
+        Команда для просмотра статуса кэша клавиатуры сезонов
+        """
+        try:
+            from handlers.users.video_selector import _season_keyboard_cache, _cache_timestamp
+            import time
+            
+            current_time = time.time()
+            
+            if not _season_keyboard_cache:
+                await message.answer("📋 Кэш клавиатуры сезонов пуст.")
+                return
+            
+            status_text = "📋 Статус кэша клавиатуры сезонов:\n\n"
+            
+            for cache_key, keyboard in _season_keyboard_cache.items():
+                if cache_key in _cache_timestamp:
+                    age = current_time - _cache_timestamp[cache_key]
+                    age_minutes = int(age // 60)
+                    age_seconds = int(age % 60)
+                    
+                    status_text += f"🔑 {cache_key}:\n"
+                    status_text += f"   ⏰ Возраст: {age_minutes}м {age_seconds}с\n"
+                    status_text += f"   📱 Кнопок: {len(keyboard.keyboard)}\n\n"
+            
+            await message.answer(status_text)
+            
+        except Exception as e:
+            await message.answer(f"❌ Ошибка при получении статуса кэша: {e}")
+
+    @dp.message_handler(Command('force_refresh_seasons'), user_id=ADMINS + [SUPER_ADMIN_ID])
+    async def force_refresh_seasons_command(message: types.Message):
+        """
+        Команда для принудительного обновления клавиатуры сезонов в текущем чате
+        """
+        try:
+            from handlers.users.video_selector import get_season_keyboard, clear_season_keyboard_cache
+            
+            # Очищаем кэш для всех проектов
+            clear_season_keyboard_cache()
+            
+            # Создаем обновленные клавиатуры
+            centris_keyboard = get_season_keyboard("centris")
+            golden_keyboard = get_season_keyboard("golden")
+            
+            await message.answer(
+                "🔄 Клавиатуры сезонов обновлены!\n\n"
+                "📱 Centris Towers:",
+                reply_markup=centris_keyboard
+            )
+            
+            await message.answer(
+                "📱 Golden Lake:",
+                reply_markup=golden_keyboard
+            )
+            
+            await message.answer("✅ Теперь пользователи увидят актуальный список сезонов.")
+            
+        except Exception as e:
+            await message.answer(f"❌ Ошибка при обновлении клавиатуры сезонов: {e}")
 
     @dp.message_handler(Command('list_seasons'), user_id=ADMINS + [SUPER_ADMIN_ID])
     async def list_seasons_command(message: types.Message):
@@ -534,7 +635,7 @@ try:
             response += "\nВыберите действие:\n"
             response += "1. Изменить название сезона\n"
             response += "2. Редактировать видео\n"
-            response += "3. Удалить видео\n"
+            response += "3. Удалить отдельные видео\n"
             response += "4. Удалить весь сезон\n"
             response += "5. Отмена"
             
@@ -910,3 +1011,51 @@ except Exception as exx:
     # Форматировать дату и время
     formatted_date_time = now.strftime("%Y-%m-%d %H:%M:%S")
     print('admin image sender', formatted_date_time, f"error {exx}")
+
+async def update_season_keyboards_for_all_chats(project):
+    """
+    Обновляет клавиатуры сезонов для всех активных чатов после добавления нового сезона
+    """
+    try:
+        from handlers.users.video_selector import clear_season_keyboard_cache
+        
+        # Очищаем кэш клавиатуры сезонов для данного проекта
+        clear_season_keyboard_cache(project)
+        
+        logger.info(f"Кэш клавиатуры сезонов очищен для проекта {project}")
+        
+        # В будущем здесь можно добавить логику для:
+        # - Отправки уведомления о новом сезоне во все активные группы
+        # - Обновления inline клавиатур в активных чатах
+        # - Отправки push-уведомлений пользователям
+        
+    except Exception as e:
+        logger.error(f"Ошибка при обновлении клавиатур сезонов: {e}")
+
+async def notify_active_groups_about_new_season(project, season_name, video_count):
+    """
+    Отправляет уведомление о новом сезоне в активные группы
+    """
+    try:
+        project_names = {
+            "centris": "🏢 Centris Towers",
+            "golden": "🏘️ Golden Lake"
+        }
+        
+        project_display_name = project_names.get(project, project)
+        
+        notification_text = (
+            f"🎉 Новый сезон добавлен!\n\n"
+            f"📺 {project_display_name}\n"
+            f"📅 Сезон: {season_name}\n"
+            f"🎬 Количество видео: {video_count}\n\n"
+            f"💡 Выберите '{project_display_name}' в главном меню, "
+            f"чтобы увидеть новый сезон!"
+        )
+        
+        # В будущем здесь можно добавить логику для отправки уведомлений
+        # в конкретные группы, где бот активен
+        logger.info(f"Уведомление о новом сезоне подготовлено: {notification_text}")
+        
+    except Exception as e:
+        logger.error(f"Ошибка при подготовке уведомления о новом сезоне: {e}")

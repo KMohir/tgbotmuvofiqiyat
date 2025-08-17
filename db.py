@@ -418,21 +418,35 @@ class Database:
         logger.info(f"add_season_with_videos: project={project}, season_name={season_name}, links_count={len(links)}, titles_count={len(titles)}")
         if not links or not titles or len(links) != len(titles):
             logger.error(f"Попытка добавить сезон '{season_name}' без видео или с некорректными списками! links={len(links)}, titles={len(titles)}")
-            return
+            return None
+        
         try:
             cursor = self.conn.cursor()
             # id автоинкрементируется, не указываем его явно
             cursor.execute("INSERT INTO seasons (project, name) VALUES (%s, %s) RETURNING id", (project, season_name))
             season_id = cursor.fetchone()[0] # Получаем ID из последней вставки
             logger.info(f"add_season_with_videos: добавлен сезон id={season_id}, project={project}, name={season_name}")
+            
             for pos, (url, title) in enumerate(zip(links, titles)):
                 cursor.execute("INSERT INTO videos (season_id, url, title, position) VALUES (%s, %s, %s, %s)", (season_id, url, title, pos))
+            
             self.conn.commit()
             cursor.close()
+            
             logger.info(f"Сезон '{season_name}' успешно добавлен в проект '{project}' с {len(links)} видео")
+            
+            # Возвращаем информацию о добавленном сезоне
+            return {
+                'season_id': season_id,
+                'project': project,
+                'season_name': season_name,
+                'video_count': len(links)
+            }
+            
         except Exception as e:
             logger.error(f"Ошибка при добавлении сезона '{season_name}' в проект '{project}': {e}")
             self.conn.rollback()
+            return None
 
     def get_seasons_by_project(self, project):
         logger.info(f"get_seasons_by_project: project={project}")

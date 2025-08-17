@@ -11,6 +11,9 @@ from datetime import datetime
 from handlers.users.video_lists import VIDEO_LIST_1, VIDEO_LIST_2, VIDEO_LIST_3, VIDEO_LIST_4, CAPTION_LIST_1, CAPTION_LIST_2, CAPTION_LIST_3, CAPTION_LIST_4, VIDEO_LIST_GOLDEN_1, GOLDEN_LIST, CAPTION_LIST_6, VIDEO_LIST_6
 from data.config import ADMINS
 
+# Настройка логирования
+logger = logging.getLogger(__name__)
+
 # Список описаний для извлечения названий уроков (только для кнопок)
 CAPTION_LIST_2 = [
     "Келажакни инобатга олган қулай локатсия",
@@ -204,8 +207,31 @@ main_menu_keyboard = ReplyKeyboardMarkup(
 
 # Клавиатура сезонов — всегда динамически из базы
 
+# Кэш для клавиатур сезонов
+_season_keyboard_cache = {}
+_cache_timestamp = {}
+
 def get_season_keyboard(project=None):
+    """
+    Создает клавиатуру с сезонами для указанного проекта.
+    Использует кэширование для повышения производительности.
+    """
+    import time
+    
+    current_time = time.time()
+    cache_key = f"seasons_{project or 'centris'}"
+    
+    # Проверяем кэш (действителен 5 минут)
+    if (cache_key in _season_keyboard_cache and 
+        cache_key in _cache_timestamp and 
+        current_time - _cache_timestamp[cache_key] < 300):
+        logger.debug(f"Используется кэшированная клавиатура для {cache_key}")
+        return _season_keyboard_cache[cache_key]
+    
+    logger.info(f"Создается новая клавиатура для проекта {project or 'centris'}")
+    
     keyboard = ReplyKeyboardMarkup(resize_keyboard=True)
+    
     if project == "golden":
         golden_seasons = db.get_seasons_by_project("golden")
         for season_id, season_name in golden_seasons:
@@ -214,8 +240,37 @@ def get_season_keyboard(project=None):
         centris_seasons = db.get_seasons_by_project("centris")
         for season_id, season_name in centris_seasons:
             keyboard.add(KeyboardButton(season_name))
+    
     keyboard.add(KeyboardButton("Orqaga qaytish"))
+    
+    # Сохраняем в кэш
+    _season_keyboard_cache[cache_key] = keyboard
+    _cache_timestamp[cache_key] = current_time
+    
+    logger.info(f"Клавиатура для {cache_key} сохранена в кэш с {len(keyboard.keyboard)} кнопками")
+    
     return keyboard
+
+def clear_season_keyboard_cache(project=None):
+    """
+    Очищает кэш клавиатуры сезонов для указанного проекта.
+    Вызывается после добавления/удаления сезонов.
+    """
+    try:
+        if project:
+            cache_key = f"seasons_{project}"
+            if cache_key in _season_keyboard_cache:
+                del _season_keyboard_cache[cache_key]
+                logger.info(f"Кэш очищен для проекта {project}")
+            if cache_key in _cache_timestamp:
+                del _cache_timestamp[cache_key]
+        else:
+            # Очищаем весь кэш
+            _season_keyboard_cache.clear()
+            _cache_timestamp.clear()
+            logger.info("Весь кэш клавиатуры сезонов очищен")
+    except Exception as e:
+        logger.error(f"Ошибка при очистке кэша: {e}")
 
 # Клавиатура с названиями видео для сезона
 def get_video_keyboard(caption_list):
@@ -238,7 +293,15 @@ project_select = State()  # Новое состояние для выбора п
 @dp.message_handler(commands=["centris_towers", "centris_towers@CentrisTowersbot"], chat_type=[types.ChatType.GROUP, types.ChatType.SUPERGROUP, types.ChatType.PRIVATE], state="*")
 async def centris_towers_menu(message: types.Message, state: FSMContext):
     await state.update_data(project="centris")
-    await message.answer("Sezonni tanlang:", reply_markup=get_season_keyboard())
+    
+    # Очищаем кэш для получения свежих данных
+    logger.info(f"Очистка кэша для Centris Towers (пользователь: {message.from_user.id})")
+    clear_season_keyboard_cache("centris")
+    
+    # Получаем обновленную клавиатуру
+    season_keyboard = get_season_keyboard("centris")
+    
+    await message.answer("Sezonni tanlang:", reply_markup=season_keyboard)
     await message.answer("Qaysi sezonni ko'rmoqchisiz?")
     await state.set_state(VideoStates.season_select.state)
 
@@ -247,7 +310,15 @@ async def centris_towers_menu(message: types.Message, state: FSMContext):
 @dp.message_handler(commands=["golden_lake", "golden_lake@CentrisTowersbot"], chat_type=[types.ChatType.GROUP, types.ChatType.SUPERGROUP, types.ChatType.PRIVATE], state="*")
 async def golden_lake_menu(message: types.Message, state: FSMContext):
     await state.update_data(project="golden")
-    await message.answer("Sezonni tanlang:", reply_markup=get_season_keyboard("golden"))
+    
+    # Очищаем кэш для получения свежих данных
+    logger.info(f"Очистка кэша для Golden Lake (пользователь: {message.from_user.id})")
+    clear_season_keyboard_cache("golden")
+    
+    # Получаем обновленную клавиатуру
+    season_keyboard = get_season_keyboard("golden")
+    
+    await message.answer("Sezonni tanlang:", reply_markup=season_keyboard)
     await message.answer("Qaysi sezonni ko'rmoqchisiz?")
     await state.set_state(VideoStates.season_select.state)
 
