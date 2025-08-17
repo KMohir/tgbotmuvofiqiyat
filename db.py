@@ -114,16 +114,26 @@ class Database:
     def add_user(self, user_id, name, phone, preferred_time="07:00", is_group=False):
         try:
             cursor = self.conn.cursor()
+            
+            # Проверяем, существует ли уже пользователь
+            cursor.execute("SELECT 1 FROM users WHERE user_id = %s", (user_id,))
+            if cursor.fetchone():
+                logger.info(f"Foydalanuvchi {user_id} allaqachon mavjud")
+                cursor.close()
+                return False
+            
             cursor.execute('''
                 INSERT INTO users (user_id, name, phone, preferred_time, is_group)
                 VALUES (%s, %s, %s, %s, %s)
-                ON CONFLICT (user_id) DO NOTHING
             ''', (user_id, name, phone, preferred_time, is_group))
             self.conn.commit()
             cursor.close()
+            logger.info(f"Foydalanuvchi {user_id} muvaffaqiyatli qo'shildi")
+            return True
         except Exception as e:
             logger.error(f"Ошибка при добавлении пользователя {user_id}: {e}")
             self.conn.rollback()
+            return False
 
     def update(self, user_id, name, phone, preferred_time="07:00", is_group=False):
         try:
