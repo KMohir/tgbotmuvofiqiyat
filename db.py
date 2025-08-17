@@ -547,6 +547,18 @@ class Database:
             logger.error(f"Ошибка при получении сезона по названию '{season_name}': {e}")
             return None
 
+    def get_season_name(self, season_id):
+        """Получить название сезона по ID"""
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute("SELECT name FROM seasons WHERE id = %s", (season_id,))
+            result = cursor.fetchone()
+            cursor.close()
+            return result[0] if result else "Неизвестный сезон"
+        except Exception as e:
+            logger.error(f"Ошибка при получении названия сезона {season_id}: {e}")
+            return "Ошибка получения названия"
+
     def get_videos_by_season_name(self, season_name):
         try:
             cursor = self.conn.cursor()
