@@ -285,6 +285,12 @@ user_id BIGINT PRIMARY KEY
 | `/refresh_seasons` | Admin+ | Klaviaturalar keshini tozalash |
 | `/force_refresh_seasons` | Admin+ | Klaviaturalarni majburiy yangilash |
 | `/cache_status` | Admin+ | Kesh holatini ko'rsatish |
+| `/test_cache` | Admin+ | Kesh tizimini sinash va tekshirish |
+| `/sync_keyboards` | Admin+ | Klaviaturalarni bazaga sinxronlash |
+| `/instant_refresh` | Admin+ | Klaviaturalarni darhol yangilash |
+| `/force_update_keyboards` | Admin+ | Klaviaturalarni majburiy yangilash (БД) |
+| `/simple_cache_status` | Admin+ | Oddiy kesh holati |
+| `/test_commands` | Admin+ | Buyruqlar ishlayotganini tekshirish |
 
 ---
 
