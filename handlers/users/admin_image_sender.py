@@ -104,16 +104,36 @@ try:
             await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat adminlar foydalana oladi.")
             return
             
-        # Команда работает только в группах
-        if message.chat.type not in [types.ChatType.GROUP, types.ChatType.SUPERGROUP]:
-            await message.answer("⚠️ **Bu buyruq faqat guruhlarda ishlaydi!**")
+        # Сбрасываем предыдущее состояние
+        await state.finish()
+        
+        await message.answer(
+            "📹 **GURUH UCHUN VIDEO TARQATISH SOZLAMALARI**\n\n"
+            "🏢 **Loyihani tanlang:**",
+            reply_markup=get_project_keyboard(),
+            parse_mode="Markdown"
+        )
+        await state.set_state(GroupVideoStates.waiting_for_project.state)
+        await state.update_data(chat_id=message.chat.id)
+
+    # --- Команда /set_group_video для личных сообщений ---
+    @dp.message_handler(Command('set_group_video'), chat_type=types.ChatType.PRIVATE)
+    async def set_group_video_private_command(message: types.Message, state: FSMContext):
+        """
+        🎯 Команда для настройки видео рассылки в личных сообщениях
+        Позволяет выбрать проект (Centris Towers, Golden Lake или оба) и сезон для каждого проекта
+        """
+        # Проверяем права пользователя
+        user_id = message.from_user.id
+        if user_id not in ADMINS + [SUPER_ADMIN_ID] and not db.is_admin(user_id):
+            await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat adminlar foydalana oladi.")
             return
             
         # Сбрасываем предыдущее состояние
         await state.finish()
         
         await message.answer(
-            "📹 **GURUH UCHUN VIDEO TARQATISH SOZLAMALARI**\n\n"
+            "📹 **VIDEO TARQATISH SOZLAMALARI**\n\n"
             "🏢 **Loyihani tanlang:**",
             reply_markup=get_project_keyboard(),
             parse_mode="Markdown"
