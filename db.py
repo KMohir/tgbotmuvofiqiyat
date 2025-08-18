@@ -171,9 +171,12 @@ class Database:
             ''', (user_id, name, phone, preferred_time, int(is_group), group_id))
             self.conn.commit()
             cursor.close()
+            logger.info(f"Пользователь {user_id} успешно добавлен/обновлен")
+            return True
         except Exception as e:
             logger.error(f"Ошибка при добавлении пользователя {user_id}: {e}")
             self.conn.rollback()
+            return False
 
     def user_exists(self, user_id):
         try:
@@ -186,29 +189,7 @@ class Database:
             logger.error(f"Ошибка при проверке пользователя {user_id}: {e}")
             return False
 
-    def add_user(self, user_id, name, phone, preferred_time="07:00", is_group=False):
-        try:
-            cursor = self.conn.cursor()
-            
-            # Проверяем, существует ли уже пользователь
-            cursor.execute("SELECT 1 FROM users WHERE user_id = %s", (user_id,))
-            if cursor.fetchone():
-                logger.info(f"Foydalanuvchi {user_id} allaqachon mavjud")
-                cursor.close()
-                return False
-            
-            cursor.execute('''
-                INSERT INTO users (user_id, name, phone, preferred_time, is_group)
-                VALUES (%s, %s, %s, %s, %s)
-            ''', (user_id, name, phone, preferred_time, is_group))
-            self.conn.commit()
-            cursor.close()
-            logger.info(f"Foydalanuvchi {user_id} muvaffaqiyatli qo'shildi")
-            return True
-        except Exception as e:
-            logger.error(f"Ошибка при добавлении пользователя {user_id}: {e}")
-            self.conn.rollback()
-            return False
+
     def update(self, user_id, name, phone, preferred_time="07:00", is_group=False):
         try:
             cursor = self.conn.cursor()
@@ -1204,6 +1185,25 @@ class Database:
             
         except Exception as e:
             logger.error(f"Xavfsizlik jadvallarini yaratishda xatolik: {e}")
+
+    def add_group_to_whitelist_auto(self, chat_id: int, title: str, admin_id: int) -> bool:
+        """Автоматически добавить группу в whitelist при добавлении бота"""
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute("""
+                INSERT INTO group_whitelist (chat_id, title, status, added_date, added_by)
+                VALUES (%s, %s, 'active', CURRENT_TIMESTAMP, %s)
+                ON CONFLICT (chat_id) 
+                DO UPDATE SET title = EXCLUDED.title, status = 'active', 
+                              added_date = CURRENT_TIMESTAMP, added_by = EXCLUDED.added_by
+            """, (chat_id, title, admin_id))
+            self.conn.commit()
+            cursor.close()
+            logger.info(f"Группа {chat_id} автоматически добавлена в whitelist")
+            return True
+        except Exception as e:
+            logger.error(f"Ошибка при автоматическом добавлении группы {chat_id} в whitelist: {e}")
+            return False
 
 # create_security_tables метод уже определен в классе Database
 

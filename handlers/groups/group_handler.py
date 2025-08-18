@@ -25,9 +25,15 @@ async def my_chat_member_handler(message: types.ChatMemberUpdated):
                 user_id=group_id,
                 name=group_title,
                 phone=None,  # У групп нет номера телефона
-                is_group=True,  # Указываем, что это группа
-                group_id=None  # Для самой группы group_id не нужен
+                is_group=True  # Указываем, что это группа
             )
+            
+            # Автоматически добавляем группу в whitelist
+            if db.add_group_to_whitelist_auto(group_id, group_title, added_by):
+                logging.info(f"Группа '{group_title}' (ID: {group_id}) автоматически добавлена в whitelist")
+            else:
+                logging.error(f"Не удалось добавить группу '{group_title}' (ID: {group_id}) в whitelist")
+            
             logging.info(f"Бот добавлен в группу '{group_title}' (ID: {group_id}). Группа добавлена/обновлена в базе.")
 
             # Создаем клавиатуру для админа
