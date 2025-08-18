@@ -1,249 +1,216 @@
 #!/usr/bin/env python3
 """
-Скрипт для очистки базы данных Telegram бота
-ВНИМАНИЕ: Этот скрипт НАВСЕГДА удаляет данные!
+Скрипт для очистки базы данных
+ВНИМАНИЕ: Используйте осторожно!
 """
 
 import psycopg2
 import os
-from environs import Env
+from dotenv import load_dotenv
 
 # Загружаем переменные окружения
-env = Env()
-env.read_env()
-
-DB_HOST = env.str("DB_HOST")
-DB_NAME = env.str("DB_NAME") 
-DB_USER = env.str("DB_USER")
-DB_PASSWORD = env.str("DB_PASS")
+load_dotenv()
 
 def connect_db():
     """Подключение к базе данных"""
     try:
         conn = psycopg2.connect(
-            host=DB_HOST,
-            database=DB_NAME,
-            user=DB_USER,
-            password=DB_PASSWORD
+            host=os.getenv('DB_HOST', 'localhost'),
+            dbname=os.getenv('DB_NAME', 'centris_bot'),
+            user=os.getenv('DB_USER', 'postgres'),
+            password=os.getenv('DB_PASS'),
+            port=os.getenv('DB_PORT', '5432')
         )
         return conn
     except Exception as e:
         print(f"❌ Ошибка подключения к БД: {e}")
         return None
 
-def clear_security_tables():
-    """Очистить только таблицы безопасности"""
+def show_current_data():
+    """Показать текущие данные"""
     conn = connect_db()
     if not conn:
         return
     
+    cursor = conn.cursor()
+    
     try:
-        cursor = conn.cursor()
+        # Группы в users
+        cursor.execute("SELECT user_id, name FROM users WHERE is_group = 1")
+        groups = cursor.fetchall()
+        print(f"\n📋 Групп в users: {len(groups)}")
+        for group_id, name in groups:
+            print(f"  - {group_id}: {name}")
         
-        print("🧹 Проверяю таблицы безопасности...")
+        # Группы в whitelist
+        cursor.execute("SELECT chat_id, title FROM group_whitelist")
+        whitelist = cursor.fetchall()
+        print(f"\n✅ Групп в whitelist: {len(whitelist)}")
+        for chat_id, title in whitelist:
+            print(f"  - {chat_id}: {title}")
         
-        # Проверяем существование таблиц безопасности
-        cursor.execute("SELECT table_name FROM information_schema.tables WHERE table_name IN ('user_security', 'group_whitelist') AND table_schema = 'public';")
-        existing_tables = [row[0] for row in cursor.fetchall()]
-        
-        if not existing_tables:
-            print("ℹ️  Таблицы безопасности не найдены (уже удалены или не создавались)")
-            return
+        # Пользователи в security
+        cursor.execute("SELECT user_id, name FROM user_security")
+        users = cursor.fetchall()
+        print(f"\n👥 Пользователей в security: {len(users)}")
+        for user_id, name in users:
+            print(f"  - {user_id}: {name}")
             
-        for table in existing_tables:
-            cursor.execute(f"DELETE FROM {table};")
-            print(f"🗑️  Очищена таблица: {table}")
-        
-        conn.commit()
-        print("✅ Таблицы безопасности очищены!")
-        
     except Exception as e:
-        print(f"❌ Ошибка очистки: {e}")
-        conn.rollback()
+        print(f"❌ Ошибка при получении данных: {e}")
     finally:
         cursor.close()
         conn.close()
 
-def clear_all_data():
-    """Очистить все данные из всех таблиц"""
+def clear_all_groups():
+    """Очистить все группы"""
     conn = connect_db()
     if not conn:
         return
     
+    cursor = conn.cursor()
+    
     try:
-        cursor = conn.cursor()
+        print("\n🗑️ Очищаю все группы...")
         
-        print("💥 Получаю список всех таблиц...")
+        # Удаляем из group_video_settings
+        cursor.execute("DELETE FROM group_video_settings")
+        print(f"  - Удалено настроек групп: {cursor.rowcount}")
         
-        # Получаем список всех существующих таблиц
-        cursor.execute("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' ORDER BY table_name;")
-        tables = [row[0] for row in cursor.fetchall()]
+        # Удаляем из group_whitelist
+        cursor.execute("DELETE FROM group_whitelist")
+        print(f"  - Удалено из whitelist: {cursor.rowcount}")
         
-        if not tables:
-            print("ℹ️  Таблицы не найдены - база данных пуста")
-            return
-            
-        print(f"📋 Найдено таблиц: {len(tables)}")
-        
-        # Очищаем каждую таблицу
-        cleared_count = 0
-        for table in tables:
-            try:
-                cursor.execute(f"SELECT COUNT(*) FROM {table};")
-                count_before = cursor.fetchone()[0]
-                
-                cursor.execute(f"DELETE FROM {table};")
-                
-                print(f"🗑️  {table}: удалено {count_before} записей")
-                cleared_count += 1
-            except Exception as table_error:
-                print(f"⚠️  Ошибка очистки таблицы {table}: {table_error}")
+        # Удаляем из users
+        cursor.execute("DELETE FROM users WHERE is_group = 1")
+        print(f"  - Удалено групп из users: {cursor.rowcount}")
         
         conn.commit()
-        print(f"✅ Очищено таблиц: {cleared_count} из {len(tables)}")
+        print("✅ Все группы успешно удалены!")
         
     except Exception as e:
-        print(f"❌ Ошибка очистки: {e}")
+        print(f"❌ Ошибка при очистке: {e}")
         conn.rollback()
     finally:
         cursor.close()
         conn.close()
 
-def drop_security_tables():
-    """Удалить таблицы безопасности"""
+def clear_specific_group(group_id):
+    """Очистить конкретную группу"""
     conn = connect_db()
     if not conn:
         return
     
+    cursor = conn.cursor()
+    
     try:
-        cursor = conn.cursor()
+        print(f"\n🗑️ Очищаю группу {group_id}...")
         
-        print("🔥 Удаляю таблицы безопасности...")
-        cursor.execute("DROP TABLE IF EXISTS user_security CASCADE;")
-        cursor.execute("DROP TABLE IF EXISTS group_whitelist CASCADE;")
+        # Удаляем настройки
+        cursor.execute("DELETE FROM group_video_settings WHERE chat_id = %s", (str(group_id),))
+        print(f"  - Удалено настроек: {cursor.rowcount}")
+        
+        # Удаляем из whitelist
+        cursor.execute("DELETE FROM group_whitelist WHERE chat_id = %s", (group_id,))
+        print(f"  - Удалено из whitelist: {cursor.rowcount}")
+        
+        # Удаляем из users
+        cursor.execute("DELETE FROM users WHERE user_id = %s AND is_group = 1", (group_id,))
+        print(f"  - Удалено из users: {cursor.rowcount}")
         
         conn.commit()
-        print("✅ Таблицы безопасности удалены!")
+        print(f"✅ Группа {group_id} успешно удалена!")
         
     except Exception as e:
-        print(f"❌ Ошибка удаления: {e}")
+        print(f"❌ Ошибка при удалении группы: {e}")
         conn.rollback()
     finally:
         cursor.close()
         conn.close()
 
-def drop_all_tables():
-    """Удалить все таблицы"""
+def clear_all_users():
+    """Очистить всех пользователей"""
     conn = connect_db()
     if not conn:
         return
     
+    cursor = conn.cursor()
+    
     try:
-        cursor = conn.cursor()
+        print("\n🗑️ Очищаю всех пользователей...")
         
-        print("💀 Получаю список всех таблиц для удаления...")
+        # Удаляем из user_security
+        cursor.execute("DELETE FROM user_security")
+        print(f"  - Удалено пользователей из security: {cursor.rowcount}")
         
-        # Получаем список всех существующих таблиц
-        cursor.execute("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' ORDER BY table_name;")
-        tables = [row[0] for row in cursor.fetchall()]
-        
-        if not tables:
-            print("ℹ️  Таблицы не найдены - база данных уже пуста")
-            return
-            
-        print(f"📋 Найдено таблиц для удаления: {len(tables)}")
-        for table in tables:
-            print(f"   📊 {table}")
-        
-        # Удаляем каждую таблицу
-        dropped_count = 0
-        for table in tables:
-            try:
-                cursor.execute(f"DROP TABLE {table} CASCADE;")
-                print(f"🔥 Удалена таблица: {table}")
-                dropped_count += 1
-            except Exception as table_error:
-                print(f"⚠️  Ошибка удаления таблицы {table}: {table_error}")
+        # Удаляем обычных пользователей (не группы) из users
+        cursor.execute("DELETE FROM users WHERE is_group = 0")
+        print(f"  - Удалено пользователей из users: {cursor.rowcount}")
         
         conn.commit()
-        print(f"✅ Удалено таблиц: {dropped_count} из {len(tables)}")
+        print("✅ Все пользователи успешно удалены!")
         
     except Exception as e:
-        print(f"❌ Ошибка удаления: {e}")
+        print(f"❌ Ошибка при очистке: {e}")
         conn.rollback()
     finally:
         cursor.close()
         conn.close()
-
-def show_menu():
-    """Показать меню выбора"""
-    print("\n" + "="*50)
-    print("🗄️  МЕНЮ ОЧИСТКИ БАЗЫ ДАННЫХ")
-    print("="*50)
-    print("1. 🧹 Очистить только таблицы безопасности")
-    print("2. 💥 Очистить ВСЕ данные (оставить таблицы)")
-    print("3. 🔥 Удалить таблицы безопасности")
-    print("4. 💀 Удалить ВСЕ таблицы")
-    print("5. ❌ Выход")
-    print("="*50)
-    print("⚠️  ВНИМАНИЕ: Удаленные данные НЕ ВОССТАНАВЛИВАЮТСЯ!")
-    print("="*50)
 
 def main():
-    """Главная функция"""
+    print("🗄️ Скрипт очистки базы данных")
+    print("=" * 50)
+    
     while True:
-        show_menu()
-        choice = input("\n🔢 Выберите действие (1-5): ").strip()
+        print("\n📋 Выберите действие:")
+        print("1. 👀 Показать текущие данные")
+        print("2. 🗑️ Очистить все группы")
+        print("3. 🗑️ Очистить конкретную группу")
+        print("4. 🗑️ Очистить всех пользователей")
+        print("5. 🗑️ Очистить ВСЕ данные (ОПАСНО!)")
+        print("6. 🚪 Выход")
+        
+        choice = input("\nВведите номер действия (1-6): ").strip()
         
         if choice == "1":
-            confirm = input("❓ Очистить таблицы безопасности? (да/нет): ").lower()
-            if confirm in ['да', 'yes', 'y']:
-                clear_security_tables()
-            else:
-                print("❌ Отменено")
-                
+            show_current_data()
+            
         elif choice == "2":
-            confirm = input("❓ Очистить ВСЕ данные? (да/нет): ").lower()
-            if confirm in ['да', 'yes', 'y']:
-                clear_all_data()
+            confirm = input("⚠️ Вы уверены, что хотите удалить ВСЕ группы? (yes/no): ").strip().lower()
+            if confirm == "yes":
+                clear_all_groups()
             else:
-                print("❌ Отменено")
+                print("❌ Операция отменена")
                 
         elif choice == "3":
-            confirm = input("❓ Удалить таблицы безопасности? (да/нет): ").lower()
-            if confirm in ['да', 'yes', 'y']:
-                drop_security_tables()
-            else:
-                print("❌ Отменено")
+            try:
+                group_id = int(input("🆔 Введите ID группы: ").strip())
+                clear_specific_group(group_id)
+            except ValueError:
+                print("❌ Неверный ID группы")
                 
         elif choice == "4":
-            confirm = input("❓ Удалить ВСЕ таблицы? (ОПАСНО!) (да/нет): ").lower()
-            if confirm in ['да', 'yes', 'y']:
-                double_confirm = input("❓ Вы ТОЧНО уверены? Это удалит ВСЕ! (да/нет): ").lower()
-                if double_confirm in ['да', 'yes', 'y']:
-                    drop_all_tables()
-                else:
-                    print("❌ Отменено")
+            confirm = input("⚠️ Вы уверены, что хотите удалить ВСЕХ пользователей? (yes/no): ").strip().lower()
+            if confirm == "yes":
+                clear_all_users()
             else:
-                print("❌ Отменено")
+                print("❌ Операция отменена")
                 
         elif choice == "5":
+            confirm = input("🚨 ВНИМАНИЕ! Это удалит ВСЕ данные! Вы уверены? (YES/NO): ").strip()
+            if confirm == "YES":
+                clear_all_groups()
+                clear_all_users()
+                print("🚨 ВСЕ данные удалены!")
+            else:
+                print("❌ Операция отменена")
+                
+        elif choice == "6":
             print("👋 До свидания!")
             break
             
         else:
-            print("❌ Неверный выбор! Введите цифру от 1 до 5")
+            print("❌ Неверный выбор. Введите число от 1 до 6.")
 
 if __name__ == "__main__":
-    print("🗄️ Скрипт очистки базы данных запущен")
-    print(f"📋 База: {DB_NAME} на {DB_HOST}")
-    
-    # Проверяем подключение
-    test_conn = connect_db()
-    if test_conn:
-        test_conn.close()
-        print("✅ Подключение к базе данных успешно")
-        main()
-    else:
-        print("❌ Не удалось подключиться к базе данных")
-        print("🔧 Проверьте настройки в .env файле") 
+    main() 

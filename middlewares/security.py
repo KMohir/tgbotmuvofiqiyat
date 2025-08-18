@@ -94,11 +94,6 @@ class VideoSecurityMiddleware(BaseMiddleware):
         # Добавляем отладочную информацию
         logger.info(f"Проверка доступа группы {chat_id}, команда: {message.text}")
         
-        # ВРЕМЕННО: Пропускаем все команды для тестирования
-        if message.text and message.text.startswith('/'):
-            logger.info(f"Пропускаем команду: {message.text}")
-            return
-        
         # Проверить находится ли группа в whitelist
         is_whitelisted = db.is_group_whitelisted(chat_id)
         logger.info(f"Группа {chat_id} в whitelist: {is_whitelisted}")

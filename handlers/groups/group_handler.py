@@ -20,6 +20,48 @@ async def my_chat_member_handler(message: types.ChatMemberUpdated):
             added_by = message.from_user.id
             added_by_name = message.from_user.full_name
 
+            # ПРОВЕРЯЕМ: Только супер-админ может добавлять бота в группу
+            if not db.is_superadmin(added_by):
+                logging.warning(f"Попытка добавить бота в группу {group_id} неавторизованным пользователем {added_by}")
+                
+                # Отправляем сообщение о том, что только супер-админ может добавлять бота
+                try:
+                    await message.bot.send_message(
+                        group_id,
+                        f"🚫 **Bot qo'shish ruxsati yo'q!**\n\n"
+                        f"Botni faqat super-admin qo'sha oladi.\n"
+                        f"Qo'shgan: {added_by_name} (ID: {added_by})\n\n"
+                        f"Bot avtomatik ravishda guruhni tark etadi."
+                    )
+                except Exception as e:
+                    logging.error(f"Ошибка при отправке сообщения о неавторизованном добавлении: {e}")
+                
+                # Бот выходит из группы
+                try:
+                    await message.bot.leave_chat(group_id)
+                    logging.warning(f"Бот покинул группу {group_id} из-за неавторизованного добавления")
+                except Exception as e:
+                    logging.error(f"Ошибка при выходе из группы {group_id}: {e}")
+                
+                # Оповещаем супер-админов
+                for admin in ADMINS:
+                    try:
+                        await dp.bot.send_message(
+                            admin, 
+                            f"🚫 **Неавторизованная попытка добавления бота!**\n\n"
+                            f"📝 Группа: {group_title}\n"
+                            f"🆔 ID группы: {group_id}\n"
+                            f"👤 Попытался добавить: {added_by_name} (ID: {added_by})\n\n"
+                            f"❌ Бот автоматически покинул группу."
+                        )
+                    except Exception as e:
+                        logging.error(f"Ошибка при уведомлении админа {admin}: {e}")
+                
+                return
+
+            # Если добавил супер-админ - добавляем группу в whitelist
+            logging.info(f"Супер-админ {added_by} добавил бота в группу {group_id}")
+            
             # Добавляем группу в базу (или обновляем статус подписки, если она уже была)
             db.add_user(
                 user_id=group_id,
@@ -36,30 +78,19 @@ async def my_chat_member_handler(message: types.ChatMemberUpdated):
             
             logging.info(f"Бот добавлен в группу '{group_title}' (ID: {group_id}). Группа добавлена/обновлена в базе.")
 
-            # Создаем клавиатуру для админа
-            keyboard = InlineKeyboardMarkup(row_width=2)
-            # --- Формирование callback_data ---
-            # allow_callback = f"allow_group_{group_id}"
-            # ban_callback = f"ban_group_{group_id}"
-            
-            # logging.info(f"Создаем кнопки с callback_data: allow={allow_callback}, ban={ban_callback}")
-            
-            # keyboard.add(
-            #     InlineKeyboardButton("✅ Разрешить", callback_data=allow_callback),
-            #     InlineKeyboardButton("❌ Запретить", callback_data=ban_callback)
-            # )
-
-            # Оповещаем админов с кнопками
+            # Оповещаем супер-админов об успешном добавлении
             for admin in ADMINS:
-                await dp.bot.send_message(
-                    admin, 
-                    f"🤖 Бот был добавлен в новую группу:\n"
-                    f"📝 Название: {group_title}\n"
-                    f"🆔 ID группы: {group_id}\n"
-                    f"👤 Добавил: {added_by_name} (ID: {added_by})\n\n"
-                    f"Выберите действие:",
-                    reply_markup=keyboard
-                )
+                try:
+                    await dp.bot.send_message(
+                        admin, 
+                        f"✅ **Бот успешно добавлен в группу!**\n\n"
+                        f"📝 Название: {group_title}\n"
+                        f"🆔 ID группы: {group_id}\n"
+                        f"👤 Добавил: {added_by_name} (ID: {added_by})\n\n"
+                        f"🤖 Группа автоматически добавлена в whitelist и может использовать бота."
+                    )
+                except Exception as e:
+                    logging.error(f"Ошибка при уведомлении админа {admin}: {e}")
 
         # Если бота удалили или заблокировали в группе
         elif message.new_chat_member.status in [types.ChatMemberStatus.LEFT, types.ChatMemberStatus.KICKED]:
@@ -72,7 +103,10 @@ async def my_chat_member_handler(message: types.ChatMemberUpdated):
 
             # Оповещаем админов
             for admin in ADMINS:
-                await dp.bot.send_message(admin, f"🚪 Бот был удален из группы: {group_title}")
+                try:
+                    await dp.bot.send_message(admin, f"🚪 Бот был удален из группы: {group_title}")
+                except Exception as e:
+                    logging.error(f"Ошибка при уведомлении админа {admin}: {e}")
 
 
 @dp.callback_query_handler(lambda c: c.data.startswith(('allow_group_', 'ban_group_')))
@@ -249,15 +283,57 @@ async def list_groups_command(message: types.Message):
     text = '<b>Список групп:</b>\n'
     for user_id, name, phone, dt, is_group in groups:
         if is_group:
-            # banned = db.is_group_banned(user_id)
-            # status = "Нет" if banned else "Да"
-            text += f'ID: <code>{user_id}</code> | {name} | Разрешена: <b>Да</b>\n'
+            # Проверяем реальный статус в whitelist
+            is_whitelisted = db.is_group_whitelisted(user_id)
+            status = "Да" if is_whitelisted else "Нет"
+            text += f'ID: <code>{user_id}</code> | {name} | Разрешена: <b>{status}</b>\n'
     await message.reply(text, parse_mode='HTML')
 
 @dp.message_handler(commands=['unban_all_groups'])
 async def unban_all_groups_command(message: types.Message):
     db.unban_all_groups()
     await message.reply('Бан снят со всех групп. Все группы теперь разрешены!')
+
+@dp.message_handler(commands=['force_remove_group'])
+async def force_remove_group_command(message: types.Message):
+    """Принудительно удалить группу из whitelist (только для супер-админов)"""
+    user_id = message.from_user.id
+    
+    if not db.is_superadmin(user_id):
+        await message.reply("❌ Только супер-админ может использовать эту команду.")
+        return
+    
+    args = message.get_args().strip()
+    if not args:
+        await message.reply("📝 **Использование:**\n\n`/force_remove_group <chat_id>`\n\nПример: `/force_remove_group -1001234567890`")
+        return
+    
+    try:
+        chat_id = int(args)
+        
+        if not db.is_group_whitelisted(chat_id):
+            await message.reply(f"❌ Группа {chat_id} не находится в whitelist.")
+            return
+        
+        # Удаляем группу из whitelist
+        success = db.remove_group_from_whitelist(chat_id)
+        if success:
+            # Бот покидает группу
+            try:
+                await message.bot.leave_chat(chat_id)
+                await message.reply(f"✅ **Группа {chat_id} удалена из whitelist и бот покинул группу.**")
+                logging.info(f"Супер-админ {user_id} принудительно удалил группу {chat_id} из whitelist")
+            except Exception as e:
+                await message.reply(f"✅ Группа {chat_id} удалена из whitelist, но не удалось покинуть группу: {e}")
+                logging.error(f"Ошибка при выходе из группы {chat_id}: {e}")
+        else:
+            await message.reply(f"❌ Ошибка при удалении группы {chat_id} из whitelist.")
+            
+    except ValueError:
+        await message.reply("❌ Неверный chat ID. Введите отрицательное число (например: -1001234567890)")
+    except Exception as e:
+        logging.error(f"Ошибка при принудительном удалении группы: {e}")
+        await message.reply("❌ Системная ошибка при удалении группы.")
 
 @dp.message_handler(chat_type=[types.ChatType.GROUP, types.ChatType.SUPERGROUP])
 async def debug_group_message(message: types.Message):
