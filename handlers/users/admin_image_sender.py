@@ -91,53 +91,46 @@ try:
         )
         await state.set_state("waiting_for_video_number")
 
-    # --- НОВАЯ КОМАНДА /set_group_video ---
-    @dp.message_handler(Command('set_group_video'), chat_type=[types.ChatType.GROUP, types.ChatType.SUPERGROUP])
+    # --- УНИВЕРСАЛЬНАЯ КОМАНДА /set_group_video ---
+    @dp.message_handler(Command('set_group_video'))
     async def set_group_video_command(message: types.Message, state: FSMContext):
-        print(11111111111111111111)
+        print("set_group_video вызвана")
+        
         # Проверяем права пользователя
         user_id = message.from_user.id
         if user_id not in ADMINS + [SUPER_ADMIN_ID] and not db.is_admin(user_id):
             await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat adminlar foydalana oladi.")
             return
-            
+        
+        # Определяем тип чата
+        chat_type = message.chat.type
+        chat_id = message.chat.id
+        
+        print(f"Тип чата: {chat_type}, ID чата: {chat_id}")
+        
         # Сбрасываем предыдущее состояние
         await state.finish()
         
-        await message.answer(
-            "📹 **GURUH UCHUN VIDEO TARQATISH SOZLAMALARI**\n\n"
-            "🏢 **Loyihani tanlang:**",
-            reply_markup=get_project_keyboard(),
-            parse_mode="Markdown"
-        )
-        await state.set_state(GroupVideoStates.waiting_for_project.state)
-        await state.update_data(chat_id=message.chat.id)
-
-    # --- Команда /set_group_video для личных сообщений ---
-    @dp.message_handler(Command('set_group_video'), chat_type=types.ChatType.PRIVATE)
-    async def set_group_video_private_command(message: types.Message, state: FSMContext):
-        print(111111111111111111111)
-        """
-        🎯 Команда для настройки видео рассылки в личных сообщениях
-        Позволяет выбрать проект (Centris Towers, Golden Lake или оба) и сезон для каждого проекта
-        """
-        # Проверяем права пользователя
-        user_id = message.from_user.id
-        if user_id not in ADMINS + [SUPER_ADMIN_ID] and not db.is_admin(user_id):
-            await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat adminlar foydalana oladi.")
-            return
-            
-        # Сбрасываем предыдущее состояние
-        await state.finish()
+        if chat_type in [types.ChatType.GROUP, types.ChatType.SUPERGROUP]:
+            # Команда в группе
+            await message.answer(
+                "📹 **GURUH UCHUN VIDEO TARQATISH SOZLAMALARI**\n\n"
+                "🏢 **Loyihani tanlang:**",
+                reply_markup=get_project_keyboard(),
+                parse_mode="Markdown"
+            )
+        else:
+            # Команда в личных сообщениях
+            await message.answer(
+                "📹 **VIDEO TARQATISH SOZLAMALARI**\n\n"
+                "🏢 **Loyihani tanlang:**",
+                reply_markup=get_project_keyboard(),
+                parse_mode="Markdown"
+            )
         
-        await message.answer(
-            "📹 **VIDEO TARQATISH SOZLAMALARI**\n\n"
-            "🏢 **Loyihani tanlang:**",
-            reply_markup=get_project_keyboard(),
-            parse_mode="Markdown"
-        )
         await state.set_state(GroupVideoStates.waiting_for_project.state)
-        await state.update_data(chat_id=message.chat.id)
+        await state.update_data(chat_id=chat_id)
+        print(f"Состояние установлено, chat_id: {chat_id}")
 
     # --- Обработчики для новой команды ---
     @dp.callback_query_handler(lambda c: c.data.startswith("project_"), state=GroupVideoStates.waiting_for_project.state)

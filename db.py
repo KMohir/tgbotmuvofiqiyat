@@ -119,11 +119,10 @@ class Database:
                 CREATE TABLE IF NOT EXISTS group_video_settings (
                     chat_id TEXT PRIMARY KEY,
                     centris_enabled INTEGER DEFAULT 0,
-                    centris_season TEXT,
-                    centris_start_season_id INTEGER,
+                    centris_season_id INTEGER,           -- ID сезона в базе (не номер!)
                     centris_start_video INTEGER DEFAULT 0,
                     golden_enabled INTEGER DEFAULT 0,
-                    golden_start_season_id INTEGER,
+                    golden_season_id INTEGER,            -- ID сезона в базе (не номер!)
                     golden_start_video INTEGER DEFAULT 0,
                     viewed_videos TEXT DEFAULT '[]',
                     is_subscribed INTEGER DEFAULT 1
@@ -225,14 +224,20 @@ class Database:
             self.conn.close()
 
     # --- Методы для group_video_settings ---
-    def set_group_video_settings(self, chat_id: int, centris_enabled: bool, centris_season: str, centris_start_video: int, golden_enabled: bool, golden_start_video: int):
+    def set_group_video_settings(self, chat_id: int, centris_enabled: bool, centris_season_id: int, centris_start_video: int, golden_enabled: bool, golden_season_id: int, golden_start_video: int):
         try:
             cursor = self.conn.cursor()
             cursor.execute('''
-                INSERT INTO group_video_settings (chat_id, centris_enabled, centris_season, centris_start_video, golden_enabled, golden_start_video)
-                VALUES (%s, %s, %s, %s, %s, %s)
-                ON CONFLICT (chat_id) DO UPDATE SET centris_enabled=EXCLUDED.centris_enabled, centris_season=EXCLUDED.centris_season, centris_start_video=EXCLUDED.centris_start_video, golden_enabled=EXCLUDED.golden_enabled, golden_start_video=EXCLUDED.golden_start_video
-            ''', (chat_id, centris_enabled, centris_season, centris_start_video, golden_enabled, golden_start_video))
+                INSERT INTO group_video_settings (chat_id, centris_enabled, centris_season_id, centris_start_video, golden_enabled, golden_season_id, golden_start_video)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                ON CONFLICT (chat_id) DO UPDATE SET 
+                    centris_enabled=EXCLUDED.centris_enabled, 
+                    centris_season_id=EXCLUDED.centris_season_id, 
+                    centris_start_video=EXCLUDED.centris_start_video, 
+                    golden_enabled=EXCLUDED.golden_enabled, 
+                    golden_season_id=EXCLUDED.golden_season_id,
+                    golden_start_video=EXCLUDED.golden_start_video
+            ''', (chat_id, centris_enabled, centris_season_id, centris_start_video, golden_enabled, golden_season_id, golden_start_video))
             self.conn.commit()
             cursor.close()
         except Exception as e:
@@ -243,7 +248,7 @@ class Database:
         try:
             cursor = self.conn.cursor()
             cursor.execute('''
-                SELECT centris_enabled, centris_season, centris_start_video, golden_enabled, golden_start_video
+                SELECT centris_enabled, centris_season_id, centris_start_video, golden_enabled, golden_season_id, golden_start_video
                 FROM group_video_settings WHERE chat_id = %s
             ''', (str(chat_id),))
             result = cursor.fetchone()
@@ -838,7 +843,8 @@ class Database:
         try:
             cursor = self.conn.cursor()
             cursor.execute('''
-                SELECT chat_id, centris_enabled, centris_start_season_id, golden_enabled, golden_start_season_id
+                SELECT chat_id, centris_enabled, centris_season, centris_start_season_id, centris_start_video, 
+                       golden_enabled, golden_start_season_id, golden_start_video, viewed_videos, is_subscribed
                 FROM group_video_settings
             ''')
             result = cursor.fetchall()

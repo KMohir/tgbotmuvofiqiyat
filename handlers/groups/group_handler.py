@@ -218,8 +218,8 @@ async def migrate_group_video_settings(message: types.Message):
     groups = db.get_all_groups_with_settings()
     for group in groups:
         chat_id = group[0]
-        centris_season = group[2]
-        centris_start_video = group[3]
+        centris_season = group[2]  # centris_season
+        centris_start_video = group[4]  # centris_start_video
         if centris_season:
             db.set_group_video_start(chat_id, 'centris', int(centris_season), int(centris_start_video))
             updated += 1
@@ -237,8 +237,9 @@ async def group_settings(message: types.Message):
         f"centris_enabled: {settings[0] if settings else '-'}\n"
         f"centris_season: {settings[1] if settings else '-'}\n"
         f"centris_start_video: {settings[2] if settings else '-'}\n"
-        f"golden_enabled: {settings[3] if settings else '-'}\n"
-        f"golden_start_video: {settings[4] if settings else '-'}\n"
+        f"golden_enabled: {settings[4] if settings else '-'}\n"
+        f"golden_season: {settings[5] if settings else '-'}\n"
+        f"golden_start_video: {settings[6] if settings else '-'}\n"
         f"centris_start_season_id: {centris_start_season_id}\n"
         f"centris_start_video: {centris_start_video}\n"
         f"golden_start_season_id: {golden_start_season_id}\n"
@@ -292,7 +293,154 @@ async def list_groups_command(message: types.Message):
 @dp.message_handler(commands=['unban_all_groups'])
 async def unban_all_groups_command(message: types.Message):
     db.unban_all_groups()
-    await message.reply('Бан снят со всех групп. Все группы теперь разрешены!')
+    await message.reply('Все группы разблокированы.')
+
+@dp.message_handler(Command('debug_video_sending'), chat_type=[types.ChatType.GROUP, types.ChatType.SUPERGROUP])
+async def debug_video_sending(message: types.Message):
+    """Диагностика проблем с отправкой видео"""
+    user_id = message.from_user.id
+    from data.config import ADMINS
+    if user_id not in ADMINS:
+        await message.reply('Только супер-админ может использовать эту команду.')
+        return
+    
+    chat_id = message.chat.id
+    
+    # Проверяем whitelist
+    is_whitelisted = db.is_group_whitelisted(chat_id)
+    
+    # Проверяем настройки группы
+    settings = db.get_group_video_settings(chat_id)
+    
+    # Проверяем стартовые позиции
+    centris_start = db.get_group_video_start(chat_id, 'centris')
+    golden_start = db.get_group_video_start(chat_id, 'golden')
+    
+    # Проверяем просмотренные видео
+    viewed_videos = db.get_group_viewed_videos(chat_id)
+    
+    # Проверяем планировщик
+    from handlers.users.video_scheduler import scheduler
+    jobs = scheduler.get_jobs()
+    group_jobs = [job for job in jobs if job.id.startswith(f"group_") and str(chat_id) in job.id]
+    
+    text = f"""🔍 **ДИАГНОСТИКА ОТПРАВКИ ВИДЕО**
+
+📋 **Группа:** {chat_id}
+✅ **Whitelist:** {'Да' if is_whitelisted else 'Нет'}
+
+⚙️ **Настройки:**
+- Centris: {'Включен' if settings and settings[0] else 'Отключен'}
+- Centris сезон: {settings[1] if settings else 'Не задан'}
+- Centris стартовое видео: {settings[2] if settings else 'Не задано'}
+- Golden: {'Включен' if settings and settings[4] else 'Отключен'}
+- Golden сезон: {settings[5] if settings else 'Не задан'}
+- Golden стартовое видео: {settings[6] if settings else 'Не задано'}
+
+🎯 **Стартовые позиции:**
+- Centris: сезон {centris_start[0]}, видео {centris_start[1]}
+- Golden: сезон {golden_start[0]}, видео {golden_start[1]}
+
+👀 **Просмотренные видео:** {len(viewed_videos)} шт.
+📅 **Задачи в планировщике:** {len(group_jobs)} шт.
+
+🔄 **Планировщик статус:** {'Запущен' if scheduler.running else 'Остановлен'}
+"""
+    
+    await message.reply(text, parse_mode='HTML')
+
+@dp.message_handler(Command('restart_scheduler'), chat_type=[types.ChatType.GROUP, types.ChatType.SUPERGROUP])
+async def restart_scheduler_command(message: types.Message):
+    """Принудительный перезапуск планировщика видео"""
+    user_id = message.from_user.id
+    from data.config import ADMINS
+    if user_id not in ADMINS:
+        await message.reply('Только супер-админ может использовать эту команду.')
+        return
+    
+    try:
+        from handlers.users.video_scheduler import schedule_group_jobs, scheduler
+        
+        # Перезапускаем планировщик
+        if scheduler.running:
+            scheduler.shutdown()
+            await message.reply('🔄 Планировщик остановлен')
+        
+        # Создаем новые задачи
+        schedule_group_jobs()
+        
+        # Запускаем планировщик
+        if not scheduler.running:
+            scheduler.start()
+        
+        # Проверяем количество задач
+        jobs = scheduler.get_jobs()
+        group_jobs = [job for job in jobs if job.id.startswith("group_")]
+        
+        await message.reply(
+            f'✅ **Планировщик перезапущен!**\n\n'
+            f'📅 Всего задач: {len(jobs)}\n'
+            f'🏢 Задач для групп: {len(group_jobs)}\n'
+            f'🔄 Статус: {"Запущен" if scheduler.running else "Остановлен"}',
+            parse_mode='HTML'
+        )
+        
+    except Exception as e:
+        await message.reply(f'❌ Ошибка при перезапуске планировщика: {e}')
+
+@dp.message_handler(Command('test_video_sending'), chat_type=[types.ChatType.GROUP, types.ChatType.SUPERGROUP])
+async def test_video_sending_command(message: types.Message):
+    """Тестовая отправка видео в группу"""
+    user_id = message.from_user.id
+    from data.config import ADMINS
+    if user_id not in ADMINS:
+        await message.reply('Только супер-админ может использовать эту команду.')
+        return
+    
+    chat_id = message.chat.id
+    
+    try:
+        from handlers.users.video_scheduler import send_group_video_new
+        
+        # Проверяем whitelist
+        if not db.is_group_whitelisted(chat_id):
+            await message.reply('❌ Группа не в whitelist! Сначала добавьте группу в whitelist.')
+            return
+        
+        # Проверяем настройки
+        settings = db.get_group_video_settings(chat_id)
+        if not settings or (not settings[0] and not settings[4]):
+            await message.reply('❌ Группа не настроена для рассылки видео! Используйте /set_group_video')
+            return
+        
+        # Пытаемся отправить видео
+        sent = False
+        
+        if settings[0] and settings[1]:  # Centris включен
+            centris_start = db.get_group_video_start(chat_id, 'centris')
+            if centris_start[0]:
+                result = await send_group_video_new(chat_id, 'centris', centris_start[0], centris_start[1])
+                if result:
+                    sent = True
+                    await message.reply('✅ Centris видео отправлено!')
+                else:
+                    await message.reply('⚠️ Centris видео не отправлено (возможно, все просмотрены)')
+        
+        if settings[4] and settings[5]:  # Golden включен
+            golden_start = db.get_group_video_start(chat_id, 'golden')
+            if golden_start[0]:
+                result = await send_group_video_new(chat_id, 'golden_lake', golden_start[0], golden_start[1])
+                if result:
+                    sent = True
+                    await message.reply('✅ Golden Lake видео отправлено!')
+                else:
+                    await message.reply('⚠️ Golden Lake видео не отправлено (возможно, все просмотрены)')
+        
+        if not sent:
+            await message.reply('❌ Не удалось отправить ни одного видео. Проверьте настройки и статус.')
+            
+    except Exception as e:
+        await message.reply(f'❌ Ошибка при тестовой отправке: {e}')
 
 @dp.message_handler(commands=['force_remove_group'])
 async def force_remove_group_command(message: types.Message):

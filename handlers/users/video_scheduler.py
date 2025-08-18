@@ -186,18 +186,18 @@ async def send_group_video_by_settings(chat_id: int):
         return
         
     settings = db.get_group_video_settings(chat_id)
-    if not settings or (not settings[0] and not settings[2]):
+    if not settings or (not settings[0] and not settings[4]):
         logger.info(f"Группа {chat_id} не настроена для рассылки видео")
         return False
-    centris_enabled, centris_season_id, golden_enabled, golden_season_id = settings
+    centris_enabled, centris_season, centris_start_video, golden_enabled, golden_season, golden_start_video = settings
     sent = False
-    if centris_enabled and centris_season_id:
+    if centris_enabled and centris_season:
         # Отправить видео Centris
-        res = await send_group_video_new(chat_id, "centris", centris_season_id)
+        res = await send_group_video_new(chat_id, "centris", centris_season)
         sent = sent or res
-    if golden_enabled and golden_season_id:
+    if golden_enabled and golden_season:
         # Golden Lake — всегда первый сезон (или из настроек)
-        res = await send_group_video_new(chat_id, "golden_lake", golden_season_id)
+        res = await send_group_video_new(chat_id, "golden_lake", golden_season)
         sent = sent or res
     return sent
 
@@ -211,7 +211,7 @@ def schedule_group_jobs():
                 scheduler.remove_job(job.id)
         groups = db.get_all_groups_with_settings()
         logger.info(f"Найдено {len(groups)} групп с настройками")
-        for chat_id, centris_enabled, centris_season_id, golden_enabled, golden_season_id in groups:
+        for chat_id, centris_enabled, centris_season, centris_start_season_id, centris_start_video, golden_enabled, golden_start_season_id, golden_start_video, viewed_videos, is_subscribed in groups:
             if centris_enabled and not golden_enabled:
                 # Только Centris Towers
                     scheduler.add_job(
@@ -219,7 +219,7 @@ def schedule_group_jobs():
                         trigger='cron',
                         hour=8,
                         minute=0,
-                    args=[chat_id, 'centris', centris_season_id],
+                    args=[chat_id, 'centris', centris_season],
                         id=f"group_centrismorning_{chat_id}",
                         replace_existing=True,
                         timezone="Asia/Tashkent"
@@ -229,7 +229,7 @@ def schedule_group_jobs():
                         trigger='cron',
                         hour=20,
                         minute=0,
-                    args=[chat_id, 'centris', centris_season_id],
+                    args=[chat_id, 'centris', centris_season],
                         id=f"group_centrisevening_{chat_id}",
                         replace_existing=True,
                         timezone="Asia/Tashkent"
@@ -241,7 +241,7 @@ def schedule_group_jobs():
                     trigger='cron',
                     hour=8,
                     minute=0,
-                    args=[chat_id, 'golden_lake', golden_season_id],
+                    args=[chat_id, 'golden_lake', golden_start_season_id],
                     id=f"group_goldenmorning_{chat_id}",
                     replace_existing=True,
                     timezone="Asia/Tashkent"
@@ -251,7 +251,7 @@ def schedule_group_jobs():
                     trigger='cron',
                     hour=20,
                     minute=0,
-                    args=[chat_id, 'golden_lake', golden_season_id],
+                    args=[chat_id, 'golden_lake', golden_start_season_id],
                     id=f"group_goldenevening_{chat_id}",
                     replace_existing=True,
                     timezone="Asia/Tashkent"
@@ -263,7 +263,7 @@ def schedule_group_jobs():
                         trigger='cron',
                         hour=8,
                         minute=0,
-                    args=[chat_id, 'centris', centris_season_id],
+                    args=[chat_id, 'centris', centris_season],
                         id=f"group_centrismorning_{chat_id}",
                         replace_existing=True,
                         timezone="Asia/Tashkent"
@@ -273,7 +273,7 @@ def schedule_group_jobs():
                         trigger='cron',
                     hour=20,
                         minute=0,
-                    args=[chat_id, 'centris', centris_season_id],
+                    args=[chat_id, 'centris', centris_season],
                     id=f"group_centrisevening_{chat_id}",
                         replace_existing=True,
                         timezone="Asia/Tashkent"
@@ -283,7 +283,7 @@ def schedule_group_jobs():
                         trigger='cron',
                         hour=11,
                         minute=0,
-                    args=[chat_id, 'golden_lake', golden_season_id],
+                    args=[chat_id, 'golden_lake', golden_start_season_id],
                         id=f"group_golden_{chat_id}",
                         replace_existing=True,
                         timezone="Asia/Tashkent"
@@ -612,23 +612,26 @@ def schedule_group_jobs_v2():
     for group in groups:
         chat_id = group[0]
         centris_enabled = bool(group[1])
-        both_enabled = centris_enabled and bool(group[4])
+        golden_enabled = bool(group[5])
+        both_enabled = centris_enabled and golden_enabled
+        
         # Centris Towers
-        centris_start_season_id, centris_start_video = db.get_group_video_start(chat_id, 'centris')
-        if centris_enabled and centris_start_season_id:
-            if str(centris_start_season_id) == '1':
+        centris_season = group[2]  # centris_season
+        centris_start_video = group[4]  # centris_start_video
+        if centris_enabled and centris_season:
+            if str(centris_season) == '1':
                 scheduler.add_job(
                     send_group_video_new,
                     'cron',
                     hour=8, minute=0,
-                    args=[chat_id, 'centris', centris_start_season_id, centris_start_video],
+                    args=[chat_id, 'centris', centris_season, centris_start_video],
                     id=f'group_{chat_id}_centris_1'
                 )
                 scheduler.add_job(
                     send_group_video_new,
                     'cron',
                     hour=20, minute=0,
-                    args=[chat_id, 'centris', centris_start_season_id, centris_start_video],
+                    args=[chat_id, 'centris', centris_season, centris_start_video],
                     id=f'group_{chat_id}_centris_2'
                 )
             else:
@@ -636,25 +639,27 @@ def schedule_group_jobs_v2():
                     send_group_video_new,
                     'cron',
                     hour=8, minute=0,
-                    args=[chat_id, 'centris', centris_start_season_id, centris_start_video],
+                    args=[chat_id, 'centris', centris_season, centris_start_video],
                     id=f'group_{chat_id}_centris'
                 )
-    # Golden Lake
-    golden_start_season_id, golden_start_video = db.get_group_video_start(chat_id, 'golden')
-    if bool(group[4]) and golden_start_season_id:
-        if both_enabled:
-            scheduler.add_job(
-                send_group_video_new,
-                'cron',
-                hour=11, minute=0,
-                args=[chat_id, 'golden_lake', golden_start_season_id, golden_start_video],
-                id=f'group_{chat_id}_golden'
-            )
-        else:
-            scheduler.add_job(
-                send_group_video_new,
-                'cron',
-                hour=8, minute=0,
-                args=[chat_id, 'golden_lake', golden_start_season_id, golden_start_video],
-                id=f'group_{chat_id}_golden'
-            )
+        
+        # Golden Lake
+        golden_start_season_id = group[6]  # golden_start_season_id
+        golden_start_video = group[7]  # golden_start_video
+        if golden_enabled and golden_start_season_id:
+            if both_enabled:
+                scheduler.add_job(
+                    send_group_video_new,
+                    'cron',
+                    hour=11, minute=0,
+                    args=[chat_id, 'golden_lake', golden_start_season_id, golden_start_video],
+                    id=f'group_{chat_id}_golden'
+                )
+            else:
+                scheduler.add_job(
+                    send_group_video_new,
+                    'cron',
+                    hour=8, minute=0,
+                    args=[chat_id, 'golden_lake', golden_start_season_id, golden_start_video],
+                    id=f'group_{chat_id}_golden'
+                )

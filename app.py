@@ -32,6 +32,13 @@ async def on_startup(dispatcher):
 
     # Инициализировать middleware
     middlewares.setup(dp)
+    
+    # Инициализировать планировщик видео
+    try:
+        await init_scheduler()
+        logger.info("Планировщик видео успешно инициализирован")
+    except Exception as e:
+        logger.error(f"Ошибка при инициализации планировщика видео: {e}")
 
 
 async def on_shutdown(dispatcher):

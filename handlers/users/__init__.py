@@ -8,7 +8,6 @@ from .admin_image_sender import dp
 # Явно импортируем обработчики команд для их регистрации
 from .admin_image_sender import (
     set_group_video_command,
-    set_group_video_private_command,
     process_project_selection,
     process_centr_season,
     process_golden_season,
