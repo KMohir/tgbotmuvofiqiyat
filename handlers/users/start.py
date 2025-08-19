@@ -8,10 +8,9 @@ try:
     from aiogram.dispatcher.filters.builtin import CommandStart
     from aiogram.types import ParseMode, Message, ReplyKeyboardRemove
     from db import db
-    from keyboards.default.reply import key, get_lang_for_button, main_menu_keyboard
     from loader import dp, bot
-    from states.state import RegistrationStates
-    from translation import _
+    from states import RegistrationStates
+    from keyboards.default.reply import key, get_lang_for_button
     import time
     from aiogram.dispatcher.storage import DELTA
     from data.config import SUPER_ADMIN_ID, ADMINS

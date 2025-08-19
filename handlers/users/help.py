@@ -8,7 +8,7 @@ try:
     import pandas as pd
     from db import db
     from loader import dp
-    from states.state import RegistrationStates
+    from states import RegistrationStates
     import os
     from keyboards.default.reply import key, get_lang_for_button
 

@@ -9,7 +9,7 @@ from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters import Command
 from loader import dp, bot
 from db import db
-from states.state import SecurityStates
+from states import SecurityStates
 from data.config import ADMINS, SUPER_ADMIN_ID
 from keyboards.default.reply import main_menu_keyboard
 
@@ -58,7 +58,7 @@ async def security_start_registration(message: types.Message, state: FSMContext)
     security_status = db.get_user_security_status(user_id)
     
     if security_status == 'approved':
-        await message.answer("🎬 **Centris Towers & Golden Lake Botiga xush kelibsiz!**\n\nO'zingizga yoqqan loyihani tanlang:", reply_markup=main_menu_keyboard)
+        await message.answer("🎬 **Centris Towers & Golden Lake Botiga xush kelibsiz!**\n\nO'zingizga yoqqan loyihani tanlang:", reply_markup=main_menu_keyboard())
         await state.finish()
     elif security_status == 'pending':
         await message.answer("⏳ **Sizning arizangiz ko'rib chiqilmoqda**\n\nAdministrator hali sizning arizangizni ko'rib chiqmagan.\nIltimos, tasdiqlashni kuting.")

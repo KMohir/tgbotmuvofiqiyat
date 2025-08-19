@@ -246,7 +246,90 @@ async def group_settings(message: types.Message):
         f"golden_start_video: {golden_start_video}\n"
         f"is_subscribed: {is_subscribed}"
     )
-    await message.reply(text, parse_mode='HTML') 
+    await message.reply(text, parse_mode='HTML')
+
+# Команда для просмотра настроек видео рассылки группы (красивый формат)
+@dp.message_handler(Command('show_group_video_settings'), chat_type=[types.ChatType.GROUP, types.ChatType.SUPERGROUP])
+async def show_group_video_settings_command(message: types.Message):
+    """
+    Команда для просмотра текущих настроек видео рассылки в группе
+    """
+    try:
+        chat_id = message.chat.id
+        user_id = message.from_user.id
+        
+        # Проверяем права пользователя
+        from data.config import ADMINS
+        if user_id not in ADMINS:
+            await message.reply('❌ Только супер-админ может использовать эту команду.')
+            return
+        
+        # Получаем настройки группы
+        settings = db.get_group_video_settings(chat_id)
+        if not settings:
+            await message.reply(
+                "📹 **GURUH VIDEO SOZLAMALARI**\n\n"
+                "❌ **Hech qanday sozlamalar topilmadi!**\n\n"
+                "Video tarqatishni yoqish uchun /set_group_video buyrug'ini ishlating."
+            )
+            return
+        
+        # Получаем стартовые позиции
+        centris_start = db.get_group_video_start(chat_id, 'centris')
+        golden_start = db.get_group_video_start(chat_id, 'golden')
+        
+        # Получаем информацию о сезонах
+        centris_season_name = "N/A"
+        golden_season_name = "N/A"
+        
+        if settings[1]:  # centris_season
+            centris_season_info = db.get_season_by_id(settings[1])
+            if centris_season_info:
+                centris_season_name = centris_season_info[1]  # season_name
+        
+        if settings[5]:  # golden_season
+            golden_season_info = db.get_season_by_id(settings[5])
+            if golden_season_info:
+                golden_season_name = golden_season_info[1]  # season_name
+        
+        # Формируем ответ
+        response = "📹 **GURUH VIDEO SOZLAMALARI**\n\n"
+        
+        # Centris Towers
+        response += "🏢 **Centris Towers:**\n"
+        if settings[0]:  # centris_enabled
+            response += f"   ✅ Yoqilgan\n"
+            response += f"   📺 Seson: {centris_season_name}\n"
+            response += f"   🎬 Boshlash videosi: {centris_start[1] if centris_start[0] else 0}\n"
+        else:
+            response += "   ❌ O'chirilgan\n"
+        
+        response += "\n"
+        
+        # Golden Lake
+        response += "🏘️ **Golden Lake:**\n"
+        if settings[4]:  # golden_enabled
+            response += f"   ✅ Yoqilgan\n"
+            response += f"   📺 Seson: {golden_season_name}\n"
+            response += f"   🎬 Boshlash videosi: {golden_start[1] if golden_start[0] else 0}\n"
+        else:
+            response += "   ❌ O'chirilgan\n"
+        
+        response += "\n"
+        
+        # Статус подписки
+        is_subscribed = db.get_subscription_status(chat_id)
+        response += f"📡 **Obuna holati:** {'✅ Faol' if is_subscribed else '❌ Faol emas'}\n"
+        
+        # Whitelist статус
+        is_whitelisted = db.is_group_whitelisted(chat_id)
+        response += f"🔒 **Whitelist:** {'✅ Ruxsat berilgan' if is_whitelisted else '❌ Ruxsat berilmagan'}\n"
+        
+        await message.reply(response, parse_mode='Markdown')
+        
+    except Exception as e:
+        logging.error(f"Ошибка при показе настроек группы: {e}")
+        await message.reply(f"❌ Xatolik yuz berdi: {e}")
 
 @dp.message_handler(Command('set_centr_season'), chat_type=[types.ChatType.GROUP, types.ChatType.SUPERGROUP])
 async def set_centr_season(message: types.Message):

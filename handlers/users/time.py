@@ -8,7 +8,7 @@ try:
     from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove
     from loader import dp, bot
     from db import db
-    from states.state import TimeSelection
+    from states import TimeSelection
     def get_lang_for_button(message):
         button = ReplyKeyboardMarkup(
             keyboard=[

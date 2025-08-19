@@ -1,1 +1,0 @@
-app.py [LINE:40] #ERROR    [2025-08-17 23:22:09,701]  Ошибка при остановке планировщика: 'NoneType' object has no attribute 'call_soon_threadsafe'

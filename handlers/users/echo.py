@@ -5,7 +5,7 @@ try:
     from aiogram.dispatcher import FSMContext
     from db import db
     from loader import dp
-    from states.state import TimeSelection, RegistrationStates, answer, questions, language, ImageCollection
+    from states import TimeSelection, RegistrationStates, answer, questions, language, ImageCollection
 
     # Список состояний, которые нужно исключить из обработки
     EXCLUDED_STATES = [

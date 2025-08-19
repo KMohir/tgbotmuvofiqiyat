@@ -1,41 +1,19 @@
+# Файл с функциями для reply клавиатур
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
 
-from translation import _
+def get_lang_for_button(user_id, button_text):
+    """Функция для выбора языка кнопки"""
+    return button_text
 
-
-def get_lang_for_button(message):
-    button = ReplyKeyboardMarkup(
-        keyboard=[
-            [
-                KeyboardButton(text="Centris towers"),
-
-            ],
-            [
-                KeyboardButton(text="Golden lake")
-            ],
-            [
-                KeyboardButton(text="Centris Towers bilan bog'lanish")
-            ],
-            [
-                KeyboardButton(text="Bino bilan tanishish")
-            ],
-        ],
-        resize_keyboard=True
-    )
-    return button
-
+def main_menu_keyboard():
+    """Главное меню клавиатура"""
+    keyboard = ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
+    keyboard.add(KeyboardButton("Centris towers"))
+    keyboard.add(KeyboardButton("Golden lake"))
+    keyboard.add(KeyboardButton("Centris Towers bilan bog'lanish"))
+    keyboard.add(KeyboardButton("Bino bilan tanishish"))
+    return keyboard
 
 def key():
-    keyboardcontakt = ReplyKeyboardMarkup(
-        keyboard=[
-            [
-                KeyboardButton(text="Kontakni yuborish", request_contact=True)
-            ],
-        ],
-        resize_keyboard=True
-    )
-    return keyboardcontakt
-
-
-main_menu_keyboard = ReplyKeyboardMarkup(resize_keyboard=True)
-main_menu_keyboard.add(KeyboardButton("Centris towers"), KeyboardButton("Golden lake"))
+    """Функция для получения языка"""
+    return "uz"

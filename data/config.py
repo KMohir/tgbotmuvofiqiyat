@@ -2,12 +2,7 @@ from environs import Env
 import logging
 import os
 
-# Настройка логирования
-logging.basicConfig(
-    level=logging.ERROR,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    filename='bot.log'
-)
+# Логирование настраивается в app.py
 logger = logging.getLogger(__name__)
 
 # Теперь используем вместо библиотеки python-dotenv библиотеку environs

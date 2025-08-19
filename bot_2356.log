@@ -1,2 +1,0 @@
-app.py [LINE:67] #ERROR    [2025-07-16 23:24:35,306]  Ошибка при остановке планировщика: 'NoneType' object has no attribute 'call_soon_threadsafe'
-app.py [LINE:92] #CRITICAL [2025-07-16 23:24:35,308]  Критическая ошибка при запуске бота: Aiohttp client throws an error: ClientConnectorError: Cannot connect to host api.telegram.org:443 ssl:default [Temporary failure in name resolution]

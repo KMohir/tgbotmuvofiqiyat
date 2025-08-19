@@ -3,29 +3,43 @@ from loader import dp
 import middlewares, filters, handlers
 from utils.misc.set_bot_commands import set_default_commands
 from utils.notify_admins import on_startup_notify
-from handlers.users import admin_image_sender
-# Явно импортируем обработчики команд
-from handlers.users.admin_image_sender import set_group_video_command
 from handlers.users.video_scheduler import scheduler, init_scheduler
 from db import db
-import asyncio
 import logging
 
 # Настройка логирования
 logging.basicConfig(
-    level=logging.ERROR,  # Вернул обратно ERROR после диагностики
+    level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    filename='bot.log'
+    filename='bot.log',
+    filemode='a',
+    encoding='utf-8'
 )
+
+# Настраиваем логгер для проекта
 logger = logging.getLogger(__name__)
+
+# Устанавливаем уровень логирования для всех модулей проекта
+logging.getLogger('handlers').setLevel(logging.INFO)
+logging.getLogger('db').setLevel(logging.INFO)
+logging.getLogger('utils').setLevel(logging.INFO)
 
 db.create_tables()  # Автоматически создать все таблицы, если их нет
 
-print("dp в app.py:", id(dp))
+# Явно импортируем модуль команд групп для их регистрации
+import handlers.users.group_video_commands
 
 async def on_startup(dispatcher):
     # Установить команды бота
     await set_default_commands(dispatcher)
+    
+    # Проверяем зарегистрированные команды
+    logger.info("🔍 Проверяем зарегистрированные команды...")
+    try:
+        commands = await dispatcher.bot.get_my_commands()
+        logger.info(f"✅ Команды бота: {[cmd.command for cmd in commands]}")
+    except Exception as e:
+        logger.error(f"❌ Ошибка при получении команд: {e}")
 
     # Уведомить админов
     await on_startup_notify(dispatcher)

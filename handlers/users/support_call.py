@@ -11,7 +11,7 @@ try:
     from keyboards.default.reply import get_lang_for_button
     from keyboards.inline.support import support_keyboard, support_callback, cancel_support_callback
     from loader import dp, bot
-    from states.state import RegistrationStates
+    from states import RegistrationStates
     from aiogram import types
     from aiogram.dispatcher.filters import Text
     from loader import dp, bot

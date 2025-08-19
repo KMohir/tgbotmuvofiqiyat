@@ -10,7 +10,7 @@ try:
     from db import db
     from keyboards.default.reply import key, get_lang_for_button
     from loader import dp, bot
-    from states.state import RegistrationStates
+    from states import RegistrationStates
 
     # Настройка логирования
     logger = logging.getLogger(__name__)

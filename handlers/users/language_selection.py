@@ -5,7 +5,7 @@ try:
     from aiogram import types
     from aiogram.dispatcher import FSMContext
     from loader import dp, bot
-    from states.state import RegistrationStates
+    from states import RegistrationStates
     from db import db
 
     @dp.callback_query_handler(text_contains="lang_", state=RegistrationStates.lang)
