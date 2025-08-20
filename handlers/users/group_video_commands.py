@@ -1239,7 +1239,7 @@ async def debug_group_video_command(message: types.Message):
         response += f"   • ID: {chat_id}\n"
         response += f"   • Nomi: {message.chat.title}\n"
         response += f"   • Turi: {message.chat.type}\n"
-        response += f"   • Username: {message.chat.username or 'Yo\'q'}\n\n"
+        response += f"   • Username: {message.chat.username or 'Yo''q'}\n\n"
         
         # Настройки видео
         settings = db.get_group_video_settings(chat_id)
@@ -3959,10 +3959,10 @@ async def process_group_selection(callback_query: types.CallbackQuery, state: FS
                     f"🆔 **ID:** {chat_id}\n\n"
                     f"🎬 Video tarqatish faollashtirildi.\n\n"
                     f"📋 **Sozlamalar:**\n"
-                    f"• Centris: {'✅ Yoqilgan' if saved_settings['centris_enabled'] else '❌ O\'chirilgan'}\n"
+                    f"• Centris: {'✅ Yoqilgan' if saved_settings['centris_enabled'] else '❌ O''chirilgan'}\n"
                     f"  📺 Sezon: {centris_season_name if saved_settings['centris_enabled'] else 'N/A'}\n"
                     f"  🎥 Video: {saved_settings['centris_start_video'] + 1 if saved_settings['centris_enabled'] else 'N/A'}\n"
-                    f"• Golden: {'✅ Yoqilgan' if saved_settings['golden_enabled'] else '❌ O\'chirilgan'}\n"
+                    f"• Golden: {'✅ Yoqilgan' if saved_settings['golden_enabled'] else '❌ O''chirilgan'}\n"
                     f"  📺 Sezon: {golden_season_name if saved_settings['golden_enabled'] else 'N/A'}\n"
                     f"  🎥 Video: {saved_settings['golden_start_video'] + 1 if saved_settings['golden_enabled'] else 'N/A'}"
                 )
@@ -4057,10 +4057,10 @@ async def process_group_selection(callback_query: types.CallbackQuery, state: FS
                 f"🆔 **ID:** {group_id}\n\n"
                 f"🎬 Video tarqatish faollashtirildi.\n\n"
                 f"📋 **Sozlamalar:**\n"
-                f"• Centris: {'✅ Yoqilgan' if saved_settings['centris_enabled'] else '❌ O\'chirilgan'}\n"
+                f"• Centris: {'✅ Yoqilgan' if saved_settings['centris_enabled'] else '❌ O''chirilgan'}\n"
                 f"  📺 Sezon: {centris_season_name if saved_settings['centris_enabled'] else 'N/A'}\n"
                 f"  🎥 Video: {saved_settings['centris_start_video'] + 1 if saved_settings['centris_enabled'] else 'N/A'}\n"
-                f"• Golden: {'✅ Yoqilgan' if saved_settings['golden_enabled'] else '❌ O\'chirilgan'}\n"
+                f"• Golden: {'✅ Yoqilgan' if saved_settings['golden_enabled'] else '❌ O''chirilgan'}\n"
                 f"  📺 Sezon: {golden_season_name if saved_settings['golden_enabled'] else 'N/A'}\n"
                 f"  🎥 Video: {saved_settings['golden_start_video'] + 1 if saved_settings['golden_enabled'] else 'N/A'}"
             )
@@ -4167,10 +4167,10 @@ async def process_manual_group_id(message: types.Message, state: FSMContext):
             f"🆔 **ID:** {group_id}\n\n"
             f"🎬 Video tarqatish faollashtirildi.\n\n"
             f"📋 **Sozlamalar:**\n"
-            f"• Centris: {'✅ Yoqilgan' if saved_settings['centris_enabled'] else '❌ O\'chirilgan'}\n"
+            f"• Centris: {'✅ Yoqilgan' if saved_settings['centris_enabled'] else '❌ O''chirilgan'}\n"
             f"  📺 Sezon: {centris_season_name if saved_settings['centris_enabled'] else 'N/A'}\n"
             f"  🎥 Video: {saved_settings['centris_start_video'] + 1 if saved_settings['centris_enabled'] else 'N/A'}\n"
-            f"• Golden: {'✅ Yoqilgan' if saved_settings['golden_enabled'] else '❌ O\'chirilgan'}\n"
+            f"• Golden: {'✅ Yoqilgan' if saved_settings['golden_enabled'] else '❌ O''chirilgan'}\n"
             f"  📺 Sezon: {golden_season_name if saved_settings['golden_enabled'] else 'N/A'}\n"
             f"  🎥 Video: {saved_settings['golden_start_video'] + 1 if saved_settings['golden_enabled'] else 'N/A'}"
         )

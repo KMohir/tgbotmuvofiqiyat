@@ -268,7 +268,7 @@ async def show_whitelisted_groups(message: types.Message):
     
     for group_data in groups:
         chat_id = group_data['chat_id']
-        title = group_data['title'] or 'Noma\'lum guruh'
+        title = group_data['title'] or 'Noma''lum guruh'
         added_date = group_data['added_date'].strftime("%d.%m.%Y %H:%M")
         
         text += f"🏷 **{title}**\n"
