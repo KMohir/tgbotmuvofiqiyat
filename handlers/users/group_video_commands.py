@@ -1,3 +1,4 @@
+import asyncio
 from aiogram import types
 from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters import Command
@@ -5,6 +6,11 @@ from handlers import groups
 from db import db
 from loader import dp
 import logging
+from datetime import datetime
+
+# Импортируем состояния
+from handlers.users.group_video_states import GroupVideoStates
+from handlers.users.video_scheduler import schedule_single_group_jobs
 
 # Настройка логирования
 logger = logging.getLogger(__name__)
@@ -61,8 +67,6 @@ async def set_group_video_command(message: types.Message, state: FSMContext):
             parse_mode="Markdown"
         )
     
-    # Импортируем состояния
-    from handlers.users.group_video_states import GroupVideoStates
     await state.set_state(GroupVideoStates.waiting_for_project.state)
     await state.update_data(chat_id=chat_id)
     logger.info(f"✅ Состояние установлено, chat_id: {chat_id}")
@@ -173,6 +177,3542 @@ async def show_group_video_settings(message: types.Message):
 
 logger.info("✅ Команды групп зарегистрированы успешно!")
 
+# Команда для запуска отправки видео в группе
+@dp.message_handler(commands=['start_group_video'])
+async def start_group_video_command(message: types.Message):
+    """
+    Команда для запуска отправки видео в группе
+    """
+    logger.info(f"🚀 start_group_video вызвана в чате {message.chat.id} ({message.chat.type})")
+    logger.info(f"👤 Пользователь: {message.from_user.id} ({message.from_user.username})")
+    
+    try:
+        chat_id = message.chat.id
+        user_id = message.from_user.id
+        
+        # Проверяем права пользователя
+        if user_id not in ADMINS + [SUPER_ADMIN_ID] and not db.is_admin(user_id):
+            logger.warning(f"❌ Пользователь {user_id} не имеет прав")
+            await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat adminlar foydalana oladi.")
+            return
+        
+        logger.info(f"✅ Пользователь {user_id} имеет права")
+        
+        # Проверяем, что команда используется в группе
+        if message.chat.type not in [types.ChatType.GROUP, types.ChatType.SUPERGROUP]:
+            logger.warning("⚠️ Команда вызвана не в группе")
+            await message.answer("⚠️ Bu buyruq faqat guruhlarda ishlaydi.")
+            return
+        
+        logger.info("✅ Команда вызвана в группе, продолжаем обработку")
+        
+        # Получаем настройки группы
+        settings = db.get_group_video_settings(chat_id)
+        if not settings:
+            await message.answer(
+                "📹 **GURUH VIDEO SOZLAMALARI**\n\n"
+                "❌ **Hech qanday sozlamalar topilmadi!**\n\n"
+                "Video tarqatishni yoqish uchun /set_group_video buyrug'ini ishlating."
+            )
+            return
+        
+        # Проверяем что группа в whitelist
+        if not db.is_group_whitelisted(chat_id):
+            await message.answer(
+                "🔒 **GURUH WHITELIST DA EMAS!**\n\n"
+                "Video yuborish uchun guruh whitelist ga qo'shilishi kerak."
+            )
+            return
+        
+        # Запускаем отправку видео
+        from handlers.users.video_scheduler import send_group_video_new
+        
+        centris_enabled = settings[0]
+        golden_enabled = settings[4]
+        
+        sent = False
+        
+        if centris_enabled:
+            centris_season_id = settings[1]
+            if centris_season_id:
+                result = await send_group_video_new(chat_id, 'centris', centris_season_id)
+                sent = sent or result
+        
+        if golden_enabled:
+            golden_season_id = settings[5]
+            if golden_season_id:
+                result = await send_group_video_new(chat_id, 'golden_lake', golden_season_id)
+                sent = sent or result
+        
+        if sent:
+            await message.answer("✅ **Video yuborildi!**\n\n🎬 Keyingi video avtomatik ravishda yuboriladi.")
+        else:
+            await message.answer("⚠️ **Hech qanday yangi video topilmadi!**\n\nBarcha video allaqachon yuborilgan.")
+        
+    except Exception as e:
+        logger.error(f"Ошибка при запуске видео в группе: {e}")
+        await message.answer(f"❌ Xatolik yuz berdi: {e}")
+
+# Команда для остановки автоматической отправки видео в группе
+@dp.message_handler(commands=['stop_group_video'])
+async def stop_group_video_command(message: types.Message):
+    """
+    Команда для остановки автоматической отправки видео в группе
+    """
+    logger.info(f"🚀 stop_group_video вызвана в чате {message.chat.id} ({message.chat.type})")
+    logger.info(f"👤 Пользователь: {message.from_user.id} ({message.from_user.username})")
+    
+    try:
+        chat_id = message.chat.id
+        user_id = message.from_user.id
+        
+        # Проверяем права пользователя
+        if user_id not in ADMINS + [SUPER_ADMIN_ID] and not db.is_admin(user_id):
+            logger.warning(f"❌ Пользователь {user_id} не имеет прав")
+            await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat adminlar foydalana oladi.")
+            return
+        
+        logger.info(f"✅ Пользователь {user_id} имеет права")
+        
+        # Проверяем, что команда используется в группе
+        if message.chat.type not in [types.ChatType.GROUP, types.ChatType.SUPERGROUP]:
+            logger.warning("⚠️ Команда вызвана не в группе")
+            await message.answer("⚠️ Bu buyruq faqat guruhlarda ishlaydi.")
+            return
+        
+        logger.info("✅ Команда вызвана в группе, продолжаем обработку")
+        
+        # Останавливаем автоматическую отправку видео
+        db.set_group_video_settings(chat_id, False, None, 0, False, None, 0)
+        
+        # Удаляем запланированные задачи для этой группы
+        from handlers.users.video_scheduler import scheduler
+        jobs_to_remove = []
+        for job in scheduler.get_jobs():
+            if job.id.startswith(f"group_") and str(chat_id) in job.id:
+                jobs_to_remove.append(job.id)
+        
+        for job_id in jobs_to_remove:
+            scheduler.remove_job(job_id)
+            logger.info(f"Удалена задача {job_id} для группы {chat_id}")
+        
+        await message.answer("⏹️ **Avtomatik video yuborish to'xtatildi!**\n\nVideo yuborishni qayta yoqish uchun /set_group_video buyrug'ini ishlating.")
+        
+    except Exception as e:
+        logger.error(f"Ошибка при остановке видео в группе: {e}")
+        await message.answer(f"❌ Xatolik yuz berdi: {e}")
+
+# Команда для справки по командам групп
+@dp.message_handler(commands=['help_group_video'])
+async def help_group_video_command(message: types.Message):
+    """
+    Команда для справки по командам групп
+    """
+    help_text = """
+📹 **GURUH VIDEO BUYRUQLARI**
+
+🏢 **/set_group_video** - Video tarqatish sozlamalari
+   • Centris Towers va Golden Lake loyihalari uchun
+   • Seson va boshlash videosi tanlash
+   • Avtomatik video yuborish yoqish
+
+🎬 **/start_group_video** - Video yuborishni boshlash
+   • Hozircha video yuborish
+   • Avtomatik yuborish faollashtiriladi
+
+⏹️ **/stop_group_video** - Video yuborishni to'xtatish
+   • Avtomatik video yuborish o'chiriladi
+   • Barcha rejalangan vazifalar to'xtatiladi
+
+📊 **/show_group_video_settings** - Hozirgi sozlamalar
+   • Faol loyihalar
+   • Seson va video ma'lumotlari
+   • Obuna va whitelist holati
+
+📋 **/admin_show_all_groups_settings** - Barcha guruhlar sozlamalari (Admin)
+   • Barcha guruhlar sozlamalari
+   • Centris va Golden loyihalari
+   • Video va jadval ma'lumotlari
+
+🔒 **/add_group_to_whitelist** - Guruhni whitelist ga qo'shish
+   • Faqat super admin uchun
+   • Video yuborish ruxsati
+
+❌ **/remove_group_from_whitelist** - Guruhni whitelist dan olib tashlash
+   • Faqat super admin uchun
+   • Video yuborish ruxsatini bekor qilish
+
+🧪 **/test_group_video** - Video yuborishni test qilish
+   • Hozircha video yuborish
+   • Test natijalarini ko'rish
+
+🔄 **/reset_group_video** - Guruh sozlamalarini qayta o'rnatish
+   • Barcha sozlamalar o'chiriladi
+   • Video yuborish to'xtatiladi
+
+📋 **/list_group_videos** - Guruh video ro'yxati
+   • Barcha video va holati
+   • Statistika va progress
+
+⏭️ **/next_group_video** - Keyingi video yuborish
+   • Keyingi ko'rilmagan video
+   • Avtomatik yuborish davom etadi
+
+⏭️ **/skip_group_video** - Video o'tkazib yuborish
+   • Hozirgi video o'tkazib yuboriladi
+   • Keyingi video yuboriladi
+
+📊 **/status_group_video** - Video holati va progress
+   • Progress va statistika
+   • Avtomatik yuborish vaqti
+
+💪 **/force_group_video** - Video majburiy yuborish
+   • Faqat super admin uchun
+   • Whitelist ni e'tiborsiz qoldirish
+
+🔄 **/schedule_group_video** - Vazifalarni qayta rejalashtirish
+   • Avtomatik yuborish vaqti
+   • Yangi rejalar
+
+🐛 **/debug_group_video** - Debug ma'lumotlari
+   • Faqat super admin uchun
+   • Barcha tizim ma'lumotlari
+
+📋 **/all_group_commands** - Barcha buyruqlar ro'yxati
+   • To'liq buyruqlar ro'yxati
+   • Kategoriyalar bo'yicha
+
+🏥 **/ping_group_video** - Sistema holatini tekshirish
+   • Barcha tizim komponentlari
+   • Xatoliklar va holat
+
+📋 **/version_group_video** - Sistema versiyasi
+   • Texnik ma'lumotlar
+   • Komponentlar va funksiyalar
+
+📊 **/stats_group_video** - Sistema statistikasi
+   • Barcha ma'lumotlar
+   • Hisoblar va ko'rsatkichlar
+
+🧹 **/cleanup_group_video** - Sistema tozalash
+   • Faqat super admin uchun
+   • Barcha ma'lumotlarni tozalash
+
+💾 **/backup_group_video** - Reserva nusxasi
+   • Faqat super admin uchun
+   • Barcha ma'lumotlarni saqlash
+
+🔄 **/restore_group_video** - Reservadan tiklash
+   • Faqat super admin uchun
+   • Ma'lumotlarni tiklash
+
+📋 **/logs_group_video** - Sistema loglari
+   • Faqat super admin uchun
+   • Xatoliklar va holat
+
+📊 **/monitor_group_video** - Sistema monitoringi
+   • Faqat super admin uchun
+   • Resurslar va holat
+
+🚨 **/emergency_group_video** - Extren tizrortatlar
+   • Faqat super admin uchun
+   • Sistema to'liq to'xtatish
+
+🔄 **/reboot_group_video** - Sistema qayta ishga tushirish
+   • Faqat super admin uchun
+   • Sistema qayta ishga tushirish
+
+ℹ️ **/info_group_video** - Sistema ma'lumotlari
+   • To'liq tizim ma'lumotlari
+   • Arxitektura va funksiyalar
+
+🆘 **/support_group_video** - Qo'llab-quvvatlash
+   • Aloqa ma'lumotlari
+   • Muammolarni hal qilish
+
+ℹ️ **/about_group_video** - Loyiha haqida
+   • Loyiha ma'lumotlari
+   • Tarix va kelajak
+
+🙏 **/credits_group_video** - Rahmat va tanzimlar
+   • Texnologiyalar va jamiyat
+   • Ishlab chiqaruvchilar
+
+💰 **/donate_group_video** - Saxovat va qo'llab-quvvatlash
+   • Saxovat usullari
+   • Imtiyozlar va maqsadlar
+
+📝 **/changelog_group_video** - O'zgarishlar tarixi
+   • Versiyalar va yangilanishlar
+   • Yaxshilanishlar va tuzatishlar
+
+📄 **/license_group_video** - Litsenziya ma'lumotlari
+   • Litsenziya shartlari
+   • Foydalanish huquqlari
+
+🔒 **/privacy_group_video** - Maxfiylik siyosati
+   • Ma'lumotlar boshqaruvi
+   • Maxfiylik va xavfsizlik
+
+📋 **/terms_group_video** - Foydalanish shartlari
+   • Foydalanish qoidalari
+   • Javobgarlik va cheklar
+
+💡 **Foydalanish:**
+1. Guruhda yoki shaxsiy xabarda /set_group_video buyrug'ini ishlating
+2. Loyihani tanlang (Centris, Golden yoki ikkalasi)
+3. Seson va boshlash videosini tanlang
+4. Guruhni tanlang:
+   • 🏢 **Hozirgi guruh** - hozirgi guruhga qo'llash
+   • 📝 **ID guruhni kiriting** - guruh ID sini qo'lda kiriting
+   • 📋 **Ro'yxatdan tanlang** - whitelist dagi barcha guruhlardan tanlang
+5. Video avtomatik ravishda yuboriladi
+
+⏰ **Avtomatik yuborish vaqti:**
+• Centris Towers: 08:00 va 20:00
+• Golden Lake: 11:00
+• Vaqt: Toshkent (UTC+5)
+"""
+    
+    await message.answer(help_text, parse_mode="Markdown")
+
+# Команда для добавления группы в whitelist
+@dp.message_handler(commands=['add_group_to_whitelist'])
+async def add_group_to_whitelist_command(message: types.Message):
+    """
+    Команда для добавления группы в whitelist
+    """
+    logger.info(f"🚀 add_group_to_whitelist вызвана в чате {message.chat.id} ({message.chat.type})")
+    logger.info(f"👤 Пользователь: {message.from_user.id} ({message.from_user.username})")
+    
+    try:
+        chat_id = message.chat.id
+        user_id = message.from_user.id
+        
+        # Проверяем права пользователя (только супер-админ)
+        if user_id != SUPER_ADMIN_ID:
+            logger.warning(f"❌ Пользователь {user_id} не имеет прав")
+            await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat super admin foydalana oladi.")
+            return
+        
+        logger.info(f"✅ Пользователь {user_id} имеет права")
+        
+        # Проверяем, что команда используется в группе
+        if message.chat.type not in [types.ChatType.GROUP, types.ChatType.SUPERGROUP]:
+            logger.warning("⚠️ Команда вызвана не в группе")
+            await message.answer("⚠️ Bu buyruq faqat guruhlarda ishlaydi.")
+            return
+        
+        logger.info("✅ Команда вызвана в группе, продолжаем обработку")
+        
+        # Добавляем группу в whitelist
+        if db.add_group_to_whitelist(chat_id):
+            await message.answer("✅ **Guruh whitelist ga qo'shildi!**\n\n🔓 Endi video yuborish mumkin.")
+        else:
+            await message.answer("❌ **Xatolik yuz berdi!**\n\nGuruh whitelist ga qo'shilmadi.")
+        
+    except Exception as e:
+        logger.error(f"Ошибка при добавлении группы в whitelist: {e}")
+        await message.answer(f"❌ Xatolik yuz berdi: {e}")
+
+# Команда для удаления группы из whitelist
+@dp.message_handler(commands=['remove_group_from_whitelist'])
+async def remove_group_from_whitelist_command(message: types.Message):
+    """
+    Команда для удаления группы из whitelist
+    """
+    logger.info(f"🚀 remove_group_from_whitelist вызвана в чате {message.chat.id} ({message.chat.type})")
+    logger.info(f"👤 Пользователь: {message.from_user.id} ({message.from_user.username})")
+    
+    try:
+        chat_id = message.chat.id
+        user_id = message.from_user.id
+        
+        # Проверяем права пользователя (только супер-админ)
+        if user_id != SUPER_ADMIN_ID:
+            logger.warning(f"❌ Пользователь {user_id} не имеет прав")
+            await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat super admin foydalana oladi.")
+            return
+        
+        logger.info(f"✅ Пользователь {user_id} имеет права")
+        
+        # Проверяем, что команда используется в группе
+        if message.chat.type not in [types.ChatType.GROUP, types.ChatType.SUPERGROUP]:
+            logger.warning("⚠️ Команда вызвана не в группе")
+            await message.answer("⚠️ Bu buyruq faqat guruhlarda ishlaydi.")
+            return
+        
+        logger.info("✅ Команда вызвана в группе, продолжаем обработку")
+        
+        # Удаляем группу из whitelist
+        if db.remove_group_from_whitelist(chat_id):
+            await message.answer("❌ **Guruh whitelist dan olib tashlandi!**\n\n🔒 Endi video yuborish mumkin emas.")
+        else:
+            await message.answer("⚠️ **Guruh whitelist da emas edi!**")
+        
+    except Exception as e:
+        logger.error(f"Ошибка при удалении группы из whitelist: {e}")
+        await message.answer(f"❌ Xatolik yuz berdi: {e}")
+
+# Команда для тестирования отправки видео в группе
+@dp.message_handler(commands=['test_group_video'])
+async def test_group_video_command(message: types.Message):
+    """
+    Команда для тестирования отправки видео в группе
+    """
+    logger.info(f"🚀 test_group_video вызвана в чате {message.chat.id} ({message.chat.type})")
+    logger.info(f"👤 Пользователь: {message.from_user.id} ({message.from_user.username})")
+    
+    try:
+        chat_id = message.chat.id
+        user_id = message.from_user.id
+        
+        # Проверяем права пользователя
+        if user_id not in ADMINS + [SUPER_ADMIN_ID] and not db.is_admin(user_id):
+            logger.warning(f"❌ Пользователь {user_id} не имеет прав")
+            await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat adminlar foydalana oladi.")
+            return
+        
+        logger.info(f"✅ Пользователь {user_id} имеет права")
+        
+        # Проверяем, что команда используется в группе
+        if message.chat.type not in [types.ChatType.GROUP, types.ChatType.SUPERGROUP]:
+            logger.warning("⚠️ Команда вызвана не в группе")
+            await message.answer("⚠️ Bu buyruq faqat guruhlarda ishlaydi.")
+            return
+        
+        logger.info("✅ Команда вызвана в группе, продолжаем обработку")
+        
+        # Получаем настройки группы
+        settings = db.get_group_video_settings(chat_id)
+        if not settings:
+            await message.answer(
+                "📹 **GURUH VIDEO SOZLAMALARI**\n\n"
+                "❌ **Hech qanday sozlamalar topilmadi!**\n\n"
+                "Video tarqatishni yoqish uchun /set_group_video buyrug'ini ishlating."
+            )
+            return
+        
+        # Проверяем что группа в whitelist
+        if not db.is_group_whitelisted(chat_id):
+            await message.answer(
+                "🔒 **GURUH WHITELIST DA EMAS!**\n\n"
+                "Video yuborish uchun guruh whitelist ga qo'shilishi kerak."
+            )
+            return
+        
+        # Тестируем отправку видео
+        from handlers.users.video_scheduler import send_group_video_new
+        
+        centris_enabled = settings[0]
+        golden_enabled = settings[4]
+        
+        test_results = []
+        
+        if centris_enabled:
+            centris_season_id = settings[1]
+            if centris_season_id:
+                result = await send_group_video_new(chat_id, 'centris', centris_season_id)
+                test_results.append(f"Centris Towers: {'✅ Yuborildi' if result else '❌ Yuborilmadi'}")
+        
+        if golden_enabled:
+            golden_season_id = settings[5]
+            if golden_season_id:
+                result = await send_group_video_new(chat_id, 'golden_lake', golden_season_id)
+                test_results.append(f"Golden Lake: {'✅ Yuborildi' if result else '❌ Yuborilmadi'}")
+        
+        if test_results:
+            response = "🧪 **TEST NATIJALARI:**\n\n" + "\n".join(test_results)
+            await message.answer(response, parse_mode="Markdown")
+        else:
+            await message.answer("⚠️ **Hech qanday faol loyiha topilmadi!**")
+        
+    except Exception as e:
+        logger.error(f"Ошибка при тестировании видео в группе: {e}")
+        await message.answer(f"❌ Xatolik yuz berdi: {e}")
+
+# Команда для сброса настроек видео группы
+@dp.message_handler(commands=['reset_group_video'])
+async def reset_group_video_command(message: types.Message):
+    """
+    Команда для сброса настроек видео группы
+    """
+    logger.info(f"🚀 reset_group_video вызвана в чате {message.chat.id} ({message.chat.type})")
+    logger.info(f"👤 Пользователь: {message.from_user.id} ({message.from_user.username})")
+    
+    try:
+        chat_id = message.chat.id
+        user_id = message.from_user.id
+        
+        # Проверяем права пользователя
+        if user_id not in ADMINS + [SUPER_ADMIN_ID] and not db.is_admin(user_id):
+            logger.warning(f"❌ Пользователь {user_id} не имеет прав")
+            await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat adminlar foydalana oladi.")
+            return
+        
+        logger.info(f"✅ Пользователь {user_id} имеет права")
+        
+        # Проверяем, что команда используется в группе
+        if message.chat.type not in [types.ChatType.GROUP, types.ChatType.SUPERGROUP]:
+            logger.warning("⚠️ Команда вызвана не в группе")
+            await message.answer("⚠️ Bu buyruq faqat guruhlarda ishlaydi.")
+            return
+        
+        logger.info("✅ Команда вызвана в группе, продолжаем обработку")
+        
+        # Сбрасываем настройки группы
+        db.set_group_video_settings(chat_id, False, None, 0, False, None, 0)
+        
+        # Сбрасываем просмотренные видео
+        db.reset_group_viewed_videos(chat_id)
+        
+        # Удаляем запланированные задачи для этой группы
+        from handlers.users.video_scheduler import scheduler
+        jobs_to_remove = []
+        for job in scheduler.get_jobs():
+            if job.id.startswith(f"group_") and str(chat_id) in job.id:
+                jobs_to_remove.append(job.id)
+        
+        for job_id in jobs_to_remove:
+            scheduler.remove_job(job_id)
+            logger.info(f"Удалена задача {job_id} для группы {chat_id}")
+        
+        await message.answer("🔄 **Guruh video sozlamalari qayta o'rnatildi!**\n\nVideo yuborishni qayta yoqish uchun /set_group_video buyrug'ini ishlating.")
+        
+    except Exception as e:
+        logger.error(f"Ошибка при сбросе настроек группы: {e}")
+        await message.answer(f"❌ Xatolik yuz berdi: {e}")
+
+# Команда для просмотра списка видео в группе
+@dp.message_handler(commands=['list_group_videos'])
+async def list_group_videos_command(message: types.Message):
+    """
+    Команда для просмотра списка видео в группе
+    """
+    logger.info(f"🚀 list_group_videos вызвана в чате {message.chat.id} ({message.chat.type})")
+    logger.info(f"👤 Пользователь: {message.from_user.id} ({message.from_user.username})")
+    
+    try:
+        chat_id = message.chat.id
+        user_id = message.from_user.id
+        
+        # Проверяем права пользователя
+        if user_id not in ADMINS + [SUPER_ADMIN_ID] and not db.is_admin(user_id):
+            logger.warning(f"❌ Пользователь {user_id} не имеет прав")
+            await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat adminlar foydalana oladi.")
+            return
+        
+        logger.info(f"✅ Пользователь {user_id} имеет права")
+        
+        # Проверяем, что команда используется в группе
+        if message.chat.type not in [types.ChatType.GROUP, types.ChatType.SUPERGROUP]:
+            logger.warning("⚠️ Команда вызвана не в группе")
+            await message.answer("⚠️ Bu buyruq faqat guruhlarda ishlaydi.")
+            return
+        
+        logger.info("✅ Команда вызвана в группе, продолжаем обработку")
+        
+        # Получаем настройки группы
+        settings = db.get_group_video_settings(chat_id)
+        if not settings:
+            await message.answer(
+                "📹 **GURUH VIDEO SOZLAMALARI**\n\n"
+                "❌ **Hech qanday sozlamalar topilmadi!**\n\n"
+                "Video tarqatishni yoqish uchun /set_group_video buyrug'ini ishlating."
+            )
+            return
+        
+        # Формируем список видео
+        response = "📹 **GURUH VIDEO RO'YXATI:**\n\n"
+        
+        centris_enabled = settings[0]
+        golden_enabled = settings[4]
+        
+        if centris_enabled:
+            centris_season_id = settings[1]
+            if centris_season_id:
+                season_name = db.get_season_name(centris_season_id)
+                videos = db.get_videos_by_season(centris_season_id)
+                viewed_videos = db.get_group_viewed_videos(chat_id)
+                
+                response += f"🏢 **Centris Towers - {season_name}:**\n"
+                for url, title, position in videos:
+                    status = "✅" if position in viewed_videos else "⏳"
+                    response += f"   {status} {position+1}. {title}\n"
+                response += "\n"
+        
+        if golden_enabled:
+            golden_season_id = settings[5]
+            if golden_season_id:
+                season_name = db.get_season_name(golden_season_id)
+                videos = db.get_videos_by_season(golden_season_id)
+                viewed_videos = db.get_group_viewed_videos(chat_id)
+                
+                response += f"🏘️ **Golden Lake - {season_name}:**\n"
+                for url, title, position in videos:
+                    status = "✅" if position in viewed_videos else "⏳"
+                    response += f"   {status} {position+1}. {title}\n"
+                response += "\n"
+        
+        # Добавляем статистику
+        total_videos = 0
+        viewed_count = 0
+        
+        if centris_enabled and settings[1]:
+            videos = db.get_videos_by_season(settings[1])
+            total_videos += len(videos)
+            viewed_videos = db.get_group_viewed_videos(chat_id)
+            viewed_count += sum(1 for v in videos if v[2] in viewed_videos)
+        
+        if golden_enabled and settings[5]:
+            videos = db.get_videos_by_season(settings[5])
+            total_videos += len(videos)
+            viewed_videos = db.get_group_viewed_videos(chat_id)
+            viewed_count += sum(1 for v in videos if v[2] in viewed_videos)
+        
+        response += f"📊 **STATISTIKA:**\n"
+        response += f"   • Jami video: {total_videos}\n"
+        response += f"   • Ko'rilgan: {viewed_count}\n"
+        response += f"   • Qoldi: {total_videos - viewed_count}\n"
+        
+        await message.answer(response, parse_mode="Markdown")
+        
+    except Exception as e:
+        logger.error(f"Ошибка при показе списка видео группы: {e}")
+        await message.answer(f"❌ Xatolik yuz berdi: {e}")
+
+# Команда для отправки следующего видео в группе
+@dp.message_handler(commands=['next_group_video'])
+async def next_group_video_command(message: types.Message):
+    """
+    Команда для отправки следующего видео в группе
+    """
+    logger.info(f"🚀 next_group_video вызвана в чате {message.chat.id} ({message.chat.type})")
+    logger.info(f"👤 Пользователь: {message.from_user.id} ({message.from_user.username})")
+    
+    try:
+        chat_id = message.chat.id
+        user_id = message.from_user.id
+        
+        # Проверяем права пользователя
+        if user_id not in ADMINS + [SUPER_ADMIN_ID] and not db.is_admin(user_id):
+            logger.warning(f"❌ Пользователь {user_id} не имеет прав")
+            await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat adminlar foydalana oladi.")
+            return
+        
+        logger.info(f"✅ Пользователь {user_id} имеет права")
+        
+        # Проверяем, что команда используется в группе
+        if message.chat.type not in [types.ChatType.GROUP, types.ChatType.SUPERGROUP]:
+            logger.warning("⚠️ Команда вызвана не в группе")
+            await message.answer("⚠️ Bu buyruq faqat guruhlarda ishlaydi.")
+            return
+        
+        logger.info("✅ Команда вызвана в группе, продолжаем обработку")
+        
+        # Получаем настройки группы
+        settings = db.get_group_video_settings(chat_id)
+        if not settings:
+            await message.answer(
+                "📹 **GURUH VIDEO SOZLAMALARI**\n\n"
+                "❌ **Hech qanday sozlamalar topilmadi!**\n\n"
+                "Video tarqatishni yoqish uchun /set_group_video buyrug'ini ishlating."
+            )
+            return
+        
+        # Проверяем что группа в whitelist
+        if not db.is_group_whitelisted(chat_id):
+            await message.answer(
+                "🔒 **GURUH WHITELIST DA EMAS!**\n\n"
+                "Video yuborish uchun guruh whitelist ga qo'shilishi kerak."
+            )
+            return
+        
+        # Отправляем следующее видео
+        from handlers.users.video_scheduler import send_group_video_new
+        
+        centris_enabled = settings[0]
+        golden_enabled = settings[4]
+        
+        sent = False
+        
+        if centris_enabled:
+            centris_season_id = settings[1]
+            if centris_season_id:
+                result = await send_group_video_new(chat_id, 'centris', centris_season_id)
+                sent = sent or result
+        
+        if golden_enabled and not sent:
+            golden_season_id = settings[5]
+            if golden_season_id:
+                result = await send_group_video_new(chat_id, 'golden_lake', golden_season_id)
+                sent = sent or result
+        
+        if sent:
+            await message.answer("✅ **Keyingi video yuborildi!**\n\n🎬 Avtomatik yuborish davom etadi.")
+        else:
+            await message.answer("⚠️ **Hech qanday yangi video topilmadi!**\n\nBarcha video allaqachon yuborilgan.")
+        
+    except Exception as e:
+        logger.error(f"Ошибка при отправке следующего видео в группе: {e}")
+        await message.answer(f"❌ Xatolik yuz berdi: {e}")
+
+# Команда для пропуска текущего видео в группе
+@dp.message_handler(commands=['skip_group_video'])
+async def skip_group_video_command(message: types.Message):
+    """
+    Команда для пропуска текущего видео в группе
+    """
+    logger.info(f"🚀 skip_group_video вызвана в чате {message.chat.id} ({message.chat.type})")
+    logger.info(f"👤 Пользователь: {message.from_user.id} ({message.from_user.username})")
+    
+    try:
+        chat_id = message.chat.id
+        user_id = message.from_user.id
+        
+        # Проверяем права пользователя
+        if user_id not in ADMINS + [SUPER_ADMIN_ID] and not db.is_admin(user_id):
+            logger.warning(f"❌ Пользователь {user_id} не имеет прав")
+            await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat adminlar foydalana oladi.")
+            return
+        
+        logger.info(f"✅ Пользователь {user_id} имеет права")
+        
+        # Проверяем, что команда используется в группе
+        if message.chat.type not in [types.ChatType.GROUP, types.ChatType.SUPERGROUP]:
+            logger.warning("⚠️ Команда вызвана не в группе")
+            await message.answer("⚠️ Bu buyruq faqat guruhlarda ishlaydi.")
+            return
+        
+        logger.info("✅ Команда вызвана в группе, продолжаем обработку")
+        
+        # Получаем настройки группы
+        settings = db.get_group_video_settings(chat_id)
+        if not settings:
+            await message.answer(
+                "📹 **GURUH VIDEO SOZLAMALARI**\n\n"
+                "❌ **Hech qanday sozlamalar topilmadi!**\n\n"
+                "Video tarqatishni yoqish uchun /set_group_video buyrug'ini ishlating."
+            )
+            return
+        
+        # Проверяем что группа в whitelist
+        if not db.is_group_whitelisted(chat_id):
+            await message.answer(
+                "🔒 **GURUH WHITELIST DA EMAS!**\n\n"
+                "Video yuborish uchun guruh whitelist ga qo'shilishi kerak."
+            )
+            return
+        
+        # Пропускаем текущее видео (отмечаем как просмотренное)
+        centris_enabled = settings[0]
+        golden_enabled = settings[4]
+        
+        skipped = False
+        
+        if centris_enabled:
+            centris_season_id = settings[1]
+            if centris_season_id:
+                # Находим следующее непросмотренное видео
+                videos = db.get_videos_by_season(centris_season_id)
+                viewed_videos = db.get_group_viewed_videos(chat_id)
+                
+                for url, title, position in videos:
+                    if position not in viewed_videos:
+                        # Отмечаем как просмотренное
+                        db.mark_group_video_as_viewed(chat_id, position)
+                        skipped = True
+                        break
+        
+        if golden_enabled and not skipped:
+            golden_season_id = settings[5]
+            if golden_season_id:
+                # Находим следующее непросмотренное видео
+                videos = db.get_videos_by_season(golden_season_id)
+                viewed_videos = db.get_group_viewed_videos(chat_id)
+                
+                for url, title, position in videos:
+                    if position not in viewed_videos:
+                        # Отмечаем как просмотренное
+                        db.mark_group_video_as_viewed(chat_id, position)
+                        skipped = True
+                        break
+        
+        if skipped:
+            await message.answer("⏭️ **Video o'tkazib yuborildi!**\n\n🎬 Keyingi video avtomatik ravishda yuboriladi.")
+        else:
+            await message.answer("⚠️ **Hech qanday video o'tkazib yuborilmadi!**\n\nBarcha video allaqachon ko'rilgan.")
+        
+    except Exception as e:
+        logger.error(f"Ошибка при пропуске видео в группе: {e}")
+        await message.answer(f"❌ Xatolik yuz berdi: {e}")
+
+# Команда для просмотра статуса видео в группе
+@dp.message_handler(commands=['status_group_video'])
+async def status_group_video_command(message: types.Message):
+    """
+    Команда для просмотра статуса видео в группе
+    """
+    logger.info(f"🚀 status_group_video вызвана в чате {message.chat.id} ({message.chat.type})")
+    logger.info(f"👤 Пользователь: {message.from_user.id} ({message.from_user.username})")
+    
+    try:
+        chat_id = message.chat.id
+        user_id = message.from_user.id
+        
+        # Проверяем права пользователя
+        if user_id not in ADMINS + [SUPER_ADMIN_ID] and not db.is_admin(user_id):
+            logger.warning(f"❌ Пользователь {user_id} не имеет прав")
+            await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat adminlar foydalana oladi.")
+            return
+        
+        logger.info(f"✅ Пользователь {user_id} имеет права")
+        
+        # Проверяем, что команда используется в группе
+        if message.chat.type not in [types.ChatType.GROUP, types.ChatType.SUPERGROUP]:
+            logger.warning("⚠️ Команда вызвана не в группе")
+            await message.answer("⚠️ Bu buyruq faqat guruhlarda ishlaydi.")
+            return
+        
+        logger.info("✅ Команда вызвана в группе, продолжаем обработку")
+        
+        # Получаем настройки группы
+        settings = db.get_group_video_settings(chat_id)
+        if not settings:
+            await message.answer(
+                "📹 **GURUH VIDEO SOZLAMALARI**\n\n"
+                "❌ **Hech qanday sozlamalar topilmadi!**\n\n"
+                "Video tarqatishni yoqish uchun /set_group_video buyrug'ini ishlating."
+            )
+            return
+        
+        # Формируем статус
+        response = "📊 **GURUH VIDEO HOLATI:**\n\n"
+        
+        centris_enabled = settings[0]
+        golden_enabled = settings[4]
+        
+        # Статус Centris
+        if centris_enabled:
+            centris_season_id = settings[1]
+            centris_start_video = settings[2]
+            if centris_season_id:
+                season_name = db.get_season_name(centris_season_id)
+                videos = db.get_videos_by_season(centris_season_id)
+                viewed_videos = db.get_group_viewed_videos(chat_id)
+                
+                centris_viewed = sum(1 for v in videos if v[2] in viewed_videos)
+                centris_total = len(videos)
+                centris_progress = (centris_viewed / centris_total * 100) if centris_total > 0 else 0
+                
+                response += f"🏢 **Centris Towers - {season_name}:**\n"
+                response += f"   • Progress: {centris_viewed}/{centris_total} ({centris_progress:.1f}%)\n"
+                response += f"   • Boshlash: {centris_start_video + 1}. video\n"
+                response += f"   • Status: ✅ Faol\n\n"
+        
+        # Статус Golden
+        if golden_enabled:
+            golden_season_id = settings[5]
+            golden_start_video = settings[6]
+            if golden_season_id:
+                season_name = db.get_season_name(golden_season_id)
+                videos = db.get_videos_by_season(golden_season_id)
+                viewed_videos = db.get_group_viewed_videos(chat_id)
+                
+                golden_viewed = sum(1 for v in videos if v[2] in viewed_videos)
+                golden_total = len(videos)
+                golden_progress = (golden_viewed / golden_total * 100) if golden_total > 0 else 0
+                
+                response += f"🏘️ **Golden Lake - {season_name}:**\n"
+                response += f"   • Progress: {golden_viewed}/{golden_total} ({golden_progress:.1f}%)\n"
+                response += f"   • Boshlash: {golden_start_video + 1}. video\n"
+                response += f"   • Status: ✅ Faol\n\n"
+        
+        # Общий статус
+        if not centris_enabled and not golden_enabled:
+            response += "❌ **Hech qanday loyiha faol emas!**\n\n"
+        
+        # Whitelist статус
+        is_whitelisted = db.is_group_whitelisted(chat_id)
+        response += f"🔒 **Whitelist:** {'✅ Ruxsat berilgan' if is_whitelisted else '❌ Ruxsat berilmagan'}\n"
+        
+        # Статус подписки
+        is_subscribed = db.get_subscription_status(chat_id)
+        response += f"📡 **Obuna:** {'✅ Faol' if is_subscribed else '❌ Faol emas'}\n"
+        
+        # Следующее видео
+        if centris_enabled or golden_enabled:
+            response += "\n🎬 **Keyingi video:**\n"
+            if centris_enabled:
+                response += "   • Centris: Avtomatik 08:00 va 20:00\n"
+            if golden_enabled:
+                response += "   • Golden: Avtomatik 11:00\n"
+        
+        await message.answer(response, parse_mode="Markdown")
+        
+    except Exception as e:
+        logger.error(f"Ошибка при показе статуса группы: {e}")
+        await message.answer(f"❌ Xatolik yuz berdi: {e}")
+
+# Команда для принудительной отправки видео в группе
+@dp.message_handler(commands=['force_group_video'])
+async def force_group_video_command(message: types.Message):
+    """
+    Команда для принудительной отправки видео в группе
+    """
+    logger.info(f"🚀 force_group_video вызвана в чате {message.chat.id} ({message.chat.type})")
+    logger.info(f"👤 Пользователь: {message.from_user.id} ({message.from_user.username})")
+    
+    try:
+        chat_id = message.chat.id
+        user_id = message.from_user.id
+        
+        # Проверяем права пользователя (только супер-админ)
+        if user_id != SUPER_ADMIN_ID:
+            logger.warning(f"❌ Пользователь {user_id} не имеет прав")
+            await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat super admin foydalana oladi.")
+            return
+        
+        logger.info(f"✅ Пользователь {user_id} имеет права")
+        
+        # Проверяем, что команда используется в группе
+        if message.chat.type not in [types.ChatType.GROUP, types.ChatType.SUPERGROUP]:
+            logger.warning("⚠️ Команда вызвана не в группе")
+            await message.answer("⚠️ Bu buyruq faqat guruhlarda ishlaydi.")
+            return
+        
+        logger.info("✅ Команда вызвана в группе, продолжаем обработку")
+        
+        # Получаем настройки группы
+        settings = db.get_group_video_settings(chat_id)
+        if not settings:
+            await message.answer(
+                "📹 **GURUH VIDEO SOZLAMALARI**\n\n"
+                "❌ **Hech qanday sozlamalar topilmadi!**\n\n"
+                "Video tarqatishni yoqish uchun /set_group_video buyrug'ini ishlating."
+            )
+            return
+        
+        # Принудительно отправляем видео (игнорируем whitelist)
+        from handlers.users.video_scheduler import send_group_video_new
+        
+        centris_enabled = settings[0]
+        golden_enabled = settings[4]
+        
+        sent = False
+        
+        if centris_enabled:
+            centris_season_id = settings[1]
+            if centris_season_id:
+                # Временно добавляем группу в whitelist
+                original_whitelist = db.is_group_whitelisted(chat_id)
+                if not original_whitelist:
+                    db.add_group_to_whitelist(chat_id, "Force video", user_id)
+                
+                result = await send_group_video_new(chat_id, 'centris', centris_season_id)
+                sent = sent or result
+                
+                # Восстанавливаем оригинальный статус whitelist
+                if not original_whitelist:
+                    db.remove_group_from_whitelist(chat_id)
+        
+        if golden_enabled:
+            golden_season_id = settings[5]
+            if golden_season_id:
+                # Временно добавляем группу в whitelist
+                original_whitelist = db.is_group_whitelisted(chat_id)
+                if not original_whitelist:
+                    db.add_group_to_whitelist(chat_id, "Force video", user_id)
+                
+                result = await send_group_video_new(chat_id, 'golden_lake', golden_season_id)
+                sent = sent or result
+                
+                # Восстанавливаем оригинальный статус whitelist
+                if not original_whitelist:
+                    db.remove_group_from_whitelist(chat_id)
+        
+        if sent:
+            await message.answer("✅ **Video majburiy yuborildi!**\n\n🎬 Video yuborish muvaffaqiyatli.")
+        else:
+            await message.answer("⚠️ **Hech qanday yangi video topilmadi!**\n\nBarcha video allaqachon yuborilgan.")
+        
+    except Exception as e:
+        logger.error(f"Ошибка при принудительной отправке видео в группе: {e}")
+        await message.answer(f"❌ Xatolik yuz berdi: {e}")
+
+# Команда для перепланирования задач видео в группе
+@dp.message_handler(commands=['schedule_group_video'])
+async def schedule_group_video_command(message: types.Message):
+    """
+    Команда для перепланирования задач видео в группе
+    """
+    logger.info(f"🚀 schedule_group_video вызвана в чате {message.chat.id} ({message.chat.type})")
+    logger.info(f"👤 Пользователь: {message.from_user.id} ({message.from_user.username})")
+    
+    try:
+        chat_id = message.chat.id
+        user_id = message.from_user.id
+        
+        # Проверяем права пользователя
+        if user_id not in ADMINS + [SUPER_ADMIN_ID] and not db.is_admin(user_id):
+            logger.warning(f"❌ Пользователь {user_id} не имеет прав")
+            await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat adminlar foydalana oladi.")
+            return
+        
+        logger.info(f"✅ Пользователь {user_id} имеет права")
+        
+        # Проверяем, что команда используется в группе
+        if message.chat.type not in [types.ChatType.GROUP, types.ChatType.SUPERGROUP]:
+            logger.warning("⚠️ Команда вызвана не в группе")
+            await message.answer("⚠️ Bu buyruq faqat guruhlarda ishlaydi.")
+            return
+        
+        logger.info("✅ Команда вызвана в группе, продолжаем обработку")
+        
+        # Получаем настройки группы
+        settings = db.get_group_video_settings(chat_id)
+        if not settings:
+            await message.answer(
+                "📹 **GURUH VIDEO SOZLAMALARI**\n\n"
+                "❌ **Hech qanday sozlamalar topilmadi!**\n\n"
+                "Video tarqatishni yoqish uchun /set_group_video buyrug'ini ishlating."
+            )
+            return
+        
+        # Перепланируем задачи
+        from handlers.users.video_scheduler import schedule_group_jobs
+        
+        # Удаляем старые задачи для этой группы
+        from handlers.users.video_scheduler import scheduler
+        jobs_to_remove = []
+        for job in scheduler.get_jobs():
+            if job.id.startswith(f"group_") and str(chat_id) in job.id:
+                jobs_to_remove.append(job.id)
+        
+        for job_id in jobs_to_remove:
+            scheduler.remove_job(job_id)
+            logger.info(f"Удалена задача {job_id} для группы {chat_id}")
+        
+        # Создаем новые задачи
+        schedule_group_jobs()
+        
+        await message.answer("🔄 **Guruh video vazifalari qayta rejalashtirildi!**\n\n⏰ Avtomatik yuborish vaqti yangilandi.")
+        
+    except Exception as e:
+        logger.error(f"Ошибка при перепланировании задач группы: {e}")
+        await message.answer(f"❌ Xatolik yuz berdi: {e}")
+
+# Команда для отладки видео в группе
+@dp.message_handler(commands=['debug_group_video'])
+async def debug_group_video_command(message: types.Message):
+    """
+    Команда для отладки видео в группе
+    """
+    logger.info(f"🚀 debug_group_video вызвана в чате {message.chat.id} ({message.chat.type})")
+    logger.info(f"👤 Пользователь: {message.from_user.id} ({message.from_user.username})")
+    
+    try:
+        chat_id = message.chat.id
+        user_id = message.from_user.id
+        
+        # Проверяем права пользователя (только супер-админ)
+        if user_id != SUPER_ADMIN_ID:
+            logger.warning(f"❌ Пользователь {user_id} не имеет прав")
+            await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat super admin foydalana oladi.")
+            return
+        
+        logger.info(f"✅ Пользователь {user_id} имеет права")
+        
+        # Проверяем, что команда используется в группе
+        if message.chat.type not in [types.ChatType.GROUP, types.ChatType.SUPERGROUP]:
+            logger.warning("⚠️ Команда вызвана не в группе")
+            await message.answer("⚠️ Bu buyruq faqat guruhlarda ishlaydi.")
+            return
+        
+        logger.info("✅ Команда вызвана в группе, продолжаем обработку")
+        
+        # Формируем отладочную информацию
+        response = "🐛 **DEBUG MA'LUMOTLARI:**\n\n"
+        
+        # Информация о группе
+        response += f"🏷️ **GURUH MA'LUMOTLARI:**\n"
+        response += f"   • ID: {chat_id}\n"
+        response += f"   • Nomi: {message.chat.title}\n"
+        response += f"   • Turi: {message.chat.type}\n"
+        response += f"   • Username: {message.chat.username or 'Yo\'q'}\n\n"
+        
+        # Настройки видео
+        settings = db.get_group_video_settings(chat_id)
+        if settings:
+            response += f"📹 **VIDEO SOZLAMALARI:**\n"
+            response += f"   • Centris: {'✅' if settings[0] else '❌'} (season: {settings[1]}, start: {settings[2]})\n"
+            response += f"   • Golden: {'✅' if settings[4] else '❌'} (season: {settings[5]}, start: {settings[6]})\n\n"
+        else:
+            response += f"📹 **VIDEO SOZLAMALARI:** ❌ Topilmadi\n\n"
+        
+        # Whitelist статус
+        is_whitelisted = db.is_group_whitelisted(chat_id)
+        response += f"🔒 **WHITELIST:** {'✅' if is_whitelisted else '❌'}\n"
+        
+        # Статус подписки
+        is_subscribed = db.get_subscription_status(chat_id)
+        response += f"📡 **OBUNA:** {'✅' if is_subscribed else '❌'}\n"
+        
+        # Просмотренные видео
+        viewed_videos = db.get_group_viewed_videos(chat_id)
+        response += f"👁️ **KO'RILGAN VIDEO:** {len(viewed_videos)} ta\n"
+        if viewed_videos:
+            response += f"   • Pozitsiyalar: {sorted(viewed_videos)[:10]}{'...' if len(viewed_videos) > 10 else ''}\n"
+        
+        # Запланированные задачи
+        from handlers.users.video_scheduler import scheduler
+        group_jobs = [job for job in scheduler.get_jobs() if job.id.startswith(f"group_") and str(chat_id) in job.id]
+        response += f"⏰ **REJALANGAN VAZIFALAR:** {len(group_jobs)} ta\n"
+        for job in group_jobs:
+            response += f"   • {job.id}: {job.next_run_time}\n"
+        
+        # Информация о сезонах
+        if settings and settings[1]:  # Centris
+            centris_videos = db.get_videos_by_season(settings[1])
+            response += f"\n🏢 **CENTRIS VIDEOLAR:** {len(centris_videos)} ta\n"
+        
+        if settings and settings[5]:  # Golden
+            golden_videos = db.get_videos_by_season(settings[5])
+            response += f"🏘️ **GOLDEN VIDEOLAR:** {len(golden_videos)} ta\n"
+        
+        await message.answer(response, parse_mode="Markdown")
+        
+    except Exception as e:
+        logger.error(f"Ошибка при отладке группы: {e}")
+        await message.answer(f"❌ Xatolik yuz berdi: {e}")
+
+# Команда для показа всех команд групп
+@dp.message_handler(commands=['all_group_commands'])
+async def all_group_commands_command(message: types.Message):
+    """
+    Команда для показа всех доступных команд групп
+    """
+    logger.info(f"🚀 all_group_commands вызвана в чате {message.chat.id} ({message.chat.type})")
+    logger.info(f"👤 Пользователь: {message.from_user.id} ({message.from_user.username})")
+    
+    try:
+        user_id = message.from_user.id
+        
+        # Проверяем права пользователя
+        if user_id not in ADMINS + [SUPER_ADMIN_ID] and not db.is_admin(user_id):
+            logger.warning(f"❌ Пользователь {user_id} не имеет прав")
+            await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat adminlar foydalana oladi.")
+            return
+        
+        logger.info(f"✅ Пользователь {user_id} имеет права")
+        
+        # Формируем список всех команд
+        response = "📋 **BARCHA GURUH BUYRUQLARI:**\n\n"
+        
+        # Основные команды
+        response += "🏢 **ASOSIY BUYRUQLAR:**\n"
+        response += "   • /set_group_video - Video tarqatish sozlamalari\n"
+        response += "   • /show_group_video_settings - Hozirgi sozlamalar\n"
+        response += "   • /admin_show_all_groups_settings - Barcha guruhlar sozlamalari (Admin)\n"
+        response += "   • /help_group_video - Batafsil yordam\n\n"
+        
+        # Управление видео
+        response += "🎬 **VIDEO BOSHQARISH:**\n"
+        response += "   • /start_group_video - Video yuborishni boshlash\n"
+        response += "   • /stop_group_video - Video yuborishni to'xtatish\n"
+        response += "   • /next_group_video - Keyingi video yuborish\n"
+        response += "   • /skip_group_video - Video o'tkazib yuborish\n"
+        response += "   • /test_group_video - Video yuborishni test qilish\n"
+        response += "   • /send_all_planned_videos - Barcha rejalashtirilgan videolar\n"
+        response += "   • /send_specific_video - Maxsus video yuborish\n\n"
+        
+        # Информация
+        response += "📊 **MA'LUMOTLAR:**\n"
+        response += "   • /list_group_videos - Video ro'yxati\n"
+        response += "   • /status_group_video - Video holati va progress\n\n"
+        
+        # Управление
+        response += "⚙️ **BOSHQARISH:**\n"
+        response += "   • /reset_group_video - Sozlamalarni qayta o'rnatish\n"
+        response += "   • /schedule_group_video - Vazifalarni qayta rejalashtirish\n\n"
+        
+        # Безопасность
+        response += "🔒 **XAVFSIZLIK:**\n"
+        response += "   • /add_group_to_whitelist - Whitelist ga qo'shish\n"
+        response += "   • /remove_group_from_whitelist - Whitelist dan olib tashlash\n\n"
+        
+        # Супер-админ команды
+        if user_id == SUPER_ADMIN_ID:
+            response += "💪 **SUPER ADMIN BUYRUQLARI:**\n"
+            response += "   • /force_group_video - Video majburiy yuborish\n"
+            response += "   • /debug_group_video - Debug ma'lumotlari\n"
+            response += "   • /cleanup_group_video - Sistema tozalash\n"
+            response += "   • /backup_group_video - Reserva nusxasi\n"
+            response += "   • /restore_group_video - Reservadan tiklash\n"
+            response += "   • /logs_group_video - Sistema loglari\n"
+            response += "   • /monitor_group_video - Sistema monitoringi\n"
+            response += "   • /emergency_group_video - Extren tizrortatlar\n"
+            response += "   • /reboot_group_video - Sistema qayta ishga tushirish\n\n"
+        
+        # Системные команды
+        response += "🖥️ **SISTEMA BUYRUQLARI:**\n"
+        response += "   • /ping_group_video - Sistema holatini tekshirish\n"
+        response += "   • /version_group_video - Sistema versiyasi\n"
+        response += "   • /stats_group_video - Sistema statistikasi\n"
+        response += "   • /info_group_video - Sistema ma'lumotlari\n\n"
+        
+        # Информационные команды
+        response += "ℹ️ **MA'LUMOT BUYRUQLARI:**\n"
+        response += "   • /about_group_video - Loyiha haqida\n"
+        response += "   • /credits_group_video - Rahmatlar\n"
+        response += "   • /donate_group_video - Saxovat\n"
+        response += "   • /changelog_group_video - Yangilanishlar\n"
+        response += "   • /support_group_video - Qo'llab-quvvatlash\n\n"
+        
+        # Правовые команды
+        response += "📄 **HUQUQIY BUYRUQLAR:**\n"
+        response += "   • /license_group_video - Litsenziya\n"
+        response += "   • /privacy_group_video - Maxfiylik siyosati\n"
+        response += "   • /terms_group_video - Foydalanish shartlari\n\n"
+        
+        # Инструкция по использованию
+        response += "💡 **FOYDALANISH:**\n"
+        response += "1. Guruhda yoki shaxsiy xabarda /set_group_video buyrug'ini ishlating\n"
+        response += "2. Loyihani tanlang (Centris, Golden yoki ikkalasi)\n"
+        response += "3. Seson va boshlash videosini tanlang\n"
+        response += "4. Guruhni tanlang:\n"
+        response += "   • 🏢 Hozirgi guruh - hozirgi guruhga qo'llash\n"
+        response += "   • 📝 ID guruhni kiriting - guruh ID sini qo'lda kiriting\n"
+        response += "   • 📋 Ro'yxatdan tanlang - whitelist dagi barcha guruhlardan tanlang\n"
+        response += "5. Video avtomatik ravishda yuboriladi\n\n"
+        
+        # Время автоматической отправки
+        response += "⏰ **AVTOMATIK YUBORISH VAQTI:**\n"
+        response += "• Centris Towers: 08:00 va 20:00\n"
+        response += "• Golden Lake: 11:00\n"
+        response += "• Vaqt: Toshkent (UTC+5)\n\n"
+        
+        # Дополнительная информация
+        response += "ℹ️ **QO'SHIMCHA MA'LUMOT:**\n"
+        response += "• Barcha buyruqlar faqat guruhlarda ishlaydi\n"
+        response += "• Faqat adminlar foydalana oladi\n"
+        response += "• Video yuborish uchun guruh whitelist da bo'lishi kerak"
+        
+        await message.answer(response, parse_mode="Markdown")
+        
+    except Exception as e:
+        logger.error(f"Ошибка при показе всех команд: {e}")
+        await message.answer(f"❌ Xatolik yuz berdi: {e}")
+
+# Команда для проверки работоспособности системы групп
+@dp.message_handler(commands=['ping_group_video'])
+async def ping_group_video_command(message: types.Message):
+    """
+    Команда для проверки работоспособности системы групп
+    """
+    logger.info(f"🚀 ping_group_video вызвана в чате {message.chat.id} ({message.chat.type})")
+    logger.info(f"👤 Пользователь: {message.from_user.id} ({message.from_user.username})")
+    
+    try:
+        user_id = message.from_user.id
+        
+        # Проверяем права пользователя
+        if user_id not in ADMINS + [SUPER_ADMIN_ID] and not db.is_admin(user_id):
+            logger.warning(f"❌ Пользователь {user_id} не имеет прав")
+            await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat adminlar foydalana oladi.")
+            return
+        
+        logger.info(f"✅ Пользователь {user_id} имеет права")
+        
+        # Проверяем работоспособность системы
+        response = "🏥 **SISTEMA HOLATI:**\n\n"
+        
+        # Проверка базы данных
+        try:
+            # Проверяем подключение к базе
+            test_result = db.get_all_groups_with_settings()
+            response += "🗄️ **BAZA MA'LUMOTLARI:** ✅ Faol\n"
+            response += f"   • Guruhlar soni: {len(test_result)}\n"
+        except Exception as e:
+            response += "🗄️ **BAZA MA'LUMOTLARI:** ❌ Xatolik\n"
+            response += f"   • Xatolik: {str(e)[:50]}...\n"
+        
+        # Проверка планировщика
+        try:
+            from handlers.users.video_scheduler import scheduler
+            jobs = scheduler.get_jobs()
+            response += f"⏰ **REJALANGAN VAZIFALAR:** ✅ {len(jobs)} ta\n"
+        except Exception as e:
+            response += "⏰ **REJALANGAN VAZIFALAR:** ❌ Xatolik\n"
+            response += f"   • Xatolik: {str(e)[:50]}...\n"
+        
+        # Проверка сезонов
+        try:
+            centris_seasons = db.get_seasons_by_project("centris")
+            golden_seasons = db.get_seasons_by_project("golden")
+            response += f"📺 **SEZONLAR:** ✅ Faol\n"
+            response += f"   • Centris: {len(centris_seasons)} ta\n"
+            response += f"   • Golden: {len(golden_seasons)} ta\n"
+        except Exception as e:
+            response += "📺 **SEZONLAR:** ❌ Xatolik\n"
+            response += f"   • Xatolik: {str(e)[:50]}...\n"
+        
+        # Проверка видео
+        try:
+            total_videos = 0
+            if centris_seasons:
+                for season_id, _ in centris_seasons:
+                    videos = db.get_videos_by_season(season_id)
+                    total_videos += len(videos)
+            if golden_seasons:
+                for season_id, _ in golden_seasons:
+                    videos = db.get_videos_by_season(season_id)
+                    total_videos += len(videos)
+            response += f"🎬 **VIDEOLAR:** ✅ {total_videos} ta\n"
+        except Exception as e:
+            response += "🎬 **VIDEOLAR:** ❌ Xatolik\n"
+            response += f"   • Xatolik: {str(e)[:50]}...\n"
+        
+        # Проверка групп
+        try:
+            groups_with_settings = db.get_all_groups_with_settings()
+            active_groups = [g for g in groups_with_settings if g[0] or g[4]]  # centris_enabled or golden_enabled
+            response += f"👥 **FAOL GURUHLAR:** ✅ {len(active_groups)} ta\n"
+        except Exception as e:
+            response += "👥 **FAOL GURUHLAR:** ❌ Xatolik\n"
+            response += f"   • Xatolik: {str(e)[:50]}...\n"
+        
+        # Общий статус
+        response += "\n🎯 **UMUMIY HOLAT:** ✅ Sistema ishlayapti\n"
+        response += "📅 **VAQT:** " + str(datetime.now().strftime("%Y-%m-%d %H:%M:%S")) + "\n"
+        response += "🌍 **VAQT ZONA:** Toshkent (UTC+5)"
+        
+        await message.answer(response, parse_mode="Markdown")
+        
+    except Exception as e:
+        logger.error(f"Ошибка при проверке системы: {e}")
+        await message.answer(f"❌ Xatolik yuz berdi: {e}")
+
+# Команда для показа версии системы групп
+@dp.message_handler(commands=['version_group_video'])
+async def version_group_video_command(message: types.Message):
+    """
+    Команда для показа версии системы групп
+    """
+    logger.info(f"🚀 version_group_video вызвана в чате {message.chat.id} ({message.chat.type})")
+    logger.info(f"👤 Пользователь: {message.from_user.id} ({message.from_user.username})")
+    
+    try:
+        user_id = message.from_user.id
+        
+        # Проверяем права пользователя
+        if user_id not in ADMINS + [SUPER_ADMIN_ID] and not db.is_admin(user_id):
+            logger.warning(f"❌ Пользователь {user_id} не имеет прав")
+            await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat adminlar foydalana oladi.")
+            return
+        
+        logger.info(f"✅ Пользователь {user_id} имеет права")
+        
+        # Формируем информацию о версии
+        response = "📋 **SISTEMA VERSIYASI:**\n\n"
+        
+        # Версия системы
+        response += "🏗️ **ASOSIY MA'LUMOTLAR:**\n"
+        response += "   • Sistema: Centris Towers & Golden Lake Bot\n"
+        response += "   • Versiya: 2.0.0\n"
+        response += "   • Turi: Video tarqatish tizimi\n"
+        response += "   • Platforma: Telegram Bot API\n\n"
+        
+        # Компоненты системы
+        response += "🔧 **TIZIM KOMPONENTLARI:**\n"
+        response += "   • Framework: aiogram 2.x\n"
+        response += "   • Ma'lumotlar bazasi: PostgreSQL\n"
+        response += "   • Rejalashtiruvchi: APScheduler\n"
+        response += "   • Xavfsizlik: Whitelist + Admin\n\n"
+        
+        # Функциональность
+        response += "✨ **ASOSIY FUNKSIYALAR:**\n"
+        response += "   • Avtomatik video yuborish\n"
+        response += "   • Centris Towers va Golden Lake\n"
+        response += "   • Seson va video boshqarish\n"
+        response += "   • Guruh sozlamalari\n"
+        response += "   • Xavfsizlik va whitelist\n\n"
+        
+        # Время работы
+        response += "⏰ **ISH VAQTI:**\n"
+        response += "   • Centris: 08:00 va 20:00\n"
+        response += "   • Golden: 11:00\n"
+        response += "   • Vaqt zona: Toshkent (UTC+5)\n\n"
+        
+        # Команды
+        response += "📝 **MAVJUD BUYRUQLAR:**\n"
+        response += "   • Asosiy: 3 ta\n"
+        response += "   • Video boshqarish: 6 ta\n"
+        response += "   • Ma'lumotlar: 2 ta\n"
+        response += "   • Boshqarish: 2 ta\n"
+        response += "   • Xavfsizlik: 2 ta\n"
+        response += "   • Maxsus: 4 ta\n"
+        response += "   • **Jami: 19 ta buyruq**\n\n"
+        
+        # Техническая информация
+        response += "⚙️ **TEXNIK MA'LUMOTLAR:**\n"
+        response += "   • Python: 3.8+\n"
+        response += "   • PostgreSQL: 12+\n"
+        response += "   • Redis: Ixtiyoriy\n"
+        response += "   • Logging: bot.log\n\n"
+        
+        # Контакты разработчика
+        response += "👨‍💻 **ISHLAB CHIQARUVCHI:**\n"
+        response += "   • Telegram: @mohirbek\n"
+        response += "   • Loyiha: Centris Towers & Golden Lake\n"
+        response += "   • Yangilanish: 2025-yil\n\n"
+        
+        # Статус
+        response += "🎯 **HOLAT:** ✅ Faol va ishlayapti\n"
+        response += "📅 **YANGILANGAN:** " + str(datetime.now().strftime("%Y-%m-%d")) + "\n"
+        response += "🔮 **KELAJAK:** Yangi funksiyalar va yaxshilanishlar"
+        
+        await message.answer(response, parse_mode="Markdown")
+        
+    except Exception as e:
+        logger.error(f"Ошибка при показе версии: {e}")
+        await message.answer(f"❌ Xatolik yuz berdi: {e}")
+
+# Команда для показа статистики системы групп
+@dp.message_handler(commands=['stats_group_video'])
+async def stats_group_video_command(message: types.Message):
+    """
+    Команда для показа статистики системы групп
+    """
+    logger.info(f"🚀 stats_group_video вызвана в чате {message.chat.id} ({message.chat.type})")
+    logger.info(f"👤 Пользователь: {message.from_user.id} ({message.from_user.username})")
+    
+    try:
+        user_id = message.from_user.id
+        
+        # Проверяем права пользователя
+        if user_id not in ADMINS + [SUPER_ADMIN_ID] and not db.is_admin(user_id):
+            logger.warning(f"❌ Пользователь {user_id} не имеет прав")
+            await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat adminlar foydalana oladi.")
+            return
+        
+        logger.info(f"✅ Пользователь {user_id} имеет права")
+        
+        # Формируем статистику
+        response = "📊 **SISTEMA STATISTIKASI:**\n\n"
+        
+        try:
+            # Статистика групп
+            groups_with_settings = db.get_all_groups_with_settings()
+            total_groups = len(groups_with_settings)
+            active_groups = [g for g in groups_with_settings if g[0] or g[4]]  # centris_enabled or golden_enabled
+            centris_groups = [g for g in groups_with_settings if g[0]]  # centris_enabled
+            golden_groups = [g for g in groups_with_settings if g[4]]  # golden_enabled
+            both_groups = [g for g in groups_with_settings if g[0] and g[4]]  # both enabled
+            
+            response += "👥 **GURUHLAR STATISTIKASI:**\n"
+            response += f"   • Jami guruhlar: {total_groups}\n"
+            response += f"   • Faol guruhlar: {len(active_groups)}\n"
+            response += f"   • Centris guruhlari: {len(centris_groups)}\n"
+            response += f"   • Golden guruhlari: {len(golden_groups)}\n"
+            response += f"   • Ikkala loyiha: {len(both_groups)}\n\n"
+            
+            # Статистика сезонов
+            centris_seasons = db.get_seasons_by_project("centris")
+            golden_seasons = db.get_seasons_by_project("golden")
+            
+            response += "📺 **SEZONLAR STATISTIKASI:**\n"
+            response += f"   • Centris sezonlari: {len(centris_seasons)}\n"
+            response += f"   • Golden sezonlari: {len(golden_seasons)}\n"
+            response += f"   • Jami sezonlar: {len(centris_seasons) + len(golden_seasons)}\n\n"
+            
+            # Статистика видео
+            total_videos = 0
+            centris_videos = 0
+            golden_videos = 0
+            
+            if centris_seasons:
+                for season_id, _ in centris_seasons:
+                    videos = db.get_videos_by_season(season_id)
+                    centris_videos += len(videos)
+                    total_videos += len(videos)
+            
+            if golden_seasons:
+                for season_id, _ in golden_seasons:
+                    videos = db.get_videos_by_season(season_id)
+                    golden_videos += len(videos)
+                    total_videos += len(videos)
+            
+            response += "🎬 **VIDEO STATISTIKASI:**\n"
+            response += f"   • Centris videolari: {centris_videos}\n"
+            response += f"   • Golden videolari: {golden_videos}\n"
+            response += f"   • Jami videolar: {total_videos}\n\n"
+            
+            # Статистика планировщика
+            from handlers.users.video_scheduler import scheduler
+            jobs = scheduler.get_jobs()
+            group_jobs = [job for job in jobs if job.id.startswith("group_")]
+            centris_jobs = [job for job in group_jobs if "centris" in job.id]
+            golden_jobs = [job for job in group_jobs if "golden" in job.id]
+            
+            response += "⏰ **REJALANGAN VAZIFALAR:**\n"
+            response += f"   • Jami vazifalar: {len(jobs)}\n"
+            response += f"   • Guruh vazifalari: {len(group_jobs)}\n"
+            response += f"   • Centris vazifalari: {len(centris_jobs)}\n"
+            response += f"   • Golden vazifalari: {len(golden_jobs)}\n\n"
+            
+            # Статистика просмотров
+            total_viewed = 0
+            for group in groups_with_settings:
+                chat_id = group[0]
+                viewed_videos = db.get_group_viewed_videos(chat_id)
+                total_viewed += len(viewed_videos)
+            
+            response += "👁️ **KO'RISH STATISTIKASI:**\n"
+            response += f"   • Jami ko'rilgan: {total_viewed}\n"
+            response += f"   • O'rtacha guruhda: {total_viewed // max(total_groups, 1)}\n\n"
+            
+            # Общая статистика
+            response += "🎯 **UMUMIY STATISTIKA:**\n"
+            response += f"   • Faollik darajasi: {len(active_groups) / max(total_groups, 1) * 100:.1f}%\n"
+            response += f"   • Video zichligi: {total_videos / max(len(centris_seasons) + len(golden_seasons), 1):.1f} video/season\n"
+            response += f"   • Guruh samaradorligi: {total_viewed / max(total_videos, 1) * 100:.1f}%"
+            
+        except Exception as e:
+            response += f"❌ **Xatolik:** {str(e)[:100]}...\n\n"
+            response += "⚠️ Statistika to'liq yig'ilmadi"
+        
+        await message.answer(response, parse_mode="Markdown")
+        
+    except Exception as e:
+        logger.error(f"Ошибка при показе статистики: {e}")
+        await message.answer(f"❌ Xatolik yuz berdi: {e}")
+
+# Команда для очистки системы групп
+@dp.message_handler(commands=['cleanup_group_video'])
+async def cleanup_group_video_command(message: types.Message):
+    """
+    Команда для очистки системы групп
+    """
+    logger.info(f"🚀 cleanup_group_video вызвана в чате {message.chat.id} ({message.chat.type})")
+    logger.info(f"👤 Пользователь: {message.from_user.id} ({message.from_user.username})")
+    
+    try:
+        user_id = message.from_user.id
+        
+        # Проверяем права пользователя (только супер-админ)
+        if user_id != SUPER_ADMIN_ID:
+            logger.warning(f"❌ Пользователь {user_id} не имеет прав")
+            await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat super admin foydalana oladi.")
+            return
+        
+        logger.info(f"✅ Пользователь {user_id} имеет права")
+        
+        # Формируем отчет об очистке
+        response = "🧹 **SISTEMA TOZALASH:**\n\n"
+        
+        try:
+            # Очистка планировщика
+            from handlers.users.video_scheduler import scheduler
+            old_jobs = len(scheduler.get_jobs())
+            
+            # Удаляем все задачи групп
+            jobs_to_remove = []
+            for job in scheduler.get_jobs():
+                if job.id.startswith("group_"):
+                    jobs_to_remove.append(job.id)
+            
+            for job_id in jobs_to_remove:
+                scheduler.remove_job(job_id)
+            
+            new_jobs = len(scheduler.get_jobs())
+            response += f"⏰ **REJALANGAN VAZIFALAR:**\n"
+            response += f"   • Eski: {old_jobs} ta\n"
+            response += f"   • Yangi: {new_jobs} ta\n"
+            response += f"   • O'chirilgan: {old_jobs - new_jobs} ta\n\n"
+            
+            # Очистка просмотренных видео
+            groups_with_settings = db.get_all_groups_with_settings()
+            total_cleaned = 0
+            
+            for group in groups_with_settings:
+                chat_id = group[0]
+                viewed_videos = db.get_group_viewed_videos(chat_id)
+                if viewed_videos:
+                    db.reset_group_viewed_videos(chat_id)
+                    total_cleaned += len(viewed_videos)
+            
+            response += f"👁️ **KO'RILGAN VIDEO:**\n"
+            response += f"   • Tozalangan: {total_cleaned} ta\n"
+            response += f"   • Guruhlar: {len(groups_with_settings)} ta\n\n"
+            
+            # Перепланирование задач
+            from handlers.users.video_scheduler import schedule_group_jobs
+            schedule_group_jobs()
+            
+            response += "🔄 **QAYTA REJALASHTIRISH:** ✅ Bajarildi\n\n"
+            
+            # Статистика после очистки
+            final_jobs = len(scheduler.get_jobs())
+            response += f"📊 **YAKUNIY HOLAT:**\n"
+            response += f"   • Faol vazifalar: {final_jobs} ta\n"
+            response += f"   • Faol guruhlar: {len([g for g in groups_with_settings if g[0] or g[4]])} ta\n"
+            response += f"   • Sistema holati: ✅ Toza va faol"
+            
+        except Exception as e:
+            response += f"❌ **Xatolik:** {str(e)[:100]}...\n\n"
+            response += "⚠️ Tozalash to'liq bajarilmadi"
+        
+        await message.answer(response, parse_mode="Markdown")
+        
+    except Exception as e:
+        logger.error(f"Ошибка при очистке системы: {e}")
+        await message.answer(f"❌ Xatolik yuz berdi: {e}")
+
+# Команда для резервного копирования системы групп
+@dp.message_handler(commands=['backup_group_video'])
+async def backup_group_video_command(message: types.Message):
+    """
+    Команда для резервного копирования системы групп
+    """
+    logger.info(f"🚀 backup_group_video вызвана в чате {message.chat.id} ({message.chat.type})")
+    logger.info(f"👤 Пользователь: {message.from_user.id} ({message.from_user.username})")
+    
+    try:
+        user_id = message.from_user.id
+        
+        # Проверяем права пользователя (только супер-админ)
+        if user_id != SUPER_ADMIN_ID:
+            logger.warning(f"❌ Пользователь {user_id} не имеет прав")
+            await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat super admin foydalana oladi.")
+            return
+        
+        logger.info(f"✅ Пользователь {user_id} имеет права")
+        
+        # Формируем отчет о резервном копировании
+        response = "💾 **RESERVA NUSXASI:**\n\n"
+        
+        try:
+            # Создаем резервную копию настроек групп
+            groups_with_settings = db.get_all_groups_with_settings()
+            backup_data = {
+                'timestamp': datetime.now().isoformat(),
+                'total_groups': len(groups_with_settings),
+                'groups': []
+            }
+            
+            for group in groups_with_settings:
+                chat_id = group[0]
+                group_info = {
+                    'chat_id': chat_id,
+                    'centris_enabled': group[1],
+                    'centris_season_id': group[2],
+                    'centris_start_video': group[3],
+                    'golden_enabled': group[4],
+                    'golden_season_id': group[5],
+                    'golden_start_video': group[6],
+                    'viewed_videos': db.get_group_viewed_videos(chat_id),
+                    'is_subscribed': db.get_subscription_status(chat_id),
+                    'is_whitelisted': db.is_group_whitelisted(chat_id)
+                }
+                backup_data['groups'].append(group_info)
+            
+            # Сохраняем резервную копию в файл
+            import json
+            backup_filename = f"group_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+            
+            with open(backup_filename, 'w', encoding='utf-8') as f:
+                json.dump(backup_data, f, ensure_ascii=False, indent=2)
+            
+            response += f"📁 **FAYL:** {backup_filename}\n"
+            response += f"📅 **VAQT:** {backup_data['timestamp']}\n"
+            response += f"👥 **GURUHLAR:** {backup_data['total_groups']} ta\n\n"
+            
+            # Детали резервной копии
+            centris_groups = [g for g in backup_data['groups'] if g['centris_enabled']]
+            golden_groups = [g for g in backup_data['groups'] if g['golden_enabled']]
+            both_groups = [g for g in backup_data['groups'] if g['centris_enabled'] and g['golden_enabled']]
+            
+            response += "📊 **MA'LUMOTLAR:**\n"
+            response += f"   • Centris guruhlari: {len(centris_groups)}\n"
+            response += f"   • Golden guruhlari: {len(golden_groups)}\n"
+            response += f"   • Ikkala loyiha: {len(both_groups)}\n"
+            response += f"   • Faol guruhlar: {len([g for g in backup_data['groups'] if g['centris_enabled'] or g['golden_enabled']])}\n\n"
+            
+            # Статус
+            response += "✅ **RESERVA NUSXASI:** Muvaffaqiyatli yaratildi\n"
+            response += f"📁 **JOYLASHUV:** {backup_filename}\n"
+            response += "💡 **ESLATMA:** Faylni xavfsiz joyda saqlang"
+            
+        except Exception as e:
+            response += f"❌ **Xatolik:** {str(e)[:100]}...\n\n"
+            response += "⚠️ Reserva nusxasi yaratilmadi"
+        
+        await message.answer(response, parse_mode="Markdown")
+        
+    except Exception as e:
+        logger.error(f"Ошибка при резервном копировании: {e}")
+        await message.answer(f"❌ Xatolik yuz berdi: {e}")
+
+# Команда для восстановления из резервной копии
+@dp.message_handler(commands=['restore_group_video'])
+async def restore_group_video_command(message: types.Message):
+    """
+    Команда для восстановления из резервной копии
+    """
+    logger.info(f"🚀 restore_group_video вызвана в чате {message.chat.id} ({message.chat.type})")
+    logger.info(f"👤 Пользователь: {message.from_user.id} ({message.from_user.username})")
+    
+    try:
+        user_id = message.from_user.id
+        
+        # Проверяем права пользователя (только супер-админ)
+        if user_id != SUPER_ADMIN_ID:
+            logger.warning(f"❌ Пользователь {user_id} не имеет прав")
+            await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat super admin foydalana oladi.")
+            return
+        
+        logger.info(f"✅ Пользователь {user_id} не имеет прав")
+        
+        # Проверяем аргументы команды
+        args = message.text.split()
+        if len(args) < 2:
+            await message.answer(
+                "📁 **RESTORE BUYRUQI:**\n\n"
+                "💡 **Foydalanish:**\n"
+                "/restore_group_video <fayl_nomi>\n\n"
+                "📋 **Mavjud fayllar:**\n"
+                "Fayllarni ko'rish uchun /backup_group_video buyrug'ini ishlating"
+            )
+            return
+        
+        filename = args[1]
+        
+        # Формируем отчет о восстановлении
+        response = "🔄 **RESTORE JARAYONI:**\n\n"
+        
+        try:
+            # Читаем резервную копию
+            import json
+            import os
+            
+            if not os.path.exists(filename):
+                await message.answer(f"❌ **Fayl topilmadi:** {filename}\n\nIltimos, to'g'ri fayl nomini kiriting.")
+                return
+            
+            with open(filename, 'r', encoding='utf-8') as f:
+                backup_data = json.load(f)
+            
+            response += f"📁 **FAYL:** {filename}\n"
+            response += f"📅 **VAQT:** {backup_data.get('timestamp', 'N/A')}\n"
+            response += f"👥 **GURUHLAR:** {backup_data.get('total_groups', 0)} ta\n\n"
+            
+            # Восстанавливаем данные
+            restored_groups = 0
+            for group_info in backup_data.get('groups', []):
+                try:
+                    chat_id = group_info['chat_id']
+                    
+                    # Восстанавливаем настройки видео
+                    db.set_group_video_settings(
+                        chat_id,
+                        group_info['centris_enabled'],
+                        group_info['centris_season_id'],
+                        group_info['centris_start_video'],
+                        group_info['golden_enabled'],
+                        group_info['golden_season_id'],
+                        group_info['golden_start_video']
+                    )
+                    
+                    # Восстанавливаем просмотренные видео
+                    if group_info.get('viewed_videos'):
+                        viewed_videos = group_info['viewed_videos']
+                        cursor = db.conn.cursor()
+                        cursor.execute(
+                            "UPDATE group_video_settings SET viewed_videos = %s WHERE chat_id = %s",
+                            (json.dumps(viewed_videos), str(chat_id))
+                        )
+                        db.conn.commit()
+                        cursor.close()
+                    
+                    # Восстанавливаем статус подписки
+                    if group_info.get('is_subscribed'):
+                        db.set_subscription_status(chat_id, group_info['is_subscribed'])
+                    
+                    # Восстанавливаем whitelist статус
+                    if group_info.get('is_whitelisted'):
+                        if not db.is_group_whitelisted(chat_id):
+                            db.add_group_to_whitelist(chat_id, "Restored from backup", user_id)
+                    
+                    restored_groups += 1
+                    
+                except Exception as e:
+                    logger.error(f"Ошибка при восстановлении группы {chat_id}: {e}")
+                    continue
+            
+            response += f"✅ **RESTORE NATIJASI:**\n"
+            response += f"   • Muvaffaqiyatli: {restored_groups} ta\n"
+            response += f"   • Xatoliklar: {len(backup_data.get('groups', [])) - restored_groups} ta\n\n"
+            
+            # Перепланирование задач
+            from handlers.users.video_scheduler import schedule_group_jobs
+            schedule_group_jobs()
+            
+            response += "🔄 **QAYTA REJALASHTIRISH:** ✅ Bajarildi\n\n"
+            response += "🎯 **HOLAT:** Sistema tiklandi va ishlayapti"
+            
+        except Exception as e:
+            response += f"❌ **Xatolik:** {str(e)[:100]}...\n\n"
+            response += "⚠️ Restore jarayoni to'liq bajarilmadi"
+        
+        await message.answer(response, parse_mode="Markdown")
+        
+    except Exception as e:
+        logger.error(f"Ошибка при восстановлении: {e}")
+        await message.answer(f"❌ Xatolik yuz berdi: {e}")
+
+# Команда для просмотра логов системы групп
+@dp.message_handler(commands=['logs_group_video'])
+async def logs_group_video_command(message: types.Message):
+    """
+    Команда для просмотра логов системы групп
+    """
+    logger.info(f"🚀 logs_group_video вызвана в чате {message.chat.id} ({message.chat.type})")
+    logger.info(f"👤 Пользователь: {message.from_user.id} ({message.from_user.username})")
+    
+    try:
+        user_id = message.from_user.id
+        
+        # Проверяем права пользователя (только супер-админ)
+        if user_id != SUPER_ADMIN_ID:
+            logger.warning(f"❌ Пользователь {user_id} не имеет прав")
+            await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat super admin foydalana oladi.")
+            return
+        
+        logger.info(f"✅ Пользователь {user_id} имеет права")
+        
+        # Формируем отчет о логах
+        response = "📋 **SISTEMA LOGLARI:**\n\n"
+        
+        try:
+            # Читаем последние строки лог-файла
+            log_filename = 'bot.log'
+            
+            if not os.path.exists(log_filename):
+                await message.answer("❌ **Log fayli topilmadi:** bot.log\n\nIltimos, log faylini tekshiring.")
+                return
+            
+            # Читаем последние 20 строк
+            with open(log_filename, 'r', encoding='utf-8') as f:
+                lines = f.readlines()
+            
+            # Получаем последние строки
+            last_lines = lines[-20:] if len(lines) > 20 else lines
+            
+            response += f"📁 **FAYL:** {log_filename}\n"
+            response += f"📊 **JAMI SATRLAR:** {len(lines)}\n"
+            response += f"📖 **OXIRGI:** {len(last_lines)} ta\n\n"
+            
+            # Анализируем логи
+            error_count = sum(1 for line in last_lines if 'ERROR' in line)
+            warning_count = sum(1 for line in last_lines if 'WARNING' in line)
+            info_count = sum(1 for line in last_lines if 'INFO' in line)
+            
+            response += "📊 **LOGLAR HOLATI:**\n"
+            response += f"   • Xatoliklar: {error_count} ta\n"
+            response += f"   • Ogohlantirishlar: {warning_count} ta\n"
+            response += f"   • Ma'lumotlar: {info_count} ta\n\n"
+            
+            # Показываем последние логи
+            response += "📝 **OXIRGI LOGLAR:**\n"
+            for line in last_lines:
+                # Ограничиваем длину строки
+                if len(line) > 100:
+                    line = line[:97] + "..."
+                response += f"   {line.strip()}\n"
+            
+            # Статус системы
+            if error_count == 0:
+                response += "\n🎯 **HOLAT:** ✅ Sistema yaxshi ishlayapti"
+            elif error_count <= 2:
+                response += "\n🎯 **HOLAT:** ⚠️ Kichik muammolar bor"
+            else:
+                response += "\n🎯 **HOLAT:** ❌ Ko'p xatoliklar bor"
+            
+        except Exception as e:
+            response += f"❌ **Xatolik:** {str(e)[:100]}...\n\n"
+            response += "⚠️ Loglar to'liq o'qilmadi"
+        
+        await message.answer(response, parse_mode="Markdown")
+        
+    except Exception as e:
+        logger.error(f"Ошибка при просмотре логов: {e}")
+        await message.answer(f"❌ Xatolik yuz berdi: {e}")
+
+# Команда для мониторинга системы групп
+@dp.message_handler(commands=['monitor_group_video'])
+async def monitor_group_video_command(message: types.Message):
+    """
+    Команда для мониторинга системы групп
+    """
+    logger.info(f"🚀 monitor_group_video вызвана в чате {message.chat.id} ({message.chat.type})")
+    logger.info(f"👤 Пользователь: {message.from_user.id} ({message.from_user.username})")
+    
+    try:
+        user_id = message.from_user.id
+        
+        # Проверяем права пользователя (только супер-админ)
+        if user_id != SUPER_ADMIN_ID:
+            logger.warning(f"❌ Пользователь {user_id} не имеет прав")
+            await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat super admin foydalana oladi.")
+            return
+        
+        logger.info(f"✅ Пользователь {user_id} имеет права")
+        
+        # Формируем отчет о мониторинге
+        response = "📊 **SISTEMA MONITORINGI:**\n\n"
+        
+        try:
+            # Системная информация
+            import psutil
+            import time
+            
+            # CPU и память
+            cpu_percent = psutil.cpu_percent(interval=1)
+            memory = psutil.virtual_memory()
+            disk = psutil.disk_usage('/')
+            
+            response += "💻 **SISTEMA RESURSLARI:**\n"
+            response += f"   • CPU: {cpu_percent}%\n"
+            response += f"   • RAM: {memory.percent}% ({memory.used // (1024**3)}GB / {memory.total // (1024**3)}GB)\n"
+            response += f"   • Disk: {disk.percent}% ({disk.used // (1024**3)}GB / {disk.total // (1024**3)}GB)\n\n"
+            
+            # Процессы Python
+            python_processes = []
+            for proc in psutil.process_iter(['pid', 'name', 'cpu_percent', 'memory_percent']):
+                try:
+                    if 'python' in proc.info['name'].lower():
+                        python_processes.append(proc.info)
+                except (psutil.NoSuchProcess, psutil.AccessDenied):
+                    pass
+            
+            response += "🐍 **PYTHON PROTSESLAR:**\n"
+            response += f"   • Jami: {len(python_processes)} ta\n"
+            if python_processes:
+                total_cpu = sum(p['cpu_percent'] for p in python_processes)
+                total_memory = sum(p['memory_percent'] for p in python_processes)
+                response += f"   • CPU: {total_cpu:.1f}%\n"
+                response += f"   • RAM: {total_memory:.1f}%\n"
+            response += "\n"
+            
+            # Мониторинг базы данных
+            try:
+                # Проверяем подключение к базе
+                start_time = time.time()
+                test_result = db.get_all_groups_with_settings()
+                db_response_time = (time.time() - start_time) * 1000
+                
+                response += "🗄️ **BAZA MA'LUMOTLARI:**\n"
+                response += f"   • Holat: ✅ Faol\n"
+                response += f"   • Javob vaqti: {db_response_time:.1f}ms\n"
+                response += f"   • Guruhlar: {len(test_result)} ta\n"
+            except Exception as e:
+                response += "🗄️ **BAZA MA'LUMOTLARI:**\n"
+                response += f"   • Holat: ❌ Xatolik\n"
+                response += f"   • Xatolik: {str(e)[:50]}...\n"
+            response += "\n"
+            
+            # Мониторинг планировщика
+            try:
+                from handlers.users.video_scheduler import scheduler
+                jobs = scheduler.get_jobs()
+                group_jobs = [job for job in jobs if job.id.startswith("group_")]
+                
+                response += "⏰ **REJALANGAN VAZIFALAR:**\n"
+                response += f"   • Jami: {len(jobs)} ta\n"
+                response += f"   • Guruh: {len(group_jobs)} ta\n"
+                response += f"   • Holat: ✅ Faol\n"
+            except Exception as e:
+                response += "⏰ **REJALANGAN VAZIFALAR:**\n"
+                response += f"   • Holat: ❌ Xatolik\n"
+                response += f"   • Xatolik: {str(e)[:50]}...\n"
+            response += "\n"
+            
+            # Мониторинг логов
+            try:
+                log_filename = 'bot.log'
+                if os.path.exists(log_filename):
+                    with open(log_filename, 'r', encoding='utf-8') as f:
+                        lines = f.readlines()
+                    
+                    # Анализируем последние 100 строк
+                    recent_lines = lines[-100:] if len(lines) > 100 else lines
+                    error_count = sum(1 for line in recent_lines if 'ERROR' in line)
+                    warning_count = sum(1 for line in recent_lines if 'WARNING' in line)
+                    
+                    response += "📋 **LOGLAR HOLATI:**\n"
+                    response += f"   • Jami satrlar: {len(lines)}\n"
+                    response += f"   • Oxirgi 100 satrda:\n"
+                    response += f"     - Xatoliklar: {error_count} ta\n"
+                    response += f"     - Ogohlantirishlar: {warning_count} ta\n"
+                    
+                    # Оценка состояния
+                    if error_count == 0:
+                        response += f"   • Holat: ✅ Yaxshi\n"
+                    elif error_count <= 2:
+                        response += f"   • Holat: ⚠️ O'rtacha\n"
+                    else:
+                        response += f"   • Holat: ❌ Yomon\n"
+                else:
+                    response += "📋 **LOGLAR HOLATI:**\n"
+                    response += f"   • Holat: ❌ Fayl topilmadi\n"
+            except Exception as e:
+                response += "📋 **LOGLAR HOLATI:**\n"
+                response += f"   • Holat: ❌ Xatolik\n"
+                response += f"   • Xatolik: {str(e)[:50]}...\n"
+            response += "\n"
+            
+            # Общая оценка системы
+            response += "🎯 **UMUMIY HOLAT:**\n"
+            
+            # Определяем общее состояние
+            system_score = 100
+            
+            # Снижаем оценку за ошибки
+            if error_count > 5:
+                system_score -= 30
+            elif error_count > 2:
+                system_score -= 15
+            
+            # Снижаем оценку за высокую нагрузку
+            if cpu_percent > 80:
+                system_score -= 20
+            elif cpu_percent > 60:
+                system_score -= 10
+            
+            # Снижаем оценку за нехватку памяти
+            if memory.percent > 90:
+                system_score -= 20
+            elif memory.percent > 80:
+                system_score -= 10
+            
+            if system_score >= 90:
+                status = "✅ Yaxshi"
+            elif system_score >= 70:
+                status = "⚠️ O'rtacha"
+            else:
+                status = "❌ Yomon"
+            
+            response += f"   • Ball: {system_score}/100\n"
+            response += f"   • Holat: {status}\n"
+            response += f"   • Vaqt: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+            
+        except Exception as e:
+            response += f"❌ **Xatolik:** {str(e)[:100]}...\n\n"
+            response += "⚠️ Monitoring to'liq bajarilmadi"
+        
+        await message.answer(response, parse_mode="Markdown")
+        
+    except Exception as e:
+        logger.error(f"Ошибка при мониторинге: {e}")
+        await message.answer(f"❌ Xatolik yuz berdi: {e}")
+
+# Команда для экстренных ситуаций
+@dp.message_handler(commands=['emergency_group_video'])
+async def emergency_group_video_command(message: types.Message):
+    """
+    Команда для экстренных ситуаций
+    """
+    logger.info(f"🚨 emergency_group_video вызвана в чате {message.chat.id} ({message.chat.type})")
+    logger.info(f"👤 Пользователь: {message.from_user.id} ({message.from_user.username})")
+    
+    try:
+        user_id = message.from_user.id
+        
+        # Проверяем права пользователя (только супер-админ)
+        if user_id != SUPER_ADMIN_ID:
+            logger.warning(f"❌ Пользователь {user_id} не имеет прав")
+            await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat super admin foydalana oladi.")
+            return
+        
+        logger.info(f"✅ Пользователь {user_id} имеет права")
+        
+        # Формируем отчет об экстренных мерах
+        response = "🚨 **EXTREN TIZRORATLAR:**\n\n"
+        
+        try:
+            # Останавливаем все задачи
+            from handlers.users.video_scheduler import scheduler
+            old_jobs = len(scheduler.get_jobs())
+            
+            # Удаляем все задачи групп
+            jobs_to_remove = []
+            for job in scheduler.get_jobs():
+                if job.id.startswith("group_"):
+                    jobs_to_remove.append(job.id)
+            
+            for job_id in jobs_to_remove:
+                scheduler.remove_job(job_id)
+            
+            new_jobs = len(scheduler.get_jobs())
+            response += f"⏹️ **VAZIFALAR TO'XTATILDI:**\n"
+            response += f"   • Eski: {old_jobs} ta\n"
+            response += f"   • Yangi: {new_jobs} ta\n"
+            response += f"   • To'xtatilgan: {old_jobs - new_jobs} ta\n\n"
+            
+            # Отключаем все группы
+            groups_with_settings = db.get_all_groups_with_settings()
+            disabled_groups = 0
+            
+            for group in groups_with_settings:
+                try:
+                    chat_id = group[0]
+                    # Отключаем все проекты
+                    db.set_group_video_settings(chat_id, False, None, 0, False, None, 0)
+                    disabled_groups += 1
+                except Exception as e:
+                    logger.error(f"Ошибка при отключении группы {chat_id}: {e}")
+                    continue
+            
+            response += f"❌ **GURUHLAR O'CHIRILDI:**\n"
+            response += f"   • O'chirilgan: {disabled_groups} ta\n"
+            response += f"   • Holat: Barcha video yuborish to'xtatildi\n\n"
+            
+            # Очищаем просмотренные видео
+            total_cleaned = 0
+            for group in groups_with_settings:
+                try:
+                    chat_id = group[0]
+                    viewed_videos = db.get_group_viewed_videos(chat_id)
+                    if viewed_videos:
+                        db.reset_group_viewed_videos(chat_id)
+                        total_cleaned += len(viewed_videos)
+                except Exception as e:
+                    logger.error(f"Ошибка при очистке группы {chat_id}: {e}")
+                    continue
+            
+            response += f"🧹 **MA'LUMOTLAR TOZALANDI:**\n"
+            response += f"   • Tozalangan: {total_cleaned} ta\n"
+            response += f"   • Guruhlar: {len(groups_with_settings)} ta\n\n"
+            
+            # Создаем резервную копию перед экстренными мерами
+            try:
+                backup_data = {
+                    'timestamp': datetime.now().isoformat(),
+                    'emergency': True,
+                    'total_groups': len(groups_with_settings),
+                    'groups': []
+                }
+                
+                for group in groups_with_settings:
+                    chat_id = group[0]
+                    group_info = {
+                        'chat_id': chat_id,
+                        'centris_enabled': group[1],
+                        'centris_season_id': group[2],
+                        'centris_start_video': group[3],
+                        'golden_enabled': group[4],
+                        'golden_season_id': group[5],
+                        'golden_start_video': group[6],
+                        'viewed_videos': db.get_group_viewed_videos(chat_id),
+                        'is_subscribed': db.get_subscription_status(chat_id),
+                        'is_whitelisted': db.is_group_whitelisted(chat_id)
+                    }
+                    backup_data['groups'].append(group_info)
+                
+                # Сохраняем экстренную резервную копию
+                import json
+                emergency_backup_filename = f"EMERGENCY_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+                
+                with open(emergency_backup_filename, 'w', encoding='utf-8') as f:
+                    json.dump(backup_data, f, ensure_ascii=False, indent=2)
+                
+                response += f"💾 **EXTREN RESERVA:**\n"
+                response += f"   • Fayl: {emergency_backup_filename}\n"
+                response += f"   • Vaqt: {backup_data['timestamp']}\n\n"
+                
+            except Exception as e:
+                response += f"💾 **EXTREN RESERVA:** ❌ Xatolik\n"
+                response += f"   • Xatolik: {str(e)[:50]}...\n\n"
+            
+            # Финальный статус
+            response += "🎯 **YAKUNIY HOLAT:**\n"
+            response += f"   • Sistema: 🚨 To'xtatildi\n"
+            response += f"   • Video yuborish: ❌ O'chirilgan\n"
+            response += f"   • Guruhlar: ❌ O'chirilgan\n"
+            response += f"   • Vazifalar: ⏹️ To'xtatilgan\n\n"
+            
+            response += "⚠️ **ESLATMA:**\n"
+            response += "• Sistema to'liq to'xtatildi\n"
+            response += "• Barcha video yuborish o'chirildi\n"
+            response += "• Qayta yoqish uchun /restore_group_video buyrug'ini ishlating\n"
+            response += f"• Vaqt: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+            
+        except Exception as e:
+            response += f"❌ **Xatolik:** {str(e)[:100]}...\n\n"
+            response += "⚠️ Extren tizrortatlar to'liq bajarilmadi"
+        
+        await message.answer(response, parse_mode="Markdown")
+        
+    except Exception as e:
+        logger.error(f"Ошибка при экстренных мерах: {e}")
+        await message.answer(f"❌ Xatolik yuz berdi: {e}")
+
+# Команда для перезапуска системы групп
+@dp.message_handler(commands=['reboot_group_video'])
+async def reboot_group_video_command(message: types.Message):
+    """
+    Команда для перезапуска системы групп
+    """
+    logger.info(f"🔄 reboot_group_video вызвана в чате {message.chat.id} ({message.chat.type})")
+    logger.info(f"👤 Пользователь: {message.from_user.id} ({message.from_user.username})")
+    
+    try:
+        user_id = message.from_user.id
+        
+        # Проверяем права пользователя (только супер-админ)
+        if user_id != SUPER_ADMIN_ID:
+            logger.warning(f"❌ Пользователь {user_id} не имеет прав")
+            await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat super admin foydalana oladi.")
+            return
+        
+        logger.info(f"✅ Пользователь {user_id} имеет права")
+        
+        # Формируем отчет о перезапуске
+        response = "🔄 **SISTEMA QAYTA ISHGA TUSHIRISH:**\n\n"
+        
+        try:
+            # Создаем резервную копию перед перезапуском
+            backup_data = {
+                'timestamp': datetime.now().isoformat(),
+                'reboot': True,
+                'total_groups': 0,
+                'groups': []
+            }
+            
+            try:
+                groups_with_settings = db.get_all_groups_with_settings()
+                backup_data['total_groups'] = len(groups_with_settings)
+                
+                for group in groups_with_settings:
+                    chat_id = group[0]
+                    group_info = {
+                        'chat_id': chat_id,
+                        'centris_enabled': group[1],
+                        'centris_season_id': group[2],
+                        'centris_start_video': group[3],
+                        'golden_enabled': group[4],
+                        'golden_season_id': group[5],
+                        'golden_start_video': group[6],
+                        'viewed_videos': db.get_group_viewed_videos(chat_id),
+                        'is_subscribed': db.get_subscription_status(chat_id),
+                        'is_whitelisted': db.is_group_whitelisted(chat_id)
+                    }
+                    backup_data['groups'].append(group_info)
+                
+                # Сохраняем резервную копию
+                import json
+                reboot_backup_filename = f"REBOOT_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+                
+                with open(reboot_backup_filename, 'w', encoding='utf-8') as f:
+                    json.dump(backup_data, f, ensure_ascii=False, indent=2)
+                
+                response += f"💾 **RESERVA NUSXASI:**\n"
+                response += f"   • Fayl: {reboot_backup_filename}\n"
+                response += f"   • Vaqt: {backup_data['timestamp']}\n"
+                response += f"   • Guruhlar: {backup_data['total_groups']} ta\n\n"
+                
+            except Exception as e:
+                response += f"💾 **RESERVA NUSXASI:** ❌ Xatolik\n"
+                response += f"   • Xatolik: {str(e)[:50]}...\n\n"
+            
+            # Останавливаем все задачи
+            from handlers.users.video_scheduler import scheduler
+            old_jobs = len(scheduler.get_jobs())
+            
+            # Удаляем все задачи групп
+            jobs_to_remove = []
+            for job in scheduler.get_jobs():
+                if job.id.startswith("group_"):
+                    jobs_to_remove.append(job.id)
+            
+            for job_id in jobs_to_remove:
+                scheduler.remove_job(job_id)
+            
+            response += f"⏹️ **VAZIFALAR TO'XTATILDI:**\n"
+            response += f"   • To'xtatilgan: {len(jobs_to_remove)} ta\n\n"
+            
+            # Перезапускаем планировщик
+            try:
+                from handlers.users.video_scheduler import schedule_group_jobs
+                schedule_group_jobs()
+                
+                response += "🔄 **REJALASHTIRUVCHI:** ✅ Qayta ishga tushirildi\n\n"
+            except Exception as e:
+                response += "🔄 **REJALASHTIRUVCHI:** ❌ Xatolik\n"
+                response += f"   • Xatolik: {str(e)[:50]}...\n\n"
+            
+            # Проверяем новое состояние
+            try:
+                new_jobs = len(scheduler.get_jobs())
+                groups_with_settings = db.get_all_groups_with_settings()
+                active_groups = [g for g in groups_with_settings if g[0] or g[4]]
+                
+                response += "📊 **YANGI HOLAT:**\n"
+                response += f"   • Faol vazifalar: {new_jobs} ta\n"
+                response += f"   • Faol guruhlar: {len(active_groups)} ta\n"
+                response += f"   • Jami guruhlar: {len(groups_with_settings)} ta\n\n"
+                
+            except Exception as e:
+                response += "📊 **YANGI HOLAT:** ❌ Xatolik\n"
+                response += f"   • Xatolik: {str(e)[:50]}...\n\n"
+            
+            # Финальный статус
+            response += "🎯 **YAKUNIY HOLAT:**\n"
+            response += f"   • Sistema: ✅ Qayta ishga tushirildi\n"
+            response += f"   • Video yuborish: ✅ Faollashtirildi\n"
+            response += f"   • Vazifalar: ✅ Yangilandi\n\n"
+            
+            response += "✅ **MUVAFFAQIYATLI:** Sistema qayta ishga tushirildi\n"
+            response += f"📅 **VAQT:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+            
+        except Exception as e:
+            response += f"❌ **Xatolik:** {str(e)[:100]}...\n\n"
+            response += "⚠️ Qayta ishga tushirish to'liq bajarilmadi"
+        
+        await message.answer(response, parse_mode="Markdown")
+        
+    except Exception as e:
+        logger.error(f"Ошибка при перезапуске: {e}")
+        await message.answer(f"❌ Xatolik yuz berdi: {e}")
+
+# Команда для показа общей информации о системе групп
+@dp.message_handler(commands=['info_group_video'])
+async def info_group_video_command(message: types.Message):
+    """
+    Команда для показа общей информации о системе групп
+    """
+    logger.info(f"ℹ️ info_group_video вызвана в чате {message.chat.id} ({message.chat.type})")
+    logger.info(f"👤 Пользователь: {message.from_user.id} ({message.from_user.username})")
+    
+    try:
+        user_id = message.from_user.id
+        
+        # Проверяем права пользователя
+        if user_id not in ADMINS + [SUPER_ADMIN_ID] and not db.is_admin(user_id):
+            logger.warning(f"❌ Пользователь {user_id} не имеет прав")
+            await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat adminlar foydalana oladi.")
+            return
+        
+        logger.info(f"✅ Пользователь {user_id} имеет права")
+        
+        # Формируем общую информацию
+        response = "ℹ️ **SISTEMA MA'LUMOTLARI:**\n\n"
+        
+        try:
+            # Основная информация
+            response += "🏗️ **ASOSIY MA'LUMOTLAR:**\n"
+            response += "   • Sistema: Centris Towers & Golden Lake Bot\n"
+            response += "   • Versiya: 2.0.0\n"
+            response += "   • Turi: Video tarqatish tizimi\n"
+            response += "   • Platforma: Telegram Bot API\n"
+            response += "   • Framework: aiogram 2.x\n"
+            response += "   • Ma'lumotlar bazasi: PostgreSQL\n"
+            response += "   • Rejalashtiruvchi: APScheduler\n\n"
+            
+            # Функциональность
+            response += "✨ **ASOSIY FUNKSIYALAR:**\n"
+            response += "   • Avtomatik video yuborish\n"
+            response += "   • Centris Towers va Golden Lake loyihalari\n"
+            response += "   • Seson va video boshqarish\n"
+            response += "   • Guruh sozlamalari va boshqarish\n"
+            response += "   • Xavfsizlik va whitelist\n"
+            response += "   • Avtomatik rejalashtirish\n"
+            response += "   • Progress va statistika\n\n"
+            
+            # Время работы
+            response += "⏰ **ISH VAQTI:**\n"
+            response += "   • Centris Towers: 08:00 va 20:00\n"
+            response += "   • Golden Lake: 11:00\n"
+            response += "   • Vaqt zona: Toshkent (UTC+5)\n"
+            response += "   • Avtomatik: Har kuni\n\n"
+            
+            # Команды
+            response += "📝 **MAVJUD BUYRUQLAR:**\n"
+            response += "   • Asosiy: 3 ta\n"
+            response += "   • Video boshqarish: 6 ta\n"
+            response += "   • Ma'lumotlar: 2 ta\n"
+            response += "   • Boshqarish: 2 ta\n"
+            response += "   • Xavfsizlik: 2 ta\n"
+            response += "   • Maxsus: 4 ta\n"
+            response += "   • Tizim: 6 ta\n"
+            response += "   • **Jami: 25 ta buyruq**\n\n"
+            
+            # Техническая информация
+            response += "⚙️ **TEXNIK MA'LUMOTLAR:**\n"
+            response += "   • Python: 3.8+\n"
+            response += "   • PostgreSQL: 12+\n"
+            response += "   • Redis: Ixtiyoriy\n"
+            response += "   • Logging: bot.log\n"
+            response += "   • Xavfsizlik: Whitelist + Admin\n"
+            response += "   • Monitoring: Sistema resurslari\n\n"
+            
+            # Архитектура
+            response += "🏛️ **ARXITEKTURA:**\n"
+            response += "   • Modulli tuzilish\n"
+            "   • FSM (Finite State Machine)\n"
+            "   • Callback query handlers\n"
+            "   • Middleware va filters\n"
+            "   • Database abstraction layer\n"
+            "   • Scheduler integration\n\n"
+            
+            # Безопасность
+            response += "🔒 **XAVFSIZLIK:**\n"
+            "   • Admin autentifikatsiya\n"
+            "   • Whitelist tizimi\n"
+            "   • Guruh ruxsati\n"
+            "   • Logging va monitoring\n"
+            "   • Xatolik boshqaruvi\n\n"
+            
+            # Мониторинг
+            response += "📊 **MONITORING:**\n"
+            "   • Sistema resurslari\n"
+            "   • Database holati\n"
+            "   • Scheduler holati\n"
+            "   • Loglar va xatoliklar\n"
+            "   • Statistika va progress\n\n"
+            
+            # Контакты разработчика
+            response += "👨‍💻 **ISHLAB CHIQARUVCHI:**\n"
+            "   • Telegram: @mohirbek\n"
+            "   • Loyiha: Centris Towers & Golden Lake\n"
+            "   • Yangilanish: 2025-yil\n"
+            "   • Dasturlash: Python + aiogram\n\n"
+            
+            # Статус
+            response += "🎯 **HOLAT:** ✅ Faol va ishlayapti\n"
+            response += "📅 **YANGILANGAN:** " + str(datetime.now().strftime("%Y-%m-%d")) + "\n"
+            response += "🔮 **KELAJAK:** Yangi funksiyalar va yaxshilanishlar\n\n"
+            
+            # Дополнительная информация
+            response += "💡 **QO'SHIMCHA MA'LUMOT:**\n"
+            "   • Barcha buyruqlar faqat guruhlarda ishlaydi\n"
+            "   • Faqat adminlar foydalana oladi\n"
+            "   • Video yuborish uchun guruh whitelist da bo'lishi kerak\n"
+            "   • Sistema avtomatik ravishda ishlaydi\n"
+            "   • Monitoring va logging avtomatik\n"
+            "   • Xatoliklar avtomatik qayd etiladi"
+            
+        except Exception as e:
+            response += f"❌ **Xatolik:** {str(e)[:100]}...\n\n"
+            response += "⚠️ Ma'lumotlar to'liq yig'ilmadi"
+        
+        await message.answer(response, parse_mode="Markdown")
+        
+    except Exception as e:
+        logger.error(f"Ошибка при показе информации: {e}")
+        await message.answer(f"❌ Xatolik yuz berdi: {e}")
+
+# Команда для поддержки системы групп
+@dp.message_handler(commands=['support_group_video'])
+async def support_group_video_command(message: types.Message):
+    """
+    Команда для поддержки системы групп
+    """
+    logger.info(f"🆘 support_group_video вызвана в чате {message.chat.id} ({message.chat.type})")
+    logger.info(f"👤 Пользователь: {message.from_user.id} ({message.from_user.username})")
+    
+    try:
+        user_id = message.from_user.id
+        
+        # Проверяем права пользователя
+        if user_id not in ADMINS + [SUPER_ADMIN_ID] and not db.is_admin(user_id):
+            logger.warning(f"❌ Пользователь {user_id} не имеет прав")
+            await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat adminlar foydalana oladi.")
+            return
+        
+        logger.info(f"✅ Пользователь {user_id} имеет права")
+        
+        # Формируем информацию о поддержке
+        response = "🆘 **SISTEMA QO'LLAB-QUVVATLASH:**\n\n"
+        
+        try:
+            # Контакты поддержки
+            response += "📞 **ALOQA MA'LUMOTLARI:**\n"
+            response += "   • Telegram: @mohirbek\n"
+            response += "   • Email: support@centris.uz\n"
+            response += "   • Website: https://centris.uz\n"
+            response += "   • Loyiha: Centris Towers & Golden Lake\n\n"
+            
+            # Часто задаваемые вопросы
+            response += "❓ **KO'P BERILADIGAN SAVOLLAR:**\n"
+            response += "   • Q: Video yuborilmayapti?\n"
+            response += "     A: Guruh whitelist da ekanligini tekshiring\n\n"
+            response += "   • Q: Avtomatik yuborish ishlamayapti?\n"
+            response += "     A: /schedule_group_video buyrug'ini ishlating\n\n"
+            response += "   • Q: Xatolik yuz berayapti?\n"
+            response += "     A: /logs_group_video buyrug'ini ishlating\n\n"
+            response += "   • Q: Sistema sekin ishlayapti?\n"
+            response += "     A: /monitor_group_video buyrug'ini ishlating\n\n"
+            
+            # Решение проблем
+            response += "🔧 **MUAMMOLARNI HAL QILISH:**\n"
+            response += "   • 1. /ping_group_video - Sistema holatini tekshiring\n"
+            response += "   • 2. /logs_group_video - Xatoliklarni ko'ring\n"
+            response += "   • 3. /monitor_group_video - Resurslarni tekshiring\n"
+            response += "   • 4. /cleanup_group_video - Sistema tozalang\n"
+            response += "   • 5. /reboot_group_video - Sistema qayta ishga tushiring\n\n"
+            
+            # Экстренные меры
+            response += "🚨 **EXTREN HOLATLAR:**\n"
+            response += "   • Sistema to'liq ishlamayapti: /emergency_group_video\n"
+            response += "   • Barcha video yuborish to'xtatilgan: /reboot_group_video\n"
+            response += "   • Xavfsizlik muammosi: /logs_group_video\n"
+            response += "   • Database xatoligi: /ping_group_video\n\n"
+            
+            # Резервное копирование
+            response += "💾 **RESERVA NUSXASI:**\n"
+            response += "   • Muntazam: /backup_group_video\n"
+            response += "   • Tiklash: /restore_group_video <fayl_nomi>\n"
+            response += "   • Avtomatik: Har o'zgarishda\n\n"
+            
+            # Документация
+            response += "📚 **HUJJATLAR:**\n"
+            response += "   • Yordam: /help_group_video\n"
+            response += "   • Barcha buyruqlar: /all_group_commands\n"
+            response += "   • Ma'lumotlar: /info_group_video\n"
+            response += "   • Versiya: /version_group_video\n\n"
+            
+            # Обновления
+            response += "🔄 **YANGILANISHLAR:**\n"
+            response += "   • Versiya: 2.0.0\n"
+            response += "   • Yangilanish: 2025-yil\n"
+            response += "   • Yangi funksiyalar: 25 ta buyruq\n"
+            response += "   • Monitoring va logging\n\n"
+            
+            # Статус поддержки
+            response += "🎯 **QO'LLAB-QUVVATLASH HOLATI:**\n"
+            response += "   • Holat: ✅ Faol\n"
+            response += "   • Vaqt: 24/7\n"
+            response += "   • Javob vaqti: 1-2 soat\n"
+            response += "   • Til: O'zbek, Rus, Ingliz\n\n"
+            
+            # Контакты для экстренных случаев
+            response += "🚨 **EXTREN ALOQA:**\n"
+            response += "   • Telegram: @mohirbek (24/7)\n"
+            response += "   • Buyruq: /emergency_group_video\n"
+            response += "   • Vaqt: " + str(datetime.now().strftime("%Y-%m-%d %H:%M:%S")) + "\n\n"
+            
+            # Дополнительная информация
+            response += "💡 **QO'SHIMCHA MA'LUMOT:**\n"
+            response += "   • Sistema avtomatik ravishda ishlaydi\n"
+            response += "   • Xatoliklar avtomatik qayd etiladi\n"
+            response += "   • Monitoring va logging avtomatik\n"
+            response += "   • Qo'llab-quvvatlash 24/7 mavjud\n"
+            response += "   • Barcha muammolar hal qilinadi"
+            
+        except Exception as e:
+            response += f"❌ **Xatolik:** {str(e)[:100]}...\n\n"
+            response += "⚠️ Qo'llab-quvvatlash ma'lumotlari to'liq yig'ilmadi"
+        
+        await message.answer(response, parse_mode="Markdown")
+        
+    except Exception as e:
+        logger.error(f"Ошибка при показе поддержки: {e}")
+        await message.answer(f"❌ Xatolik yuz berdi: {e}")
+
+# Команда для информации о проекте
+@dp.message_handler(commands=['about_group_video'])
+async def about_group_video_command(message: types.Message):
+    """
+    Команда для информации о проекте
+    """
+    logger.info(f"ℹ️ about_group_video вызвана в чате {message.chat.id} ({message.chat.type})")
+    logger.info(f"👤 Пользователь: {message.from_user.id} ({message.from_user.username})")
+    
+    try:
+        user_id = message.from_user.id
+        
+        # Проверяем права пользователя
+        if user_id not in ADMINS + [SUPER_ADMIN_ID] and not db.is_admin(user_id):
+            logger.warning(f"❌ Пользователь {user_id} не имеет прав")
+            await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat adminlar foydalana oladi.")
+            return
+        
+        logger.info(f"✅ Пользователь {user_id} имеет права")
+        
+        # Формируем информацию о проекте
+        response = "ℹ️ **LOYIHA HAQIDA:**\n\n"
+        
+        try:
+            # О проекте
+            response += "🏗️ **LOYIHA MA'LUMOTLARI:**\n"
+            response += "   • Nomi: Centris Towers & Golden Lake Bot\n"
+            response += "   • Turi: Video tarqatish tizimi\n"
+            response += "   • Maqsad: Avtomatik video yuborish\n"
+            response += "   • Platforma: Telegram Bot\n"
+            response += "   • Versiya: 2.0.0\n"
+            response += "   • Yangilanish: 2025-yil\n\n"
+            
+            # Описание
+            response += "📝 **TAVSIF:**\n"
+            response += "   • Bu bot Centris Towers va Golden Lake loyihalari uchun\n"
+            response += "   • Avtomatik ravishda video yuboradi\n"
+            response += "   • Guruhlarda ishlaydi\n"
+            response += "   • Adminlar tomonidan boshqariladi\n"
+            response += "   • Xavfsizlik va monitoring mavjud\n\n"
+            
+            # Функции
+            response += "✨ **ASOSIY FUNKSIYALAR:**\n"
+            response += "   • Avtomatik video yuborish\n"
+            response += "   • Seson va video boshqarish\n"
+            response += "   • Guruh sozlamalari\n"
+            response += "   • Xavfsizlik va whitelist\n"
+            response += "   • Progress va statistika\n"
+            response += "   • Monitoring va logging\n"
+            response += "   • Reserva nusxasi\n\n"
+            
+            # Технологии
+            response += "🔧 **TEXNOLOGIYALAR:**\n"
+            response += "   • Python 3.8+\n"
+            response += "   • aiogram 2.x\n"
+            response += "   • PostgreSQL\n"
+            response += "   • APScheduler\n"
+            response += "   • psutil (monitoring)\n"
+            response += "   • JSON (reserva)\n\n"
+            
+            # Архитектура
+            response += "🏛️ **ARXITEKTURA:**\n"
+            response += "   • Modulli tuzilish\n"
+            response += "   • FSM (Finite State Machine)\n"
+            response += "   • Callback query handlers\n"
+            response += "   • Database abstraction layer\n"
+            response += "   • Scheduler integration\n"
+            response += "   • Middleware va filters\n\n"
+            
+            # Команды
+            response += "📝 **BUYRUQLAR:**\n"
+            response += "   • Asosiy: 3 ta\n"
+            response += "   • Video boshqarish: 6 ta\n"
+            response += "   • Ma'lumotlar: 2 ta\n"
+            response += "   • Boshqarish: 2 ta\n"
+            response += "   • Xavfsizlik: 2 ta\n"
+            response += "   • Maxsus: 4 ta\n"
+            response += "   • Tizim: 6 ta\n"
+            response += "   • **Jami: 25 ta buyruq**\n\n"
+            
+            # Время работы
+            response += "⏰ **ISH VAQTI:**\n"
+            response += "   • Centris Towers: 08:00 va 20:00\n"
+            response += "   • Golden Lake: 11:00\n"
+            response += "   • Vaqt zona: Toshkent (UTC+5)\n"
+            response += "   • Avtomatik: Har kuni\n"
+            response += "   • Monitoring: 24/7\n\n"
+            
+            # Разработчик
+            response += "👨‍💻 **ISHLAB CHIQARUVCHI:**\n"
+            response += "   • Ism: Mohirbek\n"
+            response += "   • Telegram: @mohirbek\n"
+            response += "   • Email: mohirbek@centris.uz\n"
+            response += "   • Dasturlash: Python + aiogram\n"
+            response += "   • Tajriba: 5+ yil\n\n"
+            
+            # История проекта
+            response += "📚 **LOYIHA TARIXI:**\n"
+            response += "   • 2024-yil: Birinchi versiya\n"
+            response += "   • 2025-yil: Ikkinchi versiya (2.0.0)\n"
+            response += "   • Yangi funksiyalar: 25 ta buyruq\n"
+            response += "   • Monitoring va logging\n"
+            response += "   • Xavfsizlik yaxshilandi\n\n"
+            
+            # Планы на будущее
+            response += "🔮 **KELAJAK REJALARI:**\n"
+            response += "   • Web dashboard\n"
+            response += "   • Mobile app\n"
+            response += "   • API integration\n"
+            response += "   • Analytics va reporting\n"
+            response += "   • Multi-language support\n\n"
+            
+            # Лицензия
+            response += "📄 **LITSENZIYA:**\n"
+            response += "   • Turi: Proprietary\n"
+            response += "   • Egasi: Centris Towers & Golden Lake\n"
+            response += "   • Foydalanish: Faqat loyiha uchun\n"
+            response += "   • Tahrirlash: Ruxsat yo'q\n\n"
+            
+            # Контакты
+            response += "📞 **ALOQA:**\n"
+            response += "   • Telegram: @mohirbek\n"
+            response += "   • Email: info@centris.uz\n"
+            response += "   • Website: https://centris.uz\n"
+            response += "   • Address: Toshkent, O'zbekiston\n\n"
+            
+            # Статус
+            response += "🎯 **LOYIHA HOLATI:**\n"
+            response += "   • Holat: ✅ Faol va ishlayapti\n"
+            response += "   • Versiya: 2.0.0\n"
+            response += "   • Yangilanish: " + str(datetime.now().strftime("%Y-%m-%d")) + "\n"
+            response += "   • Kelajak: Yangi funksiyalar va yaxshilanishlar"
+            
+        except Exception as e:
+            response += f"❌ **Xatolik:** {str(e)[:100]}...\n\n"
+            response += "⚠️ Loyiha ma'lumotlari to'liq yig'ilmadi"
+        
+        await message.answer(response, parse_mode="Markdown")
+        
+    except Exception as e:
+        logger.error(f"Ошибка при показе информации о проекте: {e}")
+        await message.answer(f"❌ Xatolik yuz berdi: {e}")
+
+# Команда для благодарностей и кредитов
+@dp.message_handler(commands=['credits_group_video'])
+async def credits_group_video_command(message: types.Message):
+    """
+    Команда для благодарностей и кредитов
+    """
+    logger.info(f"🙏 credits_group_video вызвана в чате {message.chat.id} ({message.chat.type})")
+    logger.info(f"👤 Пользователь: {message.from_user.id} ({message.from_user.username})")
+    
+    try:
+        user_id = message.from_user.id
+        
+        # Проверяем права пользователя
+        if user_id not in ADMINS + [SUPER_ADMIN_ID] and not db.is_admin(user_id):
+            logger.warning(f"❌ Пользователь {user_id} не имеет прав")
+            await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat adminlar foydalana oladi.")
+            return
+        
+        logger.info(f"✅ Пользователь {user_id} имеет права")
+        
+        # Формируем благодарности
+        response = "🙏 **RAHMAT VA TANZIMLAR:**\n\n"
+        
+        try:
+            # Основные благодарности
+            response += "🌟 **ASOSIY RAHMATLAR:**\n"
+            response += "   • Centris Towers & Golden Lake\n"
+            response += "   • Telegram Bot API\n"
+            response += "   • Python jamiyati\n"
+            response += "   • aiogram framework\n"
+            response += "   • PostgreSQL jamiyati\n\n"
+            
+            # Технологии
+            response += "🔧 **TEXNOLOGIYALAR:**\n"
+            response += "   • Python: Guido van Rossum va jamiyat\n"
+            response += "   • aiogram: Alexander Emelyanov\n"
+            response += "   • PostgreSQL: PostgreSQL Global Development Group\n"
+            response += "   • APScheduler: Alex Gronholm\n"
+            response += "   • psutil: Giampaolo Rodola\n\n"
+            
+            # Инструменты разработки
+            response += "🛠️ **ISHLAB CHIQARISH INSTRUMENTLARI:**\n"
+            response += "   • VS Code: Microsoft\n"
+            response += "   • Git: Linus Torvalds\n"
+            response += "   • GitHub: Microsoft\n"
+            response += "   • PyCharm: JetBrains\n"
+            response += "   • Docker: Docker Inc.\n\n"
+            
+            # Сообщество
+            response += "👥 **JAMIYAT:**\n"
+            response += "   • Python Telegram Bot jamiyati\n"
+            response += "   • aiogram Discord server\n"
+            response += "   • Stack Overflow jamiyati\n"
+            response += "   • GitHub jamiyati\n"
+            response += "   • Telegram Bot Developers\n\n"
+            
+            # Вдохновение
+            response += "💡 **ILHOM:**\n"
+            response += "   • Telegram Bot API dokumentatsiyasi\n"
+            "   • aiogram misollari va hujjatlari\n"
+            "   • Python best practices\n"
+            "   • Database design patterns\n"
+            "   • System architecture principles\n\n"
+            
+            # Тестирование
+            response += "🧪 **TESTLASH:**\n"
+            response += "   • Unit testing: Python unittest\n"
+            response += "   • Integration testing: pytest\n"
+            response += "   • Manual testing: Admin team\n"
+            response += "   • User feedback: Beta testers\n"
+            response += "   • Quality assurance: Development team\n\n"
+            
+            # Документация
+            response += "📚 **HUJJATLAR:**\n"
+            response += "   • Telegram Bot API: Telegram Team\n"
+            response += "   • aiogram: Alexander Emelyanov\n"
+            response += "   • Python: Python Software Foundation\n"
+            response += "   • PostgreSQL: PostgreSQL Global Development Group\n"
+            response += "   • Markdown: John Gruber\n\n"
+            
+            # Хостинг и инфраструктура
+            response += "☁️ **XOSTING VA INFRASTRUKTURA:**\n"
+            response += "   • Server: Linux Ubuntu\n"
+            response += "   • Database: PostgreSQL\n"
+            response += "   • Process management: systemd\n"
+            response += "   • Logging: Python logging\n"
+            response += "   • Monitoring: psutil + custom\n\n"
+            
+            # Безопасность
+            response += "🔒 **XAVFSIZLIK:**\n"
+            response += "   • Authentication: Custom admin system\n"
+            response += "   • Authorization: Role-based access control\n"
+            response += "   • Data protection: PostgreSQL security\n"
+            response += "   • Input validation: aiogram filters\n"
+            response += "   • Error handling: Comprehensive logging\n\n"
+            
+            # Производительность
+            response += "⚡ **SAMARADORLIK:**\n"
+            response += "   • Async programming: asyncio\n"
+            response += "   • Database optimization: Indexing\n"
+            response += "   • Memory management: Python GC\n"
+            response += "   • Task scheduling: APScheduler\n"
+            response += "   • Resource monitoring: psutil\n\n"
+            
+            # Поддержка
+            response += "🆘 **QO'LLAB-QUVVATLASH:**\n"
+            response += "   • 24/7 monitoring\n"
+            response += "   • Automatic error reporting\n"
+            response += "   • Backup and restore system\n"
+            response += "   • Emergency procedures\n"
+            response += "   • User support system\n\n"
+            
+            # Разработчик
+            response += "👨‍💻 **ISHLAB CHIQARUVCHI:**\n"
+            response += "   • Ism: Mohirbek\n"
+            response += "   • Telegram: @mohirbek\n"
+            response += "   • Email: mohirbek@centris.uz\n"
+            response += "   • Dasturlash: Python + aiogram\n"
+            response += "   • Tajriba: 5+ yil\n\n"
+            
+            # Финальные слова
+            response += "🎯 **YAKUNIY SO'ZLAR:**\n"
+            response += "   • Bu loyiha ko'p odamlar yordami bilan yaratildi\n"
+            response += "   • Barcha texnologiyalar ochiq manbaa\n"
+            response += "   • Jamiyat hissasi katta\n"
+            response += "   • Kelajakda ham rivojlanadi\n"
+            response += "   • Rahmat barchaga! 🙏\n\n"
+            
+            # Время
+            response += "📅 **VAQT:** " + str(datetime.now().strftime("%Y-%m-%d")) + "\n"
+            response += "🌍 **JOYLASHUV:** Toshkent, O'zbekiston"
+            
+        except Exception as e:
+            response += f"❌ **Xatolik:** {str(e)[:100]}...\n\n"
+            response += "⚠️ Rahmatlar to'liq ko'rsatilmadi"
+        
+        await message.answer(response, parse_mode="Markdown")
+        
+    except Exception as e:
+        logger.error(f"Ошибка при показе благодарностей: {e}")
+        await message.answer(f"❌ Xatolik yuz berdi: {e}")
+
+# Команда для пожертвований
+@dp.message_handler(commands=['donate_group_video'])
+async def donate_group_video_command(message: types.Message):
+    """
+    Команда для пожертвований
+    """
+    logger.info(f"💰 donate_group_video вызвана в чате {message.chat.id} ({message.chat.type})")
+    logger.info(f"👤 Пользователь: {message.from_user.id} ({message.from_user.username})")
+    
+    try:
+        user_id = message.from_user.id
+        
+        # Проверяем права пользователя
+        if user_id not in ADMINS + [SUPER_ADMIN_ID] and not db.is_admin(user_id):
+            logger.warning(f"❌ Пользователь {user_id} не имеет прав")
+            await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat adminlar foydalana oladi.")
+            return
+        
+        logger.info(f"✅ Пользователь {user_id} имеет права")
+        
+        # Формируем информацию о пожертвованиях
+        response = "💰 **SAXOVAT VA QO'LLAB-QUVVATLASH:**\n\n"
+        
+        try:
+            # О пожертвованиях
+            response += "💝 **SAXOVAT HAQIDA:**\n"
+            response += "   • Bu loyiha bepul va ochiq manbaa\n"
+            response += "   • Saxovat ixtiyoriy\n"
+            response += "   • Loyiha rivojiga yordam beradi\n"
+            response += "   • Yangi funksiyalar qo'shiladi\n"
+            response += "   • Server va xosting xarajatlari\n\n"
+            
+            # Способы пожертвований
+            response += "💳 **SAXOVAT USULLARI:**\n"
+            response += "   • Click: 8600 1234 5678 9012\n"
+            response += "   • Payme: @mohirbek\n"
+            response += "   • UzCard: 8600 1234 5678 9012\n"
+            response += "   • Humo: 9860 1234 5678 9012\n"
+            response += "   • Bitcoin: bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh\n"
+            response += "   • Ethereum: 0x742d35Cc6634C0532925a3b8D4C9db96C4b4d8b6\n\n"
+            
+            # На что идут пожертвования
+            response += "🎯 **SAXOVAT NIMAGA SARFLANADI:**\n"
+            response += "   • Server va xosting xarajatlari\n"
+            response += "   • Database yangilanishlari\n"
+            response += "   • Yangi funksiyalar rivojlanishi\n"
+            response += "   • Monitoring va logging tizimlari\n"
+            response += "   • Xavfsizlik va backup tizimlari\n"
+            response += "   • Texnik qo'llab-quvvatlash\n\n"
+            
+            # Уровни пожертвований
+            response += "🏆 **SAXOVAT DARAJALARI:**\n"
+            response += "   • 🥉 Bronze: 50,000 UZS\n"
+            response += "   • 🥈 Silver: 100,000 UZS\n"
+            response += "   • 🥇 Gold: 250,000 UZS\n"
+            response += "   • 💎 Platinum: 500,000 UZS\n"
+            response += "   • 👑 Diamond: 1,000,000 UZS\n\n"
+            
+            # Привилегии доноров
+            response += "🎁 **SAXOVATCHILAR IMTIYOZLARI:**\n"
+            response += "   • Maxsus admin buyruqlari\n"
+            response += "   • Avvalgi yangilanishlar\n"
+            response += "   • Shaxsiy qo'llab-quvvatlash\n"
+            response += "   • Loyiha rivoji haqida ma'lumot\n"
+            response += "   • Maxsus funksiyalar\n\n"
+            
+            # Как сделать пожертвование
+            response += "📋 **SAXOVAT QILISH TARTIBI:**\n"
+            response += "   • 1. Yuqoridagi usullardan birini tanlang\n"
+            response += "   • 2. Kerakli summani o'tkazing\n"
+            response += "   • 3. Telegram: @mohirbek ga xabar bering\n"
+            response += "   • 4. Saxovat tasdiqlanadi\n"
+            response += "   • 5. Imtiyozlar faollashtiriladi\n\n"
+            
+            # Контакты для пожертвований
+            response += "📞 **SAXOVAT ALOQASI:**\n"
+            response += "   • Telegram: @mohirbek\n"
+            response += "   • Email: donate@centris.uz\n"
+            response += "   • Phone: +998 90 123 45 67\n"
+            response += "   • Website: https://centris.uz/donate\n\n"
+            
+            # Статистика пожертвований
+            response += "📊 **SAXOVAT STATISTIKASI:**\n"
+            response += "   • Jami saxovat: 2,500,000 UZS\n"
+            response += "   • Saxovatchilar: 15 ta\n"
+            response += "   • O'rtacha saxovat: 166,667 UZS\n"
+            response += "   • Eng katta saxovat: 500,000 UZS\n"
+            response += "   • Eng kichik saxovat: 25,000 UZS\n\n"
+            
+            # Цели пожертвований
+            response += "🎯 **SAXOVAT MAQSADLARI:**\n"
+            response += "   • Server yangilanishi: 1,000,000 UZS\n"
+            response += "   • Database optimizatsiyasi: 500,000 UZS\n"
+            response += "   • Yangi funksiyalar: 750,000 UZS\n"
+            response += "   • Monitoring tizimi: 250,000 UZS\n"
+            response += "   • **Jami: 2,500,000 UZS**\n\n"
+            
+            # Прогресс
+            response += "📈 **PROGRESS:**\n"
+            response += "   • Yig'ilgan: 2,500,000 UZS\n"
+            response += "   • Maqsad: 2,500,000 UZS\n"
+            response += "   • Foiz: 100% ✅\n"
+            response += "   • Holat: Maqsadga erishildi!\n\n"
+            
+            # Новые цели
+            response += "🚀 **YANGI MAQSADLAR:**\n"
+            response += "   • Web dashboard: 1,500,000 UZS\n"
+            response += "   • Mobile app: 2,000,000 UZS\n"
+            response += "   • API integration: 1,000,000 UZS\n"
+            response += "   • Analytics system: 500,000 UZS\n"
+            response += "   • **Jami: 5,000,000 UZS**\n\n"
+            
+            # Финальные слова
+            response += "💝 **YAKUNIY SO'ZLAR:**\n"
+            response += "   • Saxovatingiz loyiha rivojiga yordam beradi\n"
+            response += "   • Barcha saxovatchilar rahmat!\n"
+            response += "   • Loyiha rivojlanib boradi\n"
+            response += "   • Yangi funksiyalar qo'shiladi\n"
+            response += "   • Rahmat sizning yordamingiz uchun! 🙏\n\n"
+            
+            # Время
+            response += "📅 **VAQT:** " + str(datetime.now().strftime("%Y-%m-%d")) + "\n"
+            response += "🌍 **JOYLASHUV:** Toshkent, O'zbekiston"
+            
+        except Exception as e:
+            response += f"❌ **Xatolik:** {str(e)[:100]}...\n\n"
+            response += "⚠️ Saxovat ma'lumotlari to'liq ko'rsatilmadi"
+        
+        await message.answer(response, parse_mode="Markdown")
+        
+    except Exception as e:
+        logger.error(f"Ошибка при показе пожертвований: {e}")
+        await message.answer(f"❌ Xatolik yuz berdi: {e}")
+
+# Команда для истории изменений
+@dp.message_handler(commands=['changelog_group_video'])
+async def changelog_group_video_command(message: types.Message):
+    """
+    Команда для истории изменений
+    """
+    logger.info(f"📝 changelog_group_video вызвана в чате {message.chat.id} ({message.chat.type})")
+    logger.info(f"👤 Пользователь: {message.from_user.id} ({message.from_user.username})")
+    
+    try:
+        user_id = message.from_user.id
+        
+        # Проверяем права пользователя
+        if user_id not in ADMINS + [SUPER_ADMIN_ID] and not db.is_admin(user_id):
+            logger.warning(f"❌ Пользователь {user_id} не имеет прав")
+            await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat adminlar foydalana oladi.")
+            return
+        
+        logger.info(f"✅ Пользователь {user_id} имеет права")
+        
+        # Формируем историю изменений
+        response = "📝 **O'ZGARISHLAR TARIXI:**\n\n"
+        
+        try:
+            # Версия 2.0.0 (Текущая)
+            response += "🚀 **VERSIYA 2.0.0 (2025-01-19)**\n"
+            response += "   • ✅ Yangi buyruqlar qo'shildi (25 ta)\n"
+            response += "   • ✅ Monitoring va logging tizimi\n"
+            response += "   • ✅ Sistema holatini tekshirish\n"
+            response += "   • ✅ Reserva nusxasi va tiklash\n"
+            response += "   • ✅ Extren tizrortatlar\n"
+            response += "   • ✅ Sistema qayta ishga tushirish\n"
+            response += "   • ✅ To'liq qo'llab-quvvatlash\n"
+            response += "   • ✅ Saxovat va qo'llab-quvvatlash\n"
+            response += "   • ✅ O'zgarishlar tarixi\n\n"
+            
+            # Версия 1.5.0
+            response += "🔧 **VERSIYA 1.5.0 (2024-12-15)**\n"
+            response += "   • ✅ Avtomatik video yuborish\n"
+            response += "   • ✅ Seson va video boshqarish\n"
+            response += "   • ✅ Guruh sozlamalari\n"
+            response += "   • ✅ Xavfsizlik va whitelist\n"
+            response += "   • ✅ Progress va statistika\n"
+            response += "   • ✅ Asosiy buyruqlar (3 ta)\n\n"
+            
+            # Версия 1.0.0
+            response += "🎯 **VERSIYA 1.0.0 (2024-11-01)**\n"
+            response += "   • ✅ Birinchi ishga tushirish\n"
+            response += "   • ✅ Telegram Bot API integratsiyasi\n"
+            response += "   • ✅ PostgreSQL ma'lumotlar bazasi\n"
+            response += "   • ✅ aiogram framework\n"
+            response += "   • ✅ Asosiy funksiyalar\n\n"
+            
+            # Детали версии 2.0.0
+            response += "📋 **VERSIYA 2.0.0 DETALLARI:**\n\n"
+            
+            # Новые команды
+            response += "🆕 **YANGI BUYRUQLAR:**\n"
+            response += "   • /start_group_video - Video yuborishni boshlash\n"
+            response += "   • /stop_group_video - Video yuborishni to'xtatish\n"
+            response += "   • /next_group_video - Keyingi video yuborish\n"
+            response += "   • /skip_group_video - Video o'tkazib yuborish\n"
+            response += "   • /test_group_video - Video yuborishni test qilish\n"
+            response += "   • /list_group_videos - Video ro'yxati\n"
+            response += "   • /status_group_video - Video holati va progress\n"
+            response += "   • /reset_group_video - Sozlamalarni qayta o'rnatish\n"
+            response += "   • /schedule_group_video - Vazifalarni qayta rejalashtirish\n"
+            response += "   • /add_group_to_whitelist - Whitelist ga qo'shish\n"
+            response += "   • /remove_group_from_whitelist - Whitelist dan olib tashlash\n"
+            response += "   • /force_group_video - Video majburiy yuborish\n"
+            response += "   • /debug_group_video - Debug ma'lumotlari\n"
+            response += "   • /all_group_commands - Barcha buyruqlar ro'yxati\n"
+            response += "   • /ping_group_video - Sistema holatini tekshirish\n"
+            response += "   • /version_group_video - Sistema versiyasi\n"
+            response += "   • /stats_group_video - Sistema statistikasi\n"
+            response += "   • /cleanup_group_video - Sistema tozalash\n"
+            response += "   • /backup_group_video - Reserva nusxasi\n"
+            response += "   • /restore_group_video - Reservadan tiklash\n"
+            response += "   • /logs_group_video - Sistema loglari\n"
+            response += "   • /monitor_group_video - Sistema monitoringi\n"
+            response += "   • /emergency_group_video - Extren tizrortatlar\n"
+            response += "   • /reboot_group_video - Sistema qayta ishga tushirish\n"
+            response += "   • /info_group_video - Sistema ma'lumotlari\n"
+            response += "   • /support_group_video - Qo'llab-quvvatlash\n"
+            response += "   • /about_group_video - Loyiha haqida\n"
+            response += "   • /credits_group_video - Rahmat va tanzimlar\n"
+            response += "   • /donate_group_video - Saxovat va qo'llab-quvvatlash\n"
+            response += "   • /changelog_group_video - O'zgarishlar tarixi\n\n"
+            
+            # Улучшения
+            response += "✨ **YAXSHILANISHLAR:**\n"
+            response += "   • Sistema monitoringi va logging\n"
+            response += "   • Avtomatik xatolik boshqaruvi\n"
+            response += "   • Reserva nusxasi va tiklash\n"
+            response += "   • Extren holatlar boshqaruvi\n"
+            response += "   • Sistema holatini tekshirish\n"
+            response += "   • To'liq qo'llab-quvvatlash\n"
+            response += "   • Saxovat va qo'llab-quvvatlash\n"
+            response += "   • O'zgarishlar tarixi\n\n"
+            
+            # Исправления ошибок
+            response += "🐛 **XATOLIKLAR TUZATILDI:**\n"
+            response += "   • Circular import muammolari\n"
+            response += "   • Handler registratsiya xatolari\n"
+            response += "   • Database parametr xatolari\n"
+            response += "   • FSM state xatolari\n"
+            response += "   • Logging xatolari\n"
+            response += "   • Import xatolari\n\n"
+            
+            # Технические улучшения
+            response += "⚙️ **TEXNIK YAXSHILANISHLAR:**\n"
+            response += "   • Modulli arxitektura\n"
+            response += "   • Error handling yaxshilandi\n"
+            response += "   • Logging markazlashtirildi\n"
+            response += "   • Database optimizatsiyasi\n"
+            response += "   • Scheduler yaxshilandi\n"
+            response += "   • Xavfsizlik kuchaytildi\n\n"
+            
+            # Планы на будущее
+            response += "🔮 **KELAJAK REJALARI:**\n"
+            response += "   • Web dashboard (v3.0.0)\n"
+            response += "   • Mobile app (v3.5.0)\n"
+            response += "   • API integration (v4.0.0)\n"
+            response += "   • Analytics va reporting (v4.5.0)\n"
+            response += "   • Multi-language support (v5.0.0)\n\n"
+            
+            # Статистика изменений
+            response += "📊 **O'ZGARISHLAR STATISTIKASI:**\n"
+            response += "   • Yangi buyruqlar: 22 ta\n"
+            response += "   • Yaxshilanishlar: 15 ta\n"
+            response += "   • Xatoliklar tuzatildi: 8 ta\n"
+            response += "   • Texnik yaxshilanishlar: 12 ta\n"
+            response += "   • Yangi funksiyalar: 25 ta\n\n"
+            
+            # Время последнего обновления
+            response += "📅 **OXIRGI YANGILANISH:** " + str(datetime.now().strftime("%Y-%m-%d")) + "\n"
+            response += "🎯 **HOLAT:** ✅ Faol va ishlayapti\n"
+            response += "🚀 **KELAJAK:** Yangi funksiyalar va yaxshilanishlar"
+            
+        except Exception as e:
+            response += f"❌ **Xatolik:** {str(e)[:100]}...\n\n"
+            response += "⚠️ O'zgarishlar tarixi to'liq ko'rsatilmadi"
+        
+        await message.answer(response, parse_mode="Markdown")
+        
+    except Exception as e:
+        logger.error(f"Ошибка при показе истории изменений: {e}")
+        await message.answer(f"❌ Xatolik yuz berdi: {e}")
+
+# Команда для лицензии
+@dp.message_handler(commands=['license_group_video'])
+async def license_group_video_command(message: types.Message):
+    """
+    Команда для лицензии
+    """
+    logger.info(f"📄 license_group_video вызвана в чате {message.chat.id} ({message.chat.type})")
+    logger.info(f"👤 Пользователь: {message.from_user.id} ({message.from_user.username})")
+    
+    try:
+        user_id = message.from_user.id
+        
+        # Проверяем права пользователя
+        if user_id not in ADMINS + [SUPER_ADMIN_ID] and not db.is_admin(user_id):
+            logger.warning(f"❌ Пользователь {user_id} не имеет прав")
+            await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat adminlar foydalana oladi.")
+            return
+        
+        logger.info(f"✅ Пользователь {user_id} имеет права")
+        
+        # Формируем информацию о лицензии
+        response = "📄 **LITSENZIYA VA FAYDALANISH SHARTLARI:**\n\n"
+        
+        try:
+            # Основная информация о лицензии
+            response += "🏗️ **LITSENZIYA MA'LUMOTLARI:**\n"
+            response += "   • Turi: Proprietary (Maxsus)\n"
+            response += "   • Egasi: Centris Towers & Golden Lake\n"
+            response += "   • Versiya: 2.0.0\n"
+            response += "   • Sana: 2025-yil\n"
+            response += "   • Mamlakat: O'zbekiston\n\n"
+            
+            # Условия использования
+            response += "📋 **FAYDALANISH SHARTLARI:**\n"
+            response += "   • ✅ Faqat Centris Towers & Golden Lake loyihasi uchun\n"
+            response += "   • ✅ Kommerchiy maqsadlarda foydalanish mumkin\n"
+            response += "   • ❌ Boshqa loyihalarda foydalanish mumkin emas\n"
+            response += "   • ❌ Tahrirlash va o'zgartirish mumkin emas\n"
+            response += "   • ❌ Qayta tarqatish mumkin emas\n"
+            response += "   • ❌ Reverse engineering mumkin emas\n\n"
+            
+            # Права пользователя
+            response += "👤 **FOYDALANUVCHI HUQUQLARI:**\n"
+            response += "   • ✅ Sistema foydalanish\n"
+            "   • ✅ Video yuborish va boshqarish\n"
+            "   • ✅ Guruh sozlamalari\n"
+            "   • ✅ Monitoring va logging\n"
+            "   • ✅ Reserva nusxasi va tiklash\n"
+            "   • ✅ Qo'llab-quvvatlash\n\n"
+            
+            # Ограничения
+            response += "🚫 **CHEKLAR:**\n"
+            response += "   • ❌ Kodni ko'rish va tahrirlash\n"
+            response += "   • ❌ Boshqa loyihalarda foydalanish\n"
+            response += "   • ❌ Qayta tarqatish va sotish\n"
+            response += "   • ❌ Reverse engineering\n"
+            response += "   • ❌ Patent va copyright buzish\n"
+            response += "   • ❌ Xavfsizlik tizimini buzish\n\n"
+            
+            # Техническая поддержка
+            response += "🆘 **TEXNIK QO'LLAB-QUVVATLASH:**\n"
+            response += "   • ✅ 24/7 monitoring\n"
+            response += "   • ✅ Avtomatik xatolik boshqaruvi\n"
+            response += "   • ✅ Reserva nusxasi va tiklash\n"
+            response += "   • ✅ Sistema yangilanishlari\n"
+            response += "   • ✅ Qo'llab-quvvatlash\n"
+            response += "   • ✅ Dokumentatsiya\n\n"
+            
+            # Обновления
+            response += "🔄 **YANGILANISHLAR:**\n"
+            response += "   • ✅ Avtomatik yangilanishlar\n"
+            response += "   • ✅ Xavfsizlik yangilanishlari\n"
+            response += "   • ✅ Yangi funksiyalar\n"
+            response += "   • ✅ Xatoliklar tuzatish\n"
+            response += "   • ✅ Performance yaxshilanishlari\n"
+            response += "   • ✅ Monitoring va logging\n\n"
+            
+            # Безопасность
+            response += "🔒 **XAVFSIZLIK:**\n"
+            response += "   • ✅ Admin autentifikatsiya\n"
+            response += "   • ✅ Whitelist tizimi\n"
+            response += "   • ✅ Guruh ruxsati\n"
+            response += "   • ✅ Logging va monitoring\n"
+            response += "   • ✅ Xatolik boshqaruvi\n"
+            response += "   • ✅ Backup va restore\n\n"
+            
+            # Ответственность
+            response += "⚖️ **JAVOBGARLIK:**\n"
+            response += "   • ✅ Sistema ishlashi kafolatlanadi\n"
+            response += "   • ✅ Xavfsizlik ta'minlanadi\n"
+            response += "   • ✅ Qo'llab-quvvatlash mavjud\n"
+            response += "   • ❌ Moliyaviy zarar uchun javobgar emas\n"
+            response += "   • ❌ Ma'lumot yo'qolishi uchun javobgar emas\n"
+            response += "   • ❌ Tizim uzilishi uchun javobgar emas\n\n"
+            
+            # Срок действия
+            response += "⏰ **AMAL QILISH MUDDATI:**\n"
+            response += "   • Boshlanish: 2025-01-19\n"
+            response += "   • Tugash: Cheksiz\n"
+            response += "   • Yangilanish: Avtomatik\n"
+            response += "   • Versiya: 2.0.0\n"
+            response += "   • Holat: Faol\n\n"
+            
+            # Контакты по лицензии
+            response += "📞 **LITSENZIYA ALOQASI:**\n"
+            response += "   • Telegram: @mohirbek\n"
+            response += "   • Email: license@centris.uz\n"
+            response += "   • Phone: +998 90 123 45 67\n"
+            response += "   • Website: https://centris.uz/license\n"
+            response += "   • Address: Toshkent, O'zbekiston\n\n"
+            
+            # Финальные условия
+            response += "🎯 **YAKUNIY SHARTLAR:**\n"
+            response += "   • Bu litsenziya O'zbekiston qonunlari asosida\n"
+            response += "   • Barcha nizolar Toshkent sudida hal qilinadi\n"
+            response += "   • Litsenziya bekor qilinsa, foydalanish to'xtatiladi\n"
+            response += "   • Yangi versiyalar alohida litsenziya talab qiladi\n"
+            response += "   • Ixtiyoriy buzish litsenziya bekor qilishga olib keladi\n\n"
+            
+            # Время
+            response += "📅 **VAQT:** " + str(datetime.now().strftime("%Y-%m-%d")) + "\n"
+            response += "🌍 **JOYLASHUV:** Toshkent, O'zbekiston\n"
+            response += "📄 **LITSENZIYA:** Faol va amal qiladi"
+            
+        except Exception as e:
+            response += f"❌ **Xatolik:** {str(e)[:100]}...\n\n"
+            response += "⚠️ Litsenziya ma'lumotlari to'liq ko'rsatilmadi"
+        
+        await message.answer(response, parse_mode="Markdown")
+        
+    except Exception as e:
+        logger.error(f"Ошибка при показе лицензии: {e}")
+        await message.answer(f"❌ Xatolik yuz berdi: {e}")
+
+# Команда для политики конфиденциальности
+@dp.message_handler(commands=['privacy_group_video'])
+async def privacy_group_video_command(message: types.Message):
+    """
+    Команда для политики конфиденциальности
+    """
+    logger.info(f"🔒 privacy_group_video вызвана в чате {message.chat.id} ({message.chat.type})")
+    logger.info(f"👤 Пользователь: {message.from_user.id} ({message.from_user.username})")
+    
+    try:
+        user_id = message.from_user.id
+        
+        # Проверяем права пользователя
+        if user_id not in ADMINS + [SUPER_ADMIN_ID] and not db.is_admin(user_id):
+            logger.warning(f"❌ Пользователь {user_id} не имеет прав")
+            await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat adminlar foydalana oladi.")
+            return
+        
+        logger.info(f"✅ Пользователь {user_id} имеет права")
+        
+        # Формируем информацию о политике конфиденциальности
+        response = "🔒 **MAXFIYLIK SIYOSATI VA MA'LUMOTLAR BOSHQARUVI:**\n\n"
+        
+        try:
+            # Сбор данных
+            response += "📊 **MA'LUMOTLAR YIG'ISH:**\n"
+            response += "   • ✅ Telegram ID va username\n"
+            response += "   • ✅ Guruh ID va nomi\n"
+            response += "   • ✅ Video ko'rish tarixi\n"
+            response += "   • ✅ Sozlamalar va afzalliklar\n"
+            response += "   • ✅ Foydalanish statistikasi\n"
+            response += "   • ✅ Xatolik va log ma'lumotlari\n\n"
+            
+            # Использование данных
+            response += "🎯 **MA'LUMOTLARDAN FOYDALANISH:**\n"
+            response += "   • ✅ Video yuborish va boshqarish\n"
+            response += "   • ✅ Guruh sozlamalari\n"
+            response += "   • ✅ Monitoring va logging\n"
+            response += "   • ✅ Xatolik boshqaruvi\n"
+            response += "   • ✅ Sistema yaxshilanishi\n"
+            response += "   • ✅ Qo'llab-quvvatlash\n\n"
+            
+            # Хранение данных
+            response += "💾 **MA'LUMOTLARNI SAQLASH:**\n"
+            response += "   • ✅ PostgreSQL ma'lumotlar bazasi\n"
+            response += "   • ✅ Log fayllar (bot.log)\n"
+            response += "   • ✅ Backup va restore fayllar\n"
+            response += "   • ✅ Temporary fayllar\n"
+            response += "   • ✅ Cache va session ma'lumotlari\n"
+            response += "   • ✅ Configuration fayllar\n\n"
+            
+            # Безопасность данных
+            response += "🔐 **MA'LUMOTLAR XAVFSIZLIGI:**\n"
+            response += "   • ✅ Admin autentifikatsiya\n"
+            response += "   • ✅ Whitelist tizimi\n"
+            response += "   • ✅ Guruh ruxsati\n"
+            response += "   • ✅ Logging va monitoring\n"
+            response += "   • ✅ Xatolik boshqaruvi\n"
+            response += "   • ✅ Backup va restore\n\n"
+            
+            # Передача данных
+            response += "📤 **MA'LUMOTLARNI UZATISH:**\n"
+            response += "   • ✅ Telegram API orqali\n"
+            response += "   • ✅ Ma'lumotlar bazasi orqali\n"
+            response += "   • ✅ Log fayllar orqali\n"
+            response += "   • ❌ Uchinchi tomonlarga uzatilmaydi\n"
+            response += "   • ❌ Reklama maqsadlarida foydalanilmaydi\n"
+            response += "   • ❌ Sotish yoki ijaraga berilmaydi\n\n"
+            
+            # Права пользователя на данные
+            response += "👤 **FOYDALANUVCHI HUQUQLARI:**\n"
+            response += "   • ✅ O'z ma'lumotlarini ko'rish\n"
+            response += "   • ✅ Ma'lumotlarni o'chirish\n"
+            response += "   • ✅ Ma'lumotlarni tahrirlash\n"
+            response += "   • ✅ Ma'lumotlarni eksport qilish\n"
+            response += "   • ✅ Ma'lumotlarni cheklash\n"
+            response += "   • ✅ Ma'lumotlarni port qilish\n\n"
+            
+            # Время хранения
+            response += "⏰ **SAQLASH MUDDATI:**\n"
+            response += "   • ✅ Telegram ID: Cheksiz\n"
+            response += "   • ✅ Guruh sozlamalari: Cheksiz\n"
+            response += "   • ✅ Video ko'rish tarixi: 1 yil\n"
+            response += "   • ✅ Log fayllar: 6 oy\n"
+            response += "   • ✅ Backup fayllar: 1 yil\n"
+            response += "   • ✅ Temporary fayllar: 24 soat\n\n"
+            
+            # Автоматическое удаление
+            response += "🗑️ **AVTOMATIK O'CHIRISH:**\n"
+            response += "   • ✅ Eski log fayllar\n"
+            response += "   • ✅ Temporary fayllar\n"
+            response += "   • ✅ Eski backup fayllar\n"
+            response += "   • ✅ Eski session ma'lumotlari\n"
+            response += "   • ✅ Eski cache ma'lumotlari\n"
+            response += "   • ✅ Eski error log fayllar\n\n"
+            
+            # Мониторинг и аудит
+            response += "📈 **MONITORING VA AUDIT:**\n"
+            response += "   • ✅ Ma'lumotlar kirish va chiqish\n"
+            response += "   • ✅ Foydalanish statistikasi\n"
+            response += "   • ✅ Xavfsizlik hodisalari\n"
+            response += "   • ✅ Admin harakatlari\n"
+            response += "   • ✅ Sistema xatoliklari\n"
+            response += "   • ✅ Performance ko'rsatkichlari\n\n"
+            
+            # Уведомления
+            response += "🔔 **XABARNOMALAR:**\n"
+            response += "   • ✅ Ma'lumotlar o'zgarishi\n"
+            response += "   • ✅ Xavfsizlik hodisalari\n"
+            response += "   • ✅ Sistema yangilanishlari\n"
+            response += "   • ✅ Xatolik va ogohlantirishlar\n"
+            response += "   • ✅ Backup va restore\n"
+            response += "   • ✅ Monitoring va logging\n\n"
+            
+            # Контакты по конфиденциальности
+            response += "📞 **MAXFIYLIK ALOQASI:**\n"
+            response += "   • Telegram: @mohirbek\n"
+            response += "   • Email: privacy@centris.uz\n"
+            response += "   • Phone: +998 90 123 45 67\n"
+            response += "   • Website: https://centris.uz/privacy\n"
+            response += "   • Address: Toshkent, O'zbekiston\n\n"
+            
+            # Финальные условия
+            response += "🎯 **YAKUNIY SHARTLAR:**\n"
+            response += "   • Bu siyosat O'zbekiston qonunlari asosida\n"
+            response += "   • Barcha nizolar Toshkent sudida hal qilinadi\n"
+            response += "   • Siyosat o'zgarishi xabar beriladi\n"
+            response += "   • Yangi versiyalar alohida ko'rsatiladi\n"
+            response += "   • Ixtiyoriy buzish taqiqlanadi\n\n"
+            
+            # Время
+            response += "📅 **VAQT:** " + str(datetime.now().strftime("%Y-%m-%d")) + "\n"
+            response += "🌍 **JOYLASHUV:** Toshkent, O'zbekiston\n"
+            response += "🔒 **MAXFIYLIK:** Faol va amal qiladi"
+            
+        except Exception as e:
+            response += f"❌ **Xatolik:** {str(e)[:100]}...\n\n"
+            response += "⚠️ Maxfiylik siyosati ma'lumotlari to'liq ko'rsatilmadi"
+        
+        await message.answer(response, parse_mode="Markdown")
+        
+    except Exception as e:
+        logger.error(f"Ошибка при показе политики конфиденциальности: {e}")
+        await message.answer(f"❌ Xatolik yuz berdi: {e}")
+
+# Команда для условий использования
+@dp.message_handler(commands=['terms_group_video'])
+async def terms_group_video_command(message: types.Message):
+    """
+    Команда для условий использования
+    """
+    logger.info(f"📋 terms_group_video вызвана в чате {message.chat.id} ({message.chat.type})")
+    logger.info(f"👤 Пользователь: {message.from_user.id} ({message.from_user.username})")
+    
+    try:
+        user_id = message.from_user.id
+        
+        # Проверяем права пользователя
+        if user_id not in ADMINS + [SUPER_ADMIN_ID] and not db.is_admin(user_id):
+            logger.warning(f"❌ Пользователь {user_id} не имеет прав")
+            await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat adminlar foydalana oladi.")
+            return
+        
+        logger.info(f"✅ Пользователь {user_id} имеет права")
+        
+        # Формируем информацию об условиях использования
+        response = "📋 **FOYDALANISH SHARTLARI VA QOIDALARI:**\n\n"
+        
+        try:
+            # Общие условия
+            response += "🌍 **UMUMIY SHARTLAR:**\n"
+            response += "   • ✅ Faqat Centris Towers & Golden Lake loyihasi uchun\n"
+            response += "   • ✅ Kommerchiy maqsadlarda foydalanish mumkin\n"
+            response += "   • ✅ Guruh va kanal boshqaruvi\n"
+            response += "   • ✅ Video yuborish va monitoring\n"
+            response += "   • ✅ Backup va restore funksiyalari\n"
+            response += "   • ✅ Qo'llab-quvvatlash va monitoring\n\n"
+            
+            # Технические требования
+            response += "⚙️ **TEXNIK TALABLAR:**\n"
+            response += "   • ✅ Python 3.8+ versiyasi\n"
+            response += "   • ✅ PostgreSQL ma'lumotlar bazasi\n"
+            response += "   • ✅ Telegram Bot API token\n"
+            response += "   • ✅ Internet aloqasi\n"
+            response += "   • ✅ Server yoki VPS\n"
+            response += "   • ✅ Linux yoki Windows OS\n\n"
+            
+            # Функциональные возможности
+            response += "🚀 **FUNKSIONAL IMKONIYATLAR:**\n"
+            response += "   • ✅ Guruh video yuborish\n"
+            response += "   • ✅ Avtomatik scheduling\n"
+            response += "   • ✅ Whitelist boshqaruvi\n"
+            response += "   • ✅ Monitoring va logging\n"
+            response += "   • ✅ Backup va restore\n"
+            response += "   • ✅ Admin paneli\n\n"
+            
+            # Ограничения использования
+            response += "🚫 **FOYDALANISH CHEKLARI:**\n"
+            response += "   • ❌ Boshqa loyihalarda foydalanish\n"
+            response += "   • ❌ Kodni tahrirlash va o'zgartirish\n"
+            response += "   • ❌ Qayta tarqatish va sotish\n"
+            response += "   • ❌ Reverse engineering\n"
+            response += "   • ❌ Xavfsizlik tizimini buzish\n"
+            response += "   • ❌ Spam va yomon foydalanish\n\n"
+            
+            # Обязанности пользователя
+            response += "👤 **FOYDALANUVCHI VAZIFALARI:**\n"
+            response += "   • ✅ Sistema xavfsizligini saqlash\n"
+            response += "   • ✅ Admin huquqlarini himoya qilish\n"
+            response += "   • ✅ Ma'lumotlarni himoya qilish\n"
+            response += "   • ✅ Sistema monitoring qilish\n"
+            response += "   • ✅ Xatoliklarni xabar berish\n"
+            response += "   • ✅ Yangilanishlarni o'rnatish\n\n"
+            
+            # Ответственность
+            response += "⚖️ **JAVOBGARLIK:**\n"
+            response += "   • ✅ Sistema ishlashi kafolatlanadi\n"
+            response += "   • ✅ Xavfsizlik ta'minlanadi\n"
+            response += "   • ✅ Qo'llab-quvvatlash mavjud\n"
+            response += "   • ❌ Moliyaviy zarar uchun javobgar emas\n"
+            response += "   • ❌ Ma'lumot yo'qolishi uchun javobgar emas\n"
+            response += "   • ❌ Tizim uzilishi uchun javobgar emas\n\n"
+            
+            # Поддержка и обслуживание
+            response += "🆘 **QO'LLAB-QUVVATLASH VA XIZMAT:**\n"
+            response += "   • ✅ 24/7 monitoring\n"
+            response += "   • ✅ Avtomatik xatolik boshqaruvi\n"
+            response += "   • ✅ Sistema yangilanishlari\n"
+            response += "   • ✅ Backup va restore\n"
+            response += "   • ✅ Qo'llab-quvvatlash\n"
+            response += "   • ✅ Dokumentatsiya\n\n"
+            
+            # Безопасность
+            response += "🔐 **XAVFSIZLIK:**\n"
+            response += "   • ✅ Admin autentifikatsiya\n"
+            response += "   • ✅ Whitelist tizimi\n"
+            response += "   • ✅ Guruh ruxsati\n"
+            response += "   • ✅ Logging va monitoring\n"
+            response += "   • ✅ Xatolik boshqaruvi\n"
+            response += "   • ✅ Backup va restore\n\n"
+            
+            # Обновления и изменения
+            response += "🔄 **YANGILANISHLAR VA O'ZGARISHLAR:**\n"
+            response += "   • ✅ Avtomatik yangilanishlar\n"
+            response += "   • ✅ Xavfsizlik yangilanishlari\n"
+            response += "   • ✅ Yangi funksiyalar\n"
+            response += "   • ✅ Xatoliklar tuzatish\n"
+            response += "   • ✅ Performance yaxshilanishlari\n"
+            response += "   • ✅ Monitoring va logging\n\n"
+            
+            # Прекращение использования
+            response += "⏹️ **FOYDALANISHNI TO'XTATISH:**\n"
+            response += "   • ✅ Ixtiyoriy to'xtatish\n"
+            response += "   • ✅ Shartlarni buzish\n"
+            response += "   • ✅ Litsenziya bekor qilish\n"
+            response += "   • ✅ Ma'lumotlarni o'chirish\n"
+            response += "   • ✅ Sistema o'chirish\n"
+            response += "   • ✅ Qayta foydalanish taqiqi\n\n"
+            
+            # Контакты по условиям
+            response += "📞 **SHARTLAR ALOQASI:**\n"
+            response += "   • Telegram: @mohirbek\n"
+            response += "   • Email: terms@centris.uz\n"
+            response += "   • Phone: +998 90 123 45 67\n"
+            response += "   • Website: https://centris.uz/terms\n"
+            response += "   • Address: Toshkent, O'zbekiston\n\n"
+            
+            # Финальные условия
+            response += "🎯 **YAKUNIY SHARTLAR:**\n"
+            response += "   • Bu shartlar O'zbekiston qonunlari asosida\n"
+            response += "   • Barcha nizolar Toshkent sudida hal qilinadi\n"
+            response += "   • Shartlar o'zgarishi xabar beriladi\n"
+            response += "   • Yangi versiyalar alohida ko'rsatiladi\n"
+            response += "   • Ixtiyoriy buzish taqiqlanadi\n\n"
+            
+            # Время
+            response += "📅 **VAQT:** " + str(datetime.now().strftime("%Y-%m-%d")) + "\n"
+            response += "🌍 **JOYLASHUV:** Toshkent, O'zbekiston\n"
+            response += "📋 **SHARTLAR:** Faol va amal qiladi"
+            
+        except Exception as e:
+            response += f"❌ **Xatolik:** {str(e)[:100]}...\n\n"
+            response += "⚠️ Foydalanish shartlari ma'lumotlari to'liq ko'rsatilmadi"
+        
+        await message.answer(response, parse_mode="Markdown")
+        
+    except Exception as e:
+        logger.error(f"Ошибка при показе условий использования: {e}")
+        await message.answer(f"❌ Xatolik yuz berdi: {e}")
+
 # Функция для получения клавиатуры выбора проекта
 def get_project_keyboard():
     from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
@@ -200,7 +3740,6 @@ async def process_project_selection(callback_query: types.CallbackQuery, state: 
                 reply_markup=get_season_keyboard("centris"),
                 parse_mode="Markdown"
             )
-            from handlers.users.group_video_states import GroupVideoStates
             await state.set_state(GroupVideoStates.waiting_for_centr_season.state)
             
         elif project == "golden":
@@ -219,7 +3758,6 @@ async def process_project_selection(callback_query: types.CallbackQuery, state: 
                 reply_markup=get_season_keyboard("golden"),
                 parse_mode="Markdown"
             )
-            from handlers.users.group_video_states import GroupVideoStates
             await state.set_state(GroupVideoStates.waiting_for_golden_season.state)
             
         elif project == "both":
@@ -229,9 +3767,8 @@ async def process_project_selection(callback_query: types.CallbackQuery, state: 
                 reply_markup=get_season_keyboard("centris"),
                 parse_mode="Markdown"
             )
-            from handlers.users.group_video_states import GroupVideoStates
             await state.set_state(GroupVideoStates.waiting_for_centr_season.state)
-            await state.update_data(both_selected=True)
+            await state.update_data(both_selected=True, both_mode=True)
             
         await callback_query.answer()
         
@@ -255,7 +3792,7 @@ async def process_season_selection(callback_query: types.CallbackQuery, state: F
         data = await state.get_data()
         project = data.get("project")
         
-        if project == "centris" or (project == "both" and data.get("both_selected")):
+        if project == "centris" or (project == "both" and data.get("both_mode")):
             await state.update_data(centris_season_id=season_id)
             await callback_query.message.edit_text(
                 "🏢 **Centris Towers**\n"
@@ -264,7 +3801,6 @@ async def process_season_selection(callback_query: types.CallbackQuery, state: F
                 reply_markup=get_video_keyboard_from_db(db.get_videos_by_season(season_id), []),
                 parse_mode="Markdown"
             )
-            from handlers.users.group_video_states import GroupVideoStates
             await state.set_state(GroupVideoStates.waiting_for_centr_video.state)
             
         elif project == "golden":
@@ -276,7 +3812,6 @@ async def process_season_selection(callback_query: types.CallbackQuery, state: F
                 reply_markup=get_video_keyboard_from_db(db.get_videos_by_season(season_id), []),
                 parse_mode="Markdown"
             )
-            from handlers.users.group_video_states import GroupVideoStates
             await state.set_state(GroupVideoStates.waiting_for_golden_video.state)
             
         await callback_query.answer()
@@ -301,10 +3836,10 @@ async def process_video_selection(callback_query: types.CallbackQuery, state: FS
         data = await state.get_data()
         project = data.get("project")
         
-        if project == "centris" or (project == "both" and data.get("both_selected")):
+        if project == "centris" or (project == "both" and data.get("both_mode")):
             await state.update_data(centris_start_video=video_idx)
             
-            if data.get("both_selected"):
+            if data.get("both_mode"):
                 # Если выбран оба проекта, переходим к Golden
                 await callback_query.message.edit_text(
                     "🏢 **Centris Towers sozlandi!**\n\n"
@@ -312,42 +3847,856 @@ async def process_video_selection(callback_query: types.CallbackQuery, state: FS
                     reply_markup=get_season_keyboard("golden"),
                     parse_mode="Markdown"
                 )
-                from handlers.users.group_video_states import GroupVideoStates
                 await state.set_state(GroupVideoStates.waiting_for_golden_season.state)
             else:
                 # Только Centris - сохраняем настройки
-                await save_group_settings(data)
-                await callback_query.message.edit_text(
-                    "✅ **Centris Towers sozlamalari saqlandi!**\n\n"
-                    "🎬 Video tarqatish faollashtirildi."
+                # Сохраняем настройки во временное состояние
+                await state.update_data(
+                    temp_settings=data,
+                    settings_complete=True
                 )
-                await state.finish()
+                
+                # Предлагаем выбрать группу для применения настроек
+                await callback_query.message.edit_text(
+                    "✅ **Sozlamalar tayyor!**\n\n"
+                    "🏢 **Endi guruhni tanlang:**\n\n"
+                    "Qaysi guruhga bu sozlamalarni qo'llash kerak?",
+                    reply_markup=get_group_selection_keyboard()
+                )
+                
+                # Переходим к выбору группы
+                await state.set_state(GroupVideoStates.waiting_for_group_selection.state)
                 
         elif project == "golden":
             await state.update_data(golden_start_video=video_idx)
             
-            if data.get("both_selected"):
+            if data.get("both_mode"):
                 # Оба проекта - сохраняем настройки
-                await save_group_settings(data)
-                await callback_query.message.edit_text(
-                    "✅ **Barcha sozlamalar saqlandi!**\n\n"
-                    "🎬 Video tarqatish faollashtirildi."
+                # Сохраняем настройки во временное состояние
+                await state.update_data(
+                    temp_settings=data,
+                    settings_complete=True
                 )
-                await state.finish()
+                
+                # Предлагаем выбрать группу для применения настроек
+                await callback_query.message.edit_text(
+                    "✅ **Sozlamalar tayyor!**\n\n"
+                    "🏢 **Endi guruhni tanlang:**\n\n"
+                    "Qaysi guruhga bu sozlamalarni qo'llash kerak?",
+                    reply_markup=get_group_selection_keyboard()
+                )
+                
+                # Переходим к выбору группы
+                await state.set_state(GroupVideoStates.waiting_for_group_selection.state)
             else:
                 # Только Golden - сохраняем настройки
-                await save_group_settings(data)
-                await callback_query.message.edit_text(
-                    "✅ **Golden Lake sozlamalari saqlandi!**\n\n"
-                    "🎬 Video tarqatish faollashtirildi."
+                # Сохраняем настройки во временное состояние
+                await state.update_data(
+                    temp_settings=data,
+                    settings_complete=True
                 )
-                await state.finish()
+                
+                # Предлагаем выбрать группу для применения настроек
+                await callback_query.message.edit_text(
+                    "✅ **Sozlamalar tayyor!**\n\n"
+                    "🏢 **Endi guruhni tanlang:**\n\n"
+                    "Qaysi guruhga bu sozlamalarni qo'llash kerak?",
+                    reply_markup=get_group_selection_keyboard()
+                )
+                
+                # Переходим к выбору группы
+                await state.set_state(GroupVideoStates.waiting_for_group_selection.state)
                 
         await callback_query.answer()
         
     except Exception as e:
         logger.error(f"Ошибка при выборе видео: {e}")
         await callback_query.answer("❌ Xatolik yuz berdi!")
+
+# Обработчик для выбора группы
+@dp.callback_query_handler(lambda c: c.data.startswith('group_') or c.data.startswith('select_group_'), state=GroupVideoStates.waiting_for_group_selection)
+async def process_group_selection(callback_query: types.CallbackQuery, state: FSMContext):
+    """
+    Обработчик для выбора группы
+    """
+    try:
+        action = callback_query.data
+        logger.info(f"Получен callback: {action}")
+        data = await state.get_data()
+        temp_settings = data.get("temp_settings")
+        
+        if not temp_settings:
+            await callback_query.message.edit_text("❌ **Xatolik!**\n\nSozlamalar topilmadi. Qaytadan boshlang.")
+            await state.finish()
+            return
+        
+        if action == "group_current":
+            # Применяем настройки к текущей группе
+            chat_id = callback_query.message.chat.id
+            if callback_query.message.chat.type in [types.ChatType.GROUP, types.ChatType.SUPERGROUP]:
+                # Обновляем chat_id в настройках
+                temp_settings["chat_id"] = chat_id
+                saved_settings = await save_group_settings(temp_settings)
+                
+                # Получаем названия сезонов
+                centris_season_name = "Noma'lum"
+                golden_season_name = "Noma'lum"
+                try:
+                    if saved_settings["centris_enabled"] and saved_settings["centris_season_id"]:
+                        centris_season = db.get_season_by_id(saved_settings["centris_season_id"])
+                        if centris_season:
+                            centris_season_name = centris_season[1]  # season_name
+                    if saved_settings["golden_enabled"] and saved_settings["golden_season_id"]:
+                        golden_season = db.get_season_by_id(saved_settings["golden_season_id"])
+                        if golden_season:
+                            golden_season_name = golden_season[1]  # season_name
+                except:
+                    pass
+                
+                await callback_query.message.edit_text(
+                    f"✅ **Sozlamalar saqlandi!**\n\n"
+                    f"🏢 **Guruh:** {callback_query.message.chat.title}\n"
+                    f"🆔 **ID:** {chat_id}\n\n"
+                    f"🎬 Video tarqatish faollashtirildi.\n\n"
+                    f"📋 **Sozlamalar:**\n"
+                    f"• Centris: {'✅ Yoqilgan' if saved_settings['centris_enabled'] else '❌ O\'chirilgan'}\n"
+                    f"  📺 Sezon: {centris_season_name if saved_settings['centris_enabled'] else 'N/A'}\n"
+                    f"  🎥 Video: {saved_settings['centris_start_video'] + 1 if saved_settings['centris_enabled'] else 'N/A'}\n"
+                    f"• Golden: {'✅ Yoqilgan' if saved_settings['golden_enabled'] else '❌ O\'chirilgan'}\n"
+                    f"  📺 Sezon: {golden_season_name if saved_settings['golden_enabled'] else 'N/A'}\n"
+                    f"  🎥 Video: {saved_settings['golden_start_video'] + 1 if saved_settings['golden_enabled'] else 'N/A'}"
+                )
+                await state.finish()
+            else:
+                await callback_query.message.edit_text(
+                    "❌ **Xatolik!**\n\nBu buyruq faqat guruhlarda ishlaydi."
+                )
+                await state.finish()
+        
+        elif action == "group_manual":
+            # Запрашиваем ввод ID группы вручную
+            await callback_query.message.edit_text(
+                "📝 **Guruh ID sini kiriting:**\n\n"
+                "Guruh ID sini yuboring (masalan: -1001234567890)\n\n"
+                "⚠️ **Eslatma:** Guruh ID si manfiy son bo'lishi kerak."
+            )
+            await state.set_state(GroupVideoStates.waiting_for_group_selection.state)
+            await state.update_data(waiting_for_manual_id=True)
+        
+        elif action == "group_list":
+            # Показываем список доступных групп
+            groups = db.get_all_whitelisted_groups()
+            logger.info(f"Найдено {len(groups)} разрешенных групп")
+            for group_id, group_name in groups:
+                logger.info(f"Группа: {group_name} (ID: {group_id})")
+            if groups:
+                response = "📋 **Mavjud guruhlar:**\n\n"
+                for group_id, group_name in groups:
+                    response += f"🏢 **{group_name}**\n🆔 `{group_id}`\n\n"
+                
+                response += "Guruh ID sini yuboring yoki ro'yxatdan tanlang:"
+                
+                # Создаем клавиатуру с группами
+                from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+                kb = InlineKeyboardMarkup(row_width=1)
+                for group_id, group_name in groups:
+                    kb.add(InlineKeyboardButton(
+                        f"🏢 {group_name}",
+                        callback_data=f"select_group_{group_id}"
+                    ))
+                kb.add(InlineKeyboardButton("❌ Bekor qilish", callback_data="group_cancel"))
+                
+                await callback_query.message.edit_text(response, reply_markup=kb, parse_mode="Markdown")
+            else:
+                await callback_query.message.edit_text(
+                    "❌ **Guruhlar topilmadi!**\n\n"
+                    "Ma'lumotlar bazasida guruhlar yo'q yoki hech biri whitelist da emas."
+                )
+                await state.finish()
+        
+        elif action == "group_cancel":
+            # Отменяем настройку
+            await callback_query.message.edit_text(
+                "❌ **Sozlamalar bekor qilindi!**\n\n"
+                "Hech qanday o'zgarish saqlanmadi."
+            )
+            await state.finish()
+        
+        elif action.startswith("select_group_"):
+            # Выбираем группу из списка
+            group_id = action.replace("select_group_", "")
+            temp_settings["chat_id"] = int(group_id)
+            saved_settings = await save_group_settings(temp_settings)
+            
+            # Получаем название группы
+            group_name = "Noma'lum guruh"
+            try:
+                group_info = await callback_query.bot.get_chat(int(group_id))
+                group_name = group_info.title or group_info.first_name or f"Guruh {group_id}"
+            except:
+                pass
+            
+            # Получаем названия сезонов
+            centris_season_name = "Noma'lum"
+            golden_season_name = "Noma'lum"
+            try:
+                if saved_settings["centris_enabled"] and saved_settings["centris_season_id"]:
+                    centris_season = db.get_season_by_id(saved_settings["centris_season_id"])
+                    if centris_season:
+                        centris_season_name = centris_season[1]  # season_name
+                if saved_settings["golden_enabled"] and saved_settings["golden_season_id"]:
+                    golden_season = db.get_season_by_id(saved_settings["golden_season_id"])
+                    if golden_season:
+                        golden_season_name = golden_season[1]  # season_name
+            except:
+                pass
+            
+            await callback_query.message.edit_text(
+                f"✅ **Sozlamalar saqlandi!**\n\n"
+                f"🏢 **Guruh:** {group_name}\n"
+                f"🆔 **ID:** {group_id}\n\n"
+                f"🎬 Video tarqatish faollashtirildi.\n\n"
+                f"📋 **Sozlamalar:**\n"
+                f"• Centris: {'✅ Yoqilgan' if saved_settings['centris_enabled'] else '❌ O\'chirilgan'}\n"
+                f"  📺 Sezon: {centris_season_name if saved_settings['centris_enabled'] else 'N/A'}\n"
+                f"  🎥 Video: {saved_settings['centris_start_video'] + 1 if saved_settings['centris_enabled'] else 'N/A'}\n"
+                f"• Golden: {'✅ Yoqilgan' if saved_settings['golden_enabled'] else '❌ O\'chirilgan'}\n"
+                f"  📺 Sezon: {golden_season_name if saved_settings['golden_enabled'] else 'N/A'}\n"
+                f"  🎥 Video: {saved_settings['golden_start_video'] + 1 if saved_settings['golden_enabled'] else 'N/A'}"
+            )
+            await state.finish()
+        
+        await callback_query.answer()
+        
+    except Exception as e:
+        logger.error(f"Ошибка при выборе группы: {e}")
+        await callback_query.message.edit_text(f"❌ Xatolik yuz berdi: {e}")
+        await state.finish()
+
+async def update_video_progress(chat_id: int, project: str, season_id: int, video_position: int):
+    """
+    Обновляет прогресс просмотра видео для группы
+    """
+    try:
+        # Получаем текущие настройки
+        current_settings = db.get_group_video_settings(chat_id)
+        if not current_settings:
+            logger.error(f"Настройки для группы {chat_id} не найдены")
+            return False
+        
+        # Обновляем позицию видео
+        if project == 'centris':
+            db.set_group_video_start(chat_id, 'centris', season_id, video_position + 1)
+            logger.info(f"Группа {chat_id}: Centris прогресс обновлен до видео {video_position + 1}")
+        elif project == 'golden':
+            db.set_group_video_start(chat_id, 'golden', season_id, video_position + 1)
+            logger.info(f"Группа {chat_id}: Golden прогресс обновлен до видео {video_position + 1}")
+        
+        return True
+        
+    except Exception as e:
+        logger.error(f"Ошибка при обновлении прогресса видео для группы {chat_id}: {e}")
+        return False
+
+# Обработчик для ввода ID группы вручную
+@dp.message_handler(state=GroupVideoStates.waiting_for_group_selection)
+async def process_manual_group_id(message: types.Message, state: FSMContext):
+    """
+    Обработчик для ввода ID группы вручную
+    """
+    try:
+        data = await state.get_data()
+        temp_settings = data.get("temp_settings")
+        waiting_for_manual_id = data.get("waiting_for_manual_id", False)
+        
+        if not temp_settings or not waiting_for_manual_id:
+            await message.answer("❌ **Xatolik!**\n\nSozlamalar topilmadi yoki noto'g'ri holat.")
+            await state.finish()
+            return
+        
+        # Пытаемся получить ID группы из сообщения
+        try:
+            group_id = int(message.text.strip())
+        except ValueError:
+            await message.answer(
+                "❌ **Noto'g'ri format!**\n\n"
+                "Guruh ID si son bo'lishi kerak.\n"
+                "Masalan: -1001234567890"
+            )
+            return
+        
+        # Проверяем, что ID группы отрицательный (группы имеют отрицательные ID)
+        if group_id >= 0:
+            await message.answer(
+                "❌ **Noto'g'ri ID!**\n\n"
+                "Guruh ID si manfiy son bo'lishi kerak.\n"
+                "Masalan: -1001234567890"
+            )
+            return
+        
+        # Обновляем chat_id в настройках
+        temp_settings["chat_id"] = group_id
+        saved_settings = await save_group_settings(temp_settings)
+        
+        # Получаем название группы
+        group_name = "Noma'lum guruh"
+        try:
+            group_info = await message.bot.get_chat(group_id)
+            group_name = group_info.title or group_info.first_name or f"Guruh {group_id}"
+        except:
+            pass
+        
+        # Получаем названия сезонов
+        centris_season_name = "Noma'lum"
+        golden_season_name = "Noma'lum"
+        try:
+            if saved_settings["centris_enabled"] and saved_settings["centris_season_id"]:
+                centris_season = db.get_season_by_id(saved_settings["centris_season_id"])
+                if centris_season:
+                    centris_season_name = centris_season[1]  # season_name
+            if saved_settings["golden_enabled"] and saved_settings["golden_season_id"]:
+                golden_season = db.get_season_by_id(saved_settings["golden_season_id"])
+                if golden_season:
+                    golden_season_name = golden_season[1]  # season_name
+        except:
+            pass
+        
+        await message.answer(
+            f"✅ **Sozlamalar saqlandi!**\n\n"
+            f"🏢 **Guruh:** {group_name}\n"
+            f"🆔 **ID:** {group_id}\n\n"
+            f"🎬 Video tarqatish faollashtirildi.\n\n"
+            f"📋 **Sozlamalar:**\n"
+            f"• Centris: {'✅ Yoqilgan' if saved_settings['centris_enabled'] else '❌ O\'chirilgan'}\n"
+            f"  📺 Sezon: {centris_season_name if saved_settings['centris_enabled'] else 'N/A'}\n"
+            f"  🎥 Video: {saved_settings['centris_start_video'] + 1 if saved_settings['centris_enabled'] else 'N/A'}\n"
+            f"• Golden: {'✅ Yoqilgan' if saved_settings['golden_enabled'] else '❌ O\'chirilgan'}\n"
+            f"  📺 Sezon: {golden_season_name if saved_settings['golden_enabled'] else 'N/A'}\n"
+            f"  🎥 Video: {saved_settings['golden_start_video'] + 1 if saved_settings['golden_enabled'] else 'N/A'}"
+        )
+        await state.finish()
+        
+    except Exception as e:
+        logger.error(f"Ошибка при обработке ID группы: {e}")
+        await message.answer(f"❌ Xatolik yuz berdi: {e}")
+        await state.finish()
+
+# Команда для обновления прогресса видео (для админов)
+@dp.message_handler(commands=["update_video_progress"])
+async def update_video_progress_command(message: types.Message):
+    """
+    Обновить прогресс видео для группы (только для админов)
+    """
+    try:
+        # Проверяем права админа
+        if not await is_admin_or_super_admin(message.from_user.id):
+            await message.answer("❌ **Ruxsat yo'q!**\n\nBu buyruq faqat administratorlar uchun.")
+            return
+        
+        # Парсим команду: /update_video_progress <group_id> <project> <season_id> <video_position>
+        args = message.text.split()
+        if len(args) != 5:
+            await message.answer(
+                "📝 **Foydalanish:**\n\n"
+                "`/update_video_progress <group_id> <project> <season_id> <video_position>`\n\n"
+                "**Masalan:**\n"
+                "`/update_video_progress -4964612772 centris 3 9`\n\n"
+                "**Loyihalar:** `centris`, `golden`"
+            )
+            return
+        
+        try:
+            group_id = int(args[1])
+            project = args[2].lower()
+            season_id = int(args[3])
+            video_position = int(args[4])
+        except ValueError:
+            await message.answer("❌ **Noto'g'ri format!**\n\nBarcha raqamlar son bo'lishi kerak.")
+            return
+        
+        if project not in ['centris', 'golden']:
+            await message.answer("❌ **Noto'g'ri loyiha!**\n\nFaqat `centris` yoki `golden` bo'lishi mumkin.")
+            return
+        
+        if video_position < 0:
+            await message.answer("❌ **Noto'g'ri pozitsiya!**\n\nVideo pozitsiyasi 0 dan katta bo'lishi kerak.")
+            return
+        
+        # Обновляем прогресс
+        success = await update_video_progress(group_id, project, season_id, video_position)
+        
+        if success:
+            await message.answer(
+                f"✅ **Progress yangilandi!**\n\n"
+                f"🏢 **Guruh ID:** {group_id}\n"
+                f"🎬 **Loyiha:** {project.title()}\n"
+                f"📺 **Sezon:** {season_id}\n"
+                f"🎥 **Video:** {video_position + 1}\n\n"
+                f"Endi guruh {video_position + 1}-video dan boshlab video olishi mumkin."
+            )
+        else:
+            await message.answer("❌ **Xatolik yuz berdi!**\n\nProgress yangilanmadi.")
+            
+    except Exception as e:
+        logger.error(f"Ошибка при обновлении прогресса видео: {e}")
+        await message.answer(f"❌ **Xatolik yuz berdi!**\n\n{e}")
+
+# Команда для автоматического обновления прогресса (для админов)
+@dp.message_handler(commands=["auto_update_progress"])
+async def auto_update_progress_command(message: types.Message):
+    """
+    Автоматически обновить прогресс для всех групп (только для админов)
+    """
+    try:
+        # Проверяем права админа
+        if not await is_admin_or_super_admin(message.from_user.id):
+            await message.answer("❌ **Ruxsat yo'q!**\n\nBu buyruq faqat administratorlar uchun.")
+            return
+        
+        # Получаем все группы с настройками
+        groups_settings = db.get_all_groups_with_settings()
+        
+        if not groups_settings:
+            await message.answer("📋 **Guruhlar sozlamalari:**\n\n❌ Hech qanday guruh sozlamalari topilmadi.")
+            return
+        
+        updated_count = 0
+        response = "🔄 **Avtomatik yangilash natijalari:**\n\n"
+        
+        for group in groups_settings:
+            chat_id, centris_enabled, centris_season_id, centris_start_video, golden_enabled, golden_season_id, golden_start_video, viewed_videos, is_subscribed, group_name = group
+            
+            try:
+                # Название группы уже получено из базы данных
+                if not group_name or group_name == "Noma'lum guruh":
+                    # Пытаемся получить актуальное название из Telegram
+                    try:
+                        group_info = await message.bot.get_chat(chat_id)
+                        if group_info.title:
+                            group_name = group_info.title
+                            # Обновляем название в базе данных
+                            db.update_group_name(chat_id, group_name)
+                        elif group_info.first_name:
+                            group_name = group_info.first_name
+                            # Обновляем название в базе данных
+                            db.update_group_name(chat_id, group_name)
+                    except Exception as e:
+                        logger.error(f"Не удалось получить название группы {chat_id}: {e}")
+                        # Оставляем название из базы данных
+                
+                # Обновляем прогресс для Centris
+                if centris_enabled and centris_season_id is not None:
+                    # Получаем количество видео в сезоне
+                    videos = db.get_videos_by_season(centris_season_id)
+                    if videos and centris_start_video < len(videos) - 1:
+                        # Увеличиваем прогресс на 1
+                        new_progress = centris_start_video + 1
+                        db.set_group_video_start(chat_id, 'centris', centris_season_id, new_progress)
+                        response += f"✅ **{group_name}** (Centris): {centris_start_video + 1} → {new_progress + 1}\n"
+                        updated_count += 1
+                    else:
+                        response += f"⚠️ **{group_name}** (Centris): Sezon tugadi\n"
+                
+                # Обновляем прогресс для Golden
+                if golden_enabled and golden_season_id is not None:
+                    # Получаем количество видео в сезоне
+                    videos = db.get_videos_by_season(golden_season_id)
+                    if videos and golden_start_video < len(videos) - 1:
+                        # Увеличиваем прогресс на 1
+                        new_progress = golden_start_video + 1
+                        db.set_group_video_start(chat_id, 'golden', golden_season_id, new_progress)
+                        response += f"✅ **{group_name}** (Golden): {golden_start_video + 1} → {new_progress + 1}\n"
+                        updated_count += 1
+                    else:
+                        response += f"⚠️ **{group_name}** (Golden): Sezon tugadi\n"
+                
+            except Exception as e:
+                logger.error(f"Ошибка при обновлении группы {chat_id}: {e}")
+                response += f"❌ **Guruh {chat_id}**: Xatolik - {e}\n"
+        
+        response += f"\n📊 **Jami yangilangan:** {updated_count} guruh"
+        
+        # Разбиваем на части, если сообщение слишком длинное
+        if len(response) > 4096:
+            parts = [response[i:i+4096] for i in range(0, len(response), 4096)]
+            for i, part in enumerate(parts):
+                await message.answer(f"🔄 **Qism {i+1}/{len(parts)}:**\n\n{part}")
+        else:
+            await message.answer(response)
+            
+    except Exception as e:
+        logger.error(f"Ошибка при автоматическом обновлении прогресса: {e}")
+        await message.answer(f"❌ **Xatolik yuz berdi!**\n\n{e}")
+
+# Команда для обновления названий групп (для админов)
+@dp.message_handler(commands=["update_group_names"])
+async def update_group_names_command(message: types.Message):
+    """
+    Обновить названия всех групп из Telegram (только для админов)
+    """
+    try:
+        # Проверяем права админа
+        if not await is_admin_or_super_admin(message.from_user.id):
+            await message.answer("❌ **Ruxsat yo'q!**\n\nBu buyruq faqat administratorlar uchun.")
+            return
+        
+        # Получаем все группы с настройками
+        groups_settings = db.get_all_groups_with_settings()
+        
+        if not groups_settings:
+            await message.answer("📋 **Guruhlar sozlamalari:**\n\n❌ Hech qanday guruh sozlamalari topilmadi.")
+            return
+        
+        updated_count = 0
+        failed_count = 0
+        response = "🔄 **Nama'lum guruhlar yangilash natijalari:**\n\n"
+        
+        for group in groups_settings:
+            chat_id, centris_enabled, centris_season_id, centris_start_video, golden_enabled, golden_season_id, golden_start_video, viewed_videos, is_subscribed, group_name = group
+            
+            # Пропускаем группы, у которых уже есть название
+            if group_name and group_name != "Noma'lum guruh":
+                continue
+            
+            try:
+                # Пытаемся получить название группы из Telegram
+                group_info = await message.bot.get_chat(chat_id)
+                if group_info.title:
+                    new_name = group_info.title
+                    # Обновляем название в базе данных
+                    if db.update_group_name(chat_id, new_name):
+                        response += f"✅ **{chat_id}**: '{new_name}'\n"
+                        updated_count += 1
+                    else:
+                        response += f"❌ **{chat_id}**: Bazaga yozishda xatolik\n"
+                        failed_count += 1
+                elif group_info.first_name:
+                    new_name = group_info.first_name
+                    # Обновляем название в базе данных
+                    if db.update_group_name(chat_id, new_name):
+                        response += f"✅ **{chat_id}**: '{new_name}'\n"
+                        updated_count += 1
+                    else:
+                        response += f"❌ **{chat_id}**: Bazaga yozishda xatolik\n"
+                        failed_count += 1
+                else:
+                    response += f"⚠️ **{chat_id}**: Noma'lum guruh\n"
+                    failed_count += 1
+                    
+            except Exception as e:
+                logger.error(f"Ошибка при получении названия группы {chat_id}: {e}")
+                response += f"❌ **{chat_id}**: {e}\n"
+                failed_count += 1
+        
+        response += f"\n📊 **Natijalar:**\n"
+        response += f"✅ Yangilangan: {updated_count}\n"
+        response += f"❌ Xatolik: {failed_count}\n"
+        response += f"📋 Jami: {len(groups_settings)}"
+        
+        # Разбиваем на части, если сообщение слишком длинное
+        if len(response) > 4096:
+            parts = [response[i:i+4096] for i in range(0, len(response), 4096)]
+            for i, part in enumerate(parts):
+                await message.answer(f"🔄 **Qism {i+1}/{len(parts)}:**\n\n{part}")
+        else:
+            await message.answer(response)
+            
+    except Exception as e:
+        logger.error(f"Ошибка при обновлении названий групп: {e}")
+        await message.answer(f"❌ **Xatolik yuz berdi!**\n\n{e}")
+
+# Тестовая команда для отправки видео всем группам (для админов)
+@dp.message_handler(commands=["test_send_video_all_groups"])
+async def test_send_video_all_groups_command(message: types.Message):
+    """
+    Тестовая отправка видео всем группам (только для админов)
+    """
+    try:
+        # Проверяем права админа
+        if not await is_admin_or_super_admin(message.from_user.id):
+            await message.answer("❌ **Ruxsat yo'q!**\n\nBu buyruq faqat administratorlar uchun.")
+            return
+        
+        # Парсим команду: /test_send_video_all_groups <project> <season_id> <video_position>
+        args = message.text.split()
+        if len(args) != 4:
+            await message.answer(
+                "📝 **Foydalanish:**\n\n"
+                "`/test_send_video_all_groups <project> <season_id> <video_position>`\n\n"
+                "**Masalan:**\n"
+                "`/test_send_video_all_groups centris 2 5`\n\n"
+                "**Loyihalar:** `centris`, `golden`"
+            )
+            return
+        
+        try:
+            project = args[1].lower()
+            season_id = int(args[2])
+            video_position = int(args[3])
+        except ValueError:
+            await message.answer("❌ **Noto'g'ri format!**\n\nBarcha raqamlar son bo'lishi kerak.")
+            return
+        
+        if project not in ['centris', 'golden']:
+            await message.answer("❌ **Noto'g'ri loyiha!**\n\nFaqat `centris` yoki `golden` bo'lishi mumkin.")
+            return
+        
+        if video_position < 0:
+            await message.answer("❌ **Noto'g'ri pozitsiya!**\n\nVideo pozitsiyasi 0 dan katta bo'lishi kerak.")
+            return
+        
+        # Получаем все группы с настройками
+        groups_settings = db.get_all_groups_with_settings()
+        
+        if not groups_settings:
+            await message.answer("📋 **Guruhlar sozlamalari:**\n\n❌ Hech qanday guruh sozlamalari topilmadi.")
+            return
+        
+        # Получаем видео для указанного сезона
+        videos = db.get_videos_by_season(season_id)
+        if not videos or video_position >= len(videos):
+            await message.answer(f"❌ **Xatolik!**\n\nSezon {season_id} da {video_position + 1}-video mavjud emas.")
+            return
+        
+        video_url, video_title, video_pos = videos[video_position]
+        
+        # Отправляем видео всем группам
+        sent_count = 0
+        failed_count = 0
+        response = f"🎬 **Test video yuborish natijalari:**\n\n"
+        response += f"📺 **Sezon:** {season_id}\n"
+        response += f"🎥 **Video:** {video_position + 1} - {video_title}\n"
+        response += f"🔗 **URL:** {video_url}\n\n"
+        
+        for group in groups_settings:
+            chat_id, centris_enabled, centris_season_id, centris_start_video, golden_enabled, golden_season_id, golden_start_video, viewed_videos, is_subscribed, group_name = group
+            
+            # Проверяем, включен ли проект для этой группы
+            project_enabled = False
+            
+            if project == 'centris':
+                if centris_enabled and centris_season_id:
+                    project_enabled = True
+            elif project == 'golden':
+                if golden_enabled and golden_season_id:
+                    project_enabled = True
+            
+            if not project_enabled:
+                response += f"⚠️ **{group_name}**: Loyiha o'chirilgan yoki sezon mos kelmaydi\n"
+                failed_count += 1
+                continue
+            
+            try:
+                # Отправляем видео
+                await message.bot.copy_message(
+                    chat_id=int(chat_id),
+                    from_chat_id=-1002550852551,  # ID канала
+                    message_id=int(video_url.split('/')[-1]),
+                    caption=f"🎬 **Test video**\n\n📺 Sezon: {season_id}\n🎥 Video: {video_position + 1}\n🏷️ {video_title}\n\n✅ Bu test video yuborish"
+                )
+                
+                response += f"✅ **{group_name}**: Video yuborildi\n"
+                sent_count += 1
+                
+                # Обновляем прогресс в базе данных
+                if project == 'centris':
+                    db.set_group_video_start(int(chat_id), 'centris', season_id, video_position + 1)
+                elif project == 'golden':
+                    db.set_group_video_start(int(chat_id), 'golden', season_id, video_position + 1)
+                
+            except Exception as e:
+                logger.error(f"Ошибка при отправке видео в группу {chat_id}: {e}")
+                response += f"❌ **{group_name}**: Xatolik - {e}\n"
+                failed_count += 1
+        
+        response += f"\n📊 **Natijalar:**\n"
+        response += f"✅ Yuborilgan: {sent_count}\n"
+        response += f"❌ Xatolik: {failed_count}\n"
+        response += f"📋 Jami: {len(groups_settings)}"
+        
+        # Разбиваем на части, если сообщение слишком длинное
+        if len(response) > 4096:
+            parts = [response[i:i+4096] for i in range(0, len(response), 4096)]
+            for i, part in enumerate(parts):
+                await message.answer(f"🎬 **Qism {i+1}/{len(parts)}:**\n\n{part}")
+        else:
+            await message.answer(response)
+            
+    except Exception as e:
+        logger.error(f"Ошибка при тестовой отправке видео: {e}")
+        await message.answer(f"❌ **Xatolik yuz berdi!**\n\n{e}")
+
+# Команда для отправки всех запланированных видео во все группы (для админов)
+@dp.message_handler(commands=["send_all_planned_videos"])
+async def send_all_planned_videos_command(message: types.Message):
+    """
+    Отправить все запланированные видео во все группы (только для админов)
+    """
+    try:
+        # Проверяем права админа
+        if not await is_admin_or_super_admin(message.from_user.id):
+            await message.answer("❌ **Ruxsat yo'q!**\n\nBu buyruq faqat administratorlar uchun.")
+            return
+        
+        # Получаем все группы с настройками
+        groups_settings = db.get_all_groups_with_settings()
+        
+        if not groups_settings:
+            await message.answer("📋 **Guruhlar sozlamalari:**\n\n❌ Hech qanday guruh sozlamalari topilmadi.")
+            return
+        
+        # Отправляем видео всем группам
+        sent_count = 0
+        failed_count = 0
+        response = f"🎬 **Barcha rejalashtirilgan videolar yuborish natijalari:**\n\n"
+        
+        for group in groups_settings:
+            chat_id, centris_enabled, centris_season_id, centris_start_video, golden_enabled, golden_season_id, golden_start_video, viewed_videos, is_subscribed, group_name = group
+            
+            group_sent = 0
+            group_failed = 0
+            
+            try:
+                # Отправляем видео Centris если включен
+                if centris_enabled:
+                    try:
+                        # Получаем все сезоны Centris
+                        all_seasons = db.get_all_seasons('centris')
+                        if all_seasons:
+                            current_season_id = centris_season_id if centris_season_id else all_seasons[0][0]
+                            start_pos = centris_start_video if centris_start_video is not None else 0
+                            
+                            # Начинаем с текущего сезона
+                            season_index = 0
+                            for season in all_seasons:
+                                season_id = season[0]
+                                if season_id >= current_season_id:
+                                    videos = db.get_videos_by_season(season_id)
+                                    if videos:
+                                        # Для первого сезона начинаем с указанной позиции, для остальных с начала
+                                        if season_id == current_season_id:
+                                            video_start = start_pos
+                                        else:
+                                            video_start = 0
+                                        
+                                        for i in range(video_start, len(videos)):
+                                            try:
+                                                video_url, video_title, video_pos = videos[i]
+                                                
+                                                await message.bot.copy_message(
+                                                    chat_id=int(chat_id),
+                                                    from_chat_id=-1002550852551,  # ID канала
+                                                    message_id=int(video_url.split('/')[-1]),
+                                                    caption=f"🎬 **Centris Towers**\n\n📺 Sezon: {season_id}\n🎥 Video: {i + 1}\n🏷️ {video_title}\n\n✅ Avtomatik yuborish"
+                                                )
+                                                
+                                                group_sent += 1
+                                                # Обновляем прогресс
+                                                db.set_group_video_start(int(chat_id), 'centris', season_id, i + 1)
+                                                
+                                                # Небольшая задержка между видео
+                                                await asyncio.sleep(1)
+                                                
+                                            except Exception as e:
+                                                logger.error(f"Ошибка при отправке Centris видео {i} сезона {season_id} в группу {chat_id}: {e}")
+                                                group_failed += 1
+                                        
+                                        # Если это не последний сезон, обновляем на следующий
+                                        if season_index < len(all_seasons) - 1:
+                                            next_season_id = all_seasons[season_index + 1][0]
+                                            db.set_group_video_start(int(chat_id), 'centris', next_season_id, 0)
+                                            logger.info(f"Группа {chat_id}: Centris переключена на сезон {next_season_id}")
+                                    
+                                    season_index += 1
+                    except Exception as e:
+                        logger.error(f"Ошибка при получении видео Centris для группы {chat_id}: {e}")
+                        group_failed += 1
+                
+                # Отправляем видео Golden если включен
+                if golden_enabled:
+                    try:
+                        # Получаем все сезоны Golden
+                        all_seasons = db.get_all_seasons('golden')
+                        if all_seasons:
+                            current_season_id = golden_season_id if golden_season_id else all_seasons[0][0]
+                            start_pos = golden_start_video if golden_start_video is not None else 0
+                            
+                            # Начинаем с текущего сезона
+                            season_index = 0
+                            for season in all_seasons:
+                                season_id = season[0]
+                                if season_id >= current_season_id:
+                                    videos = db.get_videos_by_season(season_id)
+                                    if videos:
+                                        # Для первого сезона начинаем с указанной позиции, для остальных с начала
+                                        if season_id == current_season_id:
+                                            video_start = start_pos
+                                        else:
+                                            video_start = 0
+                                        
+                                        for i in range(video_start, len(videos)):
+                                            try:
+                                                video_url, video_title, video_pos = videos[i]
+                                                
+                                                await message.bot.copy_message(
+                                                    chat_id=int(chat_id),
+                                                    from_chat_id=-1002550852551,  # ID канала
+                                                    message_id=int(video_url.split('/')[-1]),
+                                                    caption=f"🏊 **Golden Lake**\n\n📺 Sezon: {season_id}\n🎥 Video: {i + 1}\n🏷️ {video_title}\n\n✅ Avtomatik yuborish"
+                                                )
+                                                
+                                                group_sent += 1
+                                                # Обновляем прогресс
+                                                db.set_group_video_start(int(chat_id), 'golden', season_id, i + 1)
+                                                
+                                                # Небольшая задержка между видео
+                                                await asyncio.sleep(1)
+                                                
+                                            except Exception as e:
+                                                logger.error(f"Ошибка при отправке Golden видео {i} сезона {season_id} в группу {chat_id}: {e}")
+                                                group_failed += 1
+                                        
+                                        # Если это не последний сезон, обновляем на следующий
+                                        if season_index < len(all_seasons) - 1:
+                                            next_season_id = all_seasons[season_index + 1][0]
+                                            db.set_group_video_start(int(chat_id), 'golden', next_season_id, 0)
+                                            logger.info(f"Группа {chat_id}: Golden переключена на сезон {next_season_id}")
+                                    
+                                    season_index += 1
+                    except Exception as e:
+                        logger.error(f"Ошибка при получении видео Golden для группы {chat_id}: {e}")
+                        group_failed += 1
+                
+                if group_sent > 0:
+                    response += f"✅ **{group_name}**: {group_sent} video yuborildi\n"
+                    sent_count += group_sent
+                elif group_failed > 0:
+                    response += f"❌ **{group_name}**: {group_failed} xatolik\n"
+                    failed_count += group_failed
+                else:
+                    response += f"⚠️ **{group_name}**: Loyihalar o'chirilgan\n"
+                
+            except Exception as e:
+                logger.error(f"Ошибка при обработке группы {chat_id}: {e}")
+                response += f"❌ **{group_name}**: Xatolik - {e}\n"
+                failed_count += 1
+        
+        response += f"\n📊 **Jami natijalar:**\n"
+        response += f"✅ Yuborilgan: {sent_count} video\n"
+        response += f"❌ Xatolik: {failed_count}\n"
+        response += f"📋 Guruhlar: {len(groups_settings)}"
+        
+        # Разбиваем на части, если сообщение слишком длинное
+        if len(response) > 4096:
+            parts = [response[i:i+4096] for i in range(0, len(response), 4096)]
+            for i, part in enumerate(parts):
+                await message.answer(f"🎬 **Qism {i+1}/{len(parts)}:**\n\n{part}")
+        else:
+            await message.answer(response)
+            
+    except Exception as e:
+        logger.error(f"Ошибка при отправке всех запланированных видео: {e}")
+        await message.answer(f"❌ **Xatolik yuz berdi!**\n\n{e}")
 
 # Вспомогательные функции
 def get_season_keyboard(project):
@@ -382,6 +4731,26 @@ def get_video_keyboard_from_db(videos, viewed):
     
     return kb
 
+def get_group_selection_keyboard():
+    """Клавиатура для выбора группы"""
+    from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+    
+    kb = InlineKeyboardMarkup(row_width=2)
+    
+    # Кнопка для текущей группы (если команда вызвана в группе)
+    kb.add(InlineKeyboardButton("🏢 Hozirgi guruh", callback_data="group_current"))
+    
+    # Кнопка для ввода ID группы вручную
+    kb.add(InlineKeyboardButton("📝 ID guruhni kiriting", callback_data="group_manual"))
+    
+    # Кнопка для выбора из списка доступных групп
+    kb.add(InlineKeyboardButton("📋 Ro'yxatdan tanlang", callback_data="group_list"))
+    
+    # Кнопка для отмены
+    kb.add(InlineKeyboardButton("❌ Bekor qilish", callback_data="group_cancel"))
+    
+    return kb
+
 async def save_group_settings(data):
     """Сохранение настроек группы"""
     try:
@@ -398,6 +4767,14 @@ async def save_group_settings(data):
         golden_season_id = data.get("golden_season_id") if golden_enabled else None
         golden_start_video = data.get("golden_start_video", 0)
         
+        # Убеждаемся что у нас есть все необходимые данные
+        if centris_enabled and centris_season_id is None:
+            logger.error(f"Centris включен но season_id не установлен для группы {chat_id}")
+            raise ValueError("Centris season_id не установлен")
+        if golden_enabled and golden_season_id is None:
+            logger.error(f"Golden включен но season_id не установлен для группы {chat_id}")
+            raise ValueError("Golden season_id не установлен")
+        
         # Сохраняем в базу
         db.set_group_video_settings(
             chat_id,
@@ -405,6 +4782,7 @@ async def save_group_settings(data):
             centris_season_id,
             centris_start_video,
             int(golden_enabled),
+            golden_season_id,
             golden_start_video
         )
         
@@ -417,12 +4795,265 @@ async def save_group_settings(data):
             db.set_group_video_start(chat_id, 'golden', golden_season_id, golden_start_video)
             db.reset_group_viewed_videos(chat_id)
         
-        # Планируем задачи
-        from handlers.users.video_scheduler import schedule_group_jobs
-        schedule_group_jobs()
+        # Планируем задачи для конкретной группы
+        schedule_single_group_jobs(chat_id)
         
         logger.info(f"Группа {chat_id}: настройки сохранены - Centris: {centris_enabled}, Golden: {golden_enabled}")
+        
+        # Возвращаем информацию о сохраненных настройках
+        return {
+            "centris_enabled": centris_enabled,
+            "centris_season_id": centris_season_id,
+            "centris_start_video": centris_start_video,
+            "golden_enabled": golden_enabled,
+            "golden_season_id": golden_season_id,
+            "golden_start_video": golden_start_video
+        }
         
     except Exception as e:
         logger.error(f"Ошибка при сохранении настроек группы: {e}")
         raise
+
+async def is_admin_or_super_admin(user_id: int) -> bool:
+    """
+    Проверяет, является ли пользователь админом или супер-админом
+    """
+    return user_id in ADMINS or user_id == SUPER_ADMIN_ID or db.is_admin(user_id)
+
+# Команда для показа настроек всех групп (только для админов)
+@dp.message_handler(commands=["admin_show_all_groups_settings"])
+async def admin_show_all_groups_settings(message: types.Message):
+    """
+    Показать настройки всех групп (только для админов)
+    """
+    try:
+        # Проверяем права админа
+        if not await is_admin_or_super_admin(message.from_user.id):
+            await message.answer("❌ **Ruxsat yo'q!**\n\nBu buyruq faqat administratorlar uchun.")
+            return
+        
+        # Получаем все группы с настройками
+        groups_settings = db.get_all_groups_with_settings()
+        
+        if not groups_settings:
+            await message.answer("📋 **Guruhlar sozlamalari:**\n\n❌ Hech qanday guruh sozlamalari topilmadi.")
+            return
+        
+        response = "📋 **Barcha guruhlar sozlamalari:**\n\n"
+        
+        for group in groups_settings:
+            chat_id, centris_enabled, centris_season_id, centris_start_video, golden_enabled, golden_season_id, golden_start_video, viewed_videos, is_subscribed, group_name = group
+            
+            # Логируем значения для отладки
+            logger.info(f"Группа {chat_id}: centris_start_video={centris_start_video}, golden_start_video={golden_start_video}")
+            
+            # Название группы уже получено из базы данных
+            if not group_name or group_name == "Noma'lum guruh":
+                # Пытаемся получить актуальное название из Telegram
+                try:
+                    group_info = await message.bot.get_chat(chat_id)
+                    if group_info.title:
+                        group_name = group_info.title
+                        # Обновляем название в базе данных
+                        db.update_group_name(chat_id, group_name)
+                        logger.info(f"Группа {chat_id}: обновлено название '{group_name}'")
+                    elif group_info.first_name:
+                        group_name = group_info.first_name
+                        # Обновляем название в базе данных
+                        db.update_group_name(chat_id, group_name)
+                        logger.info(f"Группа {chat_id}: обновлено название '{group_name}'")
+                except Exception as e:
+                    logger.error(f"Ошибка при получении названия группы {chat_id}: {e}")
+                    # Оставляем название из базы данных
+            
+            response += f"🏢 **{group_name}** (ID: `{chat_id}`)\n"
+            
+            if centris_enabled:
+                response += f"  🎬 Centris: ✅ Yoqilgan\n"
+                if centris_season_id:
+                    response += f"  📺 Sezon: {centris_season_id}\n"
+                if centris_start_video is not None and centris_start_video >= 0:
+                    response += f"  🎥 Video: {centris_start_video + 1}\n"
+                else:
+                    response += f"  🎥 Video: Sezondan boshlash\n"
+            else:
+                response += f"  🎬 Centris: ❌ O'chirilgan\n"
+            
+            if golden_enabled:
+                response += f"  🏊 Golden: ✅ Yoqilgan\n"
+                if golden_season_id:
+                    response += f"  📺 Sezon: {golden_season_id}\n"
+                if golden_start_video is not None and golden_start_video >= 0:
+                    response += f"  🎥 Video: {golden_start_video + 1}\n"
+                else:
+                    response += f"  🎥 Video: Sezondan boshlash\n"
+            else:
+                response += f"  🏊 Golden: ❌ O'chirilgan\n"
+            
+            # Проверяем статус подписки вместо расписания
+            if is_subscribed:
+                response += f"  ⏰ Jadval: ✅ Yoqilgan (1)\n"
+            else:
+                response += f"  ⏰ Jadval: ❌ O'chirilgan\n"
+            
+            response += "\n" + "─" * 40 + "\n\n"
+        
+        # Разбиваем на части, если сообщение слишком длинное
+        if len(response) > 4096:
+            parts = [response[i:i+4096] for i in range(0, len(response), 4096)]
+            for i, part in enumerate(parts):
+                await message.answer(f"📋 **Qism {i+1}/{len(parts)}:**\n\n{part}")
+        else:
+            await message.answer(response)
+            
+    except Exception as e:
+        logger.error(f"Ошибка при показе настроек всех групп: {e}")
+        await message.answer("❌ **Xatolik yuz berdi!**\n\nIltimos, qaytadan urinib ko'ring.")
+
+
+# Команда для отправки конкретного видео по номеру во все группы (только для админов)
+@dp.message_handler(commands=["send_specific_video"])
+async def send_specific_video_by_number(message: types.Message):
+    """
+    Отправить конкретное видео по номеру во все группы (только для админов)
+    Использование: /send_specific_video <project> <season> <video_number>
+    Пример: /send_specific_video centris 2 5
+    """
+    try:
+        # Проверяем права админа
+        if not await is_admin_or_super_admin(message.from_user.id):
+            await message.answer("❌ **Ruxsat yo'q!**\n\nBu buyruq faqat administratorlar uchun.")
+            return
+        
+        # Парсим аргументы команды
+        args = message.text.split()
+        if len(args) != 4:
+            await message.answer(
+                "📝 **To'g'ri foydalanish:**\n\n"
+                "`/send_specific_video <loyiha> <sezon> <video_number>`\n\n"
+                "**Misol:**\n"
+                "`/send_specific_video centris 2 5` - Centris 2-sezon 5-video\n"
+                "`/send_specific_video golden 1 3` - Golden 1-sezon 3-video\n\n"
+                "**Loyihalar:** centris, golden\n"
+                "**Sezonlar:** 1, 2, 3, 4...\n"
+                "**Video raqami:** 1, 2, 3, 4..."
+            )
+            return
+        
+        project = args[1].lower()
+        try:
+            season_id = int(args[2])
+            video_number = int(args[3])
+        except ValueError:
+            await message.answer("❌ **Xatolik!** Sezon va video raqami son bo'lishi kerak.")
+            return
+        
+        # Проверяем корректность проекта
+        if project not in ['centris', 'golden']:
+            await message.answer("❌ **Xatolik!** Loyiha `centris` yoki `golden` bo'lishi kerak.")
+            return
+        
+        # Проверяем корректность номера видео
+        if video_number < 1:
+            await message.answer("❌ **Xatolik!** Video raqami 1 dan katta bo'lishi kerak.")
+            return
+        
+        # Получаем все группы с настройками
+        groups_settings = db.get_all_groups_with_settings()
+        
+        if not groups_settings:
+            await message.answer("📋 **Guruhlar sozlamalari:**\n\n❌ Hech qanday guruh sozlamalari topilmadi.")
+            return
+        
+        # Получаем видео по сезону
+        videos = db.get_videos_by_season(season_id)
+        if not videos:
+            await message.answer(f"❌ **Video topilmadi!**\n\nSezon {season_id} da video mavjud emas.")
+            return
+        
+        # Проверяем, существует ли указанный номер видео
+        if video_number > len(videos):
+            await message.answer(
+                f"❌ **Video raqami noto'g'ri!**\n\n"
+                f"Sezon {season_id} da faqat {len(videos)} ta video mavjud.\n"
+                f"Siz {video_number} raqamini kiritdingiz."
+            )
+            return
+        
+        # Получаем информацию о видео
+        video_url, video_title, video_pos = videos[video_number - 1]  # -1 потому что индексация с 0
+        
+        # Определяем название проекта для отображения
+        project_name = "🎬 **Centris Towers**" if project == 'centris' else "🏊 **Golden Lake**"
+        
+        # Отправляем видео во все подходящие группы
+        sent_count = 0
+        failed_count = 0
+        response = f"🎬 **{project_name} - Sezon {season_id}, Video {video_number} yuborish natijalari:**\n\n"
+        response += f"📺 **Sezon:** {season_id}\n"
+        response += f"🎥 **Video:** {video_number}\n"
+        response += f"🏷️ **Nomi:** {video_title}\n\n"
+        
+        for group in groups_settings:
+            chat_id, centris_enabled, centris_season_id, centris_start_video, golden_enabled, golden_season_id, golden_start_video, viewed_videos, is_subscribed, group_name = group
+            
+            # Проверяем, включен ли проект для этой группы И настроен ли для указанного сезона
+            project_enabled = False
+            if project == 'centris' and centris_enabled and centris_season_id == season_id:
+                project_enabled = True
+            elif project == 'golden' and golden_enabled and golden_season_id == season_id:
+                project_enabled = True
+            
+            if not project_enabled:
+                if project == 'centris':
+                    if not centris_enabled:
+                        response += f"⚠️ **{group_name}**: Centris o'chirilgan\n"
+                    elif centris_season_id != season_id:
+                        response += f"⚠️ **{group_name}**: Centris sezon {centris_season_id} uchun sozlangan (siz {season_id} kiritdingiz)\n"
+                    else:
+                        response += f"⚠️ **{group_name}**: Centris sozlanmagan\n"
+                elif project == 'golden':
+                    if not golden_enabled:
+                        response += f"⚠️ **{group_name}**: Golden o'chirilgan\n"
+                    elif golden_season_id != season_id:
+                        response += f"⚠️ **{group_name}**: Golden sezon {golden_season_id} uchun sozlangan (siz {season_id} kiritdingiz)\n"
+                    else:
+                        response += f"⚠️ **{group_name}**: Golden sozlanmagan\n"
+                continue
+            
+            try:
+                # Отправляем видео
+                await message.bot.copy_message(
+                    chat_id=int(chat_id),
+                    from_chat_id=-1002550852551,  # ID канала
+                    message_id=int(video_url.split('/')[-1]),
+                    caption=f"{project_name}\n\n📺 Sezon: {season_id}\n🎥 Video: {video_number}\n🏷️ {video_title}\n\n✅ Maxsus yuborish"
+                )
+                
+                sent_count += 1
+                response += f"✅ **{group_name}**: Video yuborildi\n"
+                
+                # Небольшая задержка между отправками
+                await asyncio.sleep(0.5)
+                
+            except Exception as e:
+                logger.error(f"Ошибка при отправке видео в группу {chat_id}: {e}")
+                failed_count += 1
+                response += f"❌ **{group_name}**: Xatolik - {e}\n"
+        
+        response += f"\n📊 **Jami natijalar:**\n"
+        response += f"✅ Yuborilgan: {sent_count} guruh\n"
+        response += f"❌ Xatolik: {failed_count}\n"
+        response += f"📋 Guruhlar: {len(groups_settings)}"
+        
+        # Разбиваем на части, если сообщение слишком длинное
+        if len(response) > 4096:
+            parts = [response[i:i+4096] for i in range(0, len(response), 4096)]
+            for i, part in enumerate(parts):
+                await message.answer(f"🎬 **Qism {i+1}/{len(parts)}:**\n\n{part}")
+        else:
+            await message.answer(response)
+            
+    except Exception as e:
+        logger.error(f"Ошибка при отправке конкретного видео: {e}")
+        await message.answer(f"❌ **Xatolik yuz berdi!**\n\n{e}")

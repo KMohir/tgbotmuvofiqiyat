@@ -189,15 +189,15 @@ async def send_group_video_by_settings(chat_id: int):
     if not settings or (not settings[0] and not settings[4]):
         logger.info(f"Группа {chat_id} не настроена для рассылки видео")
         return False
-    centris_enabled, centris_season, centris_start_video, golden_enabled, golden_season, golden_start_video = settings
+    centris_enabled, centris_season_id, centris_start_video, golden_enabled, golden_season_id, golden_start_video = settings
     sent = False
-    if centris_enabled and centris_season:
+    if centris_enabled and centris_season_id:
         # Отправить видео Centris
-        res = await send_group_video_new(chat_id, "centris", centris_season)
+        res = await send_group_video_new(chat_id, "centris", centris_season_id)
         sent = sent or res
-    if golden_enabled and golden_season:
+    if golden_enabled and golden_season_id:
         # Golden Lake — всегда первый сезон (или из настроек)
-        res = await send_group_video_new(chat_id, "golden_lake", golden_season)
+        res = await send_group_video_new(chat_id, "golden_lake", golden_season_id)
         sent = sent or res
     return sent
 
@@ -211,7 +211,7 @@ def schedule_group_jobs():
                 scheduler.remove_job(job.id)
         groups = db.get_all_groups_with_settings()
         logger.info(f"Найдено {len(groups)} групп с настройками")
-        for chat_id, centris_enabled, centris_season, centris_start_season_id, centris_start_video, golden_enabled, golden_start_season_id, golden_start_video, viewed_videos, is_subscribed in groups:
+        for chat_id, centris_enabled, centris_season_id, centris_start_video, golden_enabled, golden_season_id, golden_start_video, viewed_videos, is_subscribed, group_name in groups:
             if centris_enabled and not golden_enabled:
                 # Только Centris Towers
                     scheduler.add_job(
@@ -219,7 +219,7 @@ def schedule_group_jobs():
                         trigger='cron',
                         hour=8,
                         minute=0,
-                    args=[chat_id, 'centris', centris_season],
+                    args=[chat_id, 'centris', centris_season_id],
                         id=f"group_centrismorning_{chat_id}",
                         replace_existing=True,
                         timezone="Asia/Tashkent"
@@ -229,7 +229,7 @@ def schedule_group_jobs():
                         trigger='cron',
                         hour=20,
                         minute=0,
-                    args=[chat_id, 'centris', centris_season],
+                    args=[chat_id, 'centris', centris_season_id],
                         id=f"group_centrisevening_{chat_id}",
                         replace_existing=True,
                         timezone="Asia/Tashkent"
@@ -241,7 +241,7 @@ def schedule_group_jobs():
                     trigger='cron',
                     hour=8,
                     minute=0,
-                    args=[chat_id, 'golden_lake', golden_start_season_id],
+                    args=[chat_id, 'golden_lake', golden_season_id],
                     id=f"group_goldenmorning_{chat_id}",
                     replace_existing=True,
                     timezone="Asia/Tashkent"
@@ -251,7 +251,7 @@ def schedule_group_jobs():
                     trigger='cron',
                     hour=20,
                     minute=0,
-                    args=[chat_id, 'golden_lake', golden_start_season_id],
+                    args=[chat_id, 'golden_lake', golden_season_id],
                     id=f"group_goldenevening_{chat_id}",
                     replace_existing=True,
                     timezone="Asia/Tashkent"
@@ -263,7 +263,7 @@ def schedule_group_jobs():
                         trigger='cron',
                         hour=8,
                         minute=0,
-                    args=[chat_id, 'centris', centris_season],
+                    args=[chat_id, 'centris', centris_season_id],
                         id=f"group_centrismorning_{chat_id}",
                         replace_existing=True,
                         timezone="Asia/Tashkent"
@@ -273,17 +273,17 @@ def schedule_group_jobs():
                         trigger='cron',
                     hour=20,
                         minute=0,
-                    args=[chat_id, 'centris', centris_season],
-                    id=f"group_centrisevening_{chat_id}",
+                        args=[chat_id, 'centris', centris_season_id],
+                        id=f"group_centrisevening_{chat_id}",
                         replace_existing=True,
                         timezone="Asia/Tashkent"
                     )
                     scheduler.add_job(
-                    send_group_video_new,
+                        send_group_video_new,
                         trigger='cron',
                         hour=11,
                         minute=0,
-                    args=[chat_id, 'golden_lake', golden_start_season_id],
+                        args=[chat_id, 'golden_lake', golden_season_id],
                         id=f"group_golden_{chat_id}",
                         replace_existing=True,
                         timezone="Asia/Tashkent"
@@ -598,8 +598,8 @@ async def scheduled_send_20(user_id):
             await send_next_unwatched_video(user_id, VIDEO_LIST_3, 'v3')
 
     # --- Функция для обновления настроек группы и сброса просмотренных видео ---
-def update_group_video_settings_and_reset(chat_id, centris_enabled, centris_season, centris_start_video, golden_enabled, golden_start_video):
-    db.set_group_video_settings(chat_id, centris_enabled, centris_season, centris_start_video, golden_enabled, golden_start_video)
+def update_group_video_settings_and_reset(chat_id, centris_enabled, centris_season_id, centris_start_video, golden_enabled, golden_start_video):
+    db.set_group_video_settings(chat_id, centris_enabled, centris_season_id, centris_start_video, golden_enabled, None, golden_start_video)
     db.reset_group_viewed_videos(chat_id)
 
 def schedule_group_jobs_v2():
@@ -612,54 +612,162 @@ def schedule_group_jobs_v2():
     for group in groups:
         chat_id = group[0]
         centris_enabled = bool(group[1])
-        golden_enabled = bool(group[5])
+        centris_season_id = group[2]  # centris_season_id
+        centris_start_video = group[3]  # centris_start_video
+        golden_enabled = bool(group[4])
+        golden_season_id = group[5]  # golden_season_id
+        golden_start_video = group[6]  # golden_start_video
+        viewed_videos = group[7]
+        is_subscribed = group[8]
+        group_name = group[9]  # group_name
+        
         both_enabled = centris_enabled and golden_enabled
         
-        # Centris Towers
-        centris_season = group[2]  # centris_season
-        centris_start_video = group[4]  # centris_start_video
-        if centris_enabled and centris_season:
-            if str(centris_season) == '1':
+        # Centris Towers - всегда в 08:00 и 20:00
+        if centris_enabled and centris_season_id:
+            # Утренняя отправка в 08:00
+            scheduler.add_job(
+                send_group_video_new,
+                'cron',
+                hour=8, minute=0,
+                args=[chat_id, 'centris', centris_season_id, centris_start_video],
+                id=f'group_{chat_id}_centris_morning',
+                timezone="Asia/Tashkent"
+            )
+            # Вечерняя отправка в 20:00
+            scheduler.add_job(
+                send_group_video_new,
+                'cron',
+                hour=20, minute=0,
+                args=[chat_id, 'centris', centris_season_id, centris_start_video],
+                id=f'group_{chat_id}_centris_evening',
+                timezone="Asia/Tashkent"
+            )
+            logger.info(f"Группа {chat_id}: Centris запланирован на 08:00 и 20:00")
+        
+        # Golden Lake
+        if golden_enabled and golden_season_id:
+            if both_enabled:
+                # Если оба проекта включены, Golden отправляется в 11:00
+                scheduler.add_job(
+                    send_group_video_new,
+                    'cron',
+                    hour=11, minute=0,
+                    args=[chat_id, 'golden_lake', golden_season_id, golden_start_video],
+                    id=f'group_{chat_id}_golden_11',
+                    timezone="Asia/Tashkent"
+                )
+                logger.info(f"Группа {chat_id}: Golden запланирован на 11:00 (оба проекта)")
+            else:
+                # Если только Golden, то в 08:00 и 20:00
                 scheduler.add_job(
                     send_group_video_new,
                     'cron',
                     hour=8, minute=0,
-                    args=[chat_id, 'centris', centris_season, centris_start_video],
-                    id=f'group_{chat_id}_centris_1'
+                    args=[chat_id, 'golden_lake', golden_season_id, golden_start_video],
+                    id=f'group_{chat_id}_golden_morning',
+                    timezone="Asia/Tashkent"
                 )
                 scheduler.add_job(
                     send_group_video_new,
                     'cron',
                     hour=20, minute=0,
-                    args=[chat_id, 'centris', centris_season, centris_start_video],
-                    id=f'group_{chat_id}_centris_2'
+                    args=[chat_id, 'golden_lake', golden_season_id, golden_start_video],
+                    id=f'group_{chat_id}_golden_evening',
+                    timezone="Asia/Tashkent"
                 )
-            else:
-                scheduler.add_job(
-                    send_group_video_new,
-                    'cron',
-                    hour=8, minute=0,
-                    args=[chat_id, 'centris', centris_season, centris_start_video],
-                    id=f'group_{chat_id}_centris'
-                )
+                logger.info(f"Группа {chat_id}: Golden запланирован на 08:00 и 20:00")
+    
+    logger.info(f"Всего запланировано задач: {len(scheduler.get_jobs())}")
+
+
+def schedule_single_group_jobs(chat_id: int):
+    """
+    Планирует задачи для конкретной группы
+    """
+    try:
+        logger.info(f"Планирование задач для группы {chat_id}")
+        
+        # Удаляем существующие задачи для этой группы
+        jobs = scheduler.get_jobs()
+        for job in jobs:
+            if job.id.startswith(f"group_{chat_id}_"):
+                scheduler.remove_job(job.id)
+                logger.info(f"Удалена задача {job.id}")
+        
+        # Получаем настройки группы
+        group_settings = db.get_group_video_settings(chat_id)
+        if not group_settings:
+            logger.warning(f"Группа {chat_id} не найдена в настройках")
+            return False
+        
+        centris_enabled = group_settings.get('centris_enabled', False)
+        centris_season_id = group_settings.get('centris_season_id')
+        centris_start_video = group_settings.get('centris_start_video', 0)
+        golden_enabled = group_settings.get('golden_enabled', False)
+        golden_season_id = group_settings.get('golden_season_id')
+        golden_start_video = group_settings.get('golden_start_video', 0)
+        
+        both_enabled = centris_enabled and golden_enabled
+        
+        # Centris Towers - всегда в 08:00 и 20:00
+        if centris_enabled and centris_season_id:
+            # Утренняя отправка в 08:00
+            scheduler.add_job(
+                send_group_video_new,
+                'cron',
+                hour=8, minute=0,
+                args=[chat_id, 'centris', centris_season_id, centris_start_video],
+                id=f'group_{chat_id}_centris_morning',
+                timezone="Asia/Tashkent"
+            )
+            # Вечерняя отправка в 20:00
+            scheduler.add_job(
+                send_group_video_new,
+                'cron',
+                hour=20, minute=0,
+                args=[chat_id, 'centris', centris_season_id, centris_start_video],
+                id=f'group_{chat_id}_centris_evening',
+                timezone="Asia/Tashkent"
+            )
+            logger.info(f"Группа {chat_id}: Centris запланирован на 08:00 и 20:00")
         
         # Golden Lake
-        golden_start_season_id = group[6]  # golden_start_season_id
-        golden_start_video = group[7]  # golden_start_video
-        if golden_enabled and golden_start_season_id:
+        if golden_enabled and golden_season_id:
             if both_enabled:
+                # Если оба проекта включены, Golden отправляется в 11:00
                 scheduler.add_job(
                     send_group_video_new,
                     'cron',
                     hour=11, minute=0,
-                    args=[chat_id, 'golden_lake', golden_start_season_id, golden_start_video],
-                    id=f'group_{chat_id}_golden'
+                    args=[chat_id, 'golden_lake', golden_season_id, golden_start_video],
+                    id=f'group_{chat_id}_golden_11',
+                    timezone="Asia/Tashkent"
                 )
+                logger.info(f"Группа {chat_id}: Golden запланирован на 11:00 (оба проекта)")
             else:
+                # Если только Golden, то в 08:00 и 20:00
                 scheduler.add_job(
                     send_group_video_new,
                     'cron',
                     hour=8, minute=0,
-                    args=[chat_id, 'golden_lake', golden_start_season_id, golden_start_video],
-                    id=f'group_{chat_id}_golden'
+                    args=[chat_id, 'golden_lake', golden_season_id, golden_start_video],
+                    id=f'group_{chat_id}_golden_morning',
+                    timezone="Asia/Tashkent"
                 )
+                scheduler.add_job(
+                    send_group_video_new,
+                    'cron',
+                    hour=20, minute=0,
+                    args=[chat_id, 'golden_lake', golden_season_id, golden_start_video],
+                    id=f'group_{chat_id}_golden_evening',
+                    timezone="Asia/Tashkent"
+                )
+                logger.info(f"Группа {chat_id}: Golden запланирован на 08:00 и 20:00")
+        
+        logger.info(f"Группа {chat_id}: задачи запланированы успешно")
+        return True
+        
+    except Exception as e:
+        logger.error(f"Ошибка при планировании задач для группы {chat_id}: {e}")
+        return False

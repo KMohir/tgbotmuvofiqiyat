@@ -7,6 +7,7 @@ class GroupVideoStates(StatesGroup):
     waiting_for_centr_video = State()
     waiting_for_golden_video = State()
     waiting_for_golden_season = State()
+    waiting_for_group_selection = State()
 
 
 class AddSeasonStates(StatesGroup):

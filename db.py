@@ -128,6 +128,39 @@ class Database:
                     is_subscribed INTEGER DEFAULT 1
                 )
             ''')
+            
+            # Проверяем и обновляем структуру существующей таблицы
+            cursor.execute('''
+                DO $$
+                BEGIN
+                    -- Добавляем недостающие колонки если их нет
+                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'group_video_settings' AND column_name = 'centris_season_id') THEN
+                        ALTER TABLE group_video_settings ADD COLUMN centris_season_id INTEGER;
+                    END IF;
+                    
+                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'group_video_settings' AND column_name = 'golden_season_id') THEN
+                        ALTER TABLE group_video_settings ADD COLUMN golden_season_id INTEGER;
+                    END IF;
+                    
+                    -- Добавляем поле для названия группы если его нет
+                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'group_video_settings' AND column_name = 'group_name') THEN
+                        ALTER TABLE group_video_settings ADD COLUMN group_name TEXT DEFAULT 'Noma''lum guruh';
+                    END IF;
+                    
+                    -- Удаляем старые колонки если они есть
+                    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'group_video_settings' AND column_name = 'centris_season') THEN
+                        ALTER TABLE group_video_settings DROP COLUMN centris_season;
+                    END IF;
+                    
+                    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'group_video_settings' AND column_name = 'centris_start_season_id') THEN
+                        ALTER TABLE group_video_settings DROP COLUMN centris_start_season_id;
+                    END IF;
+                    
+                    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'group_video_settings' AND column_name = 'golden_start_season_id') THEN
+                        ALTER TABLE group_video_settings DROP COLUMN golden_start_season_id;
+                    END IF;
+                END $$;
+            ''')
             # --- Таблица seasons ---
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS seasons (
@@ -155,6 +188,13 @@ class Database:
             ''')
             self.conn.commit()
             cursor.close()
+            
+            # Попытка синхронизировать названия групп
+            try:
+                self.sync_group_names_from_users()
+            except Exception as e:
+                logger.error(f"Ошибка при синхронизации названий групп: {e}")
+                
         except Exception as e:
             logger.error(f"Ошибка при создании/обновлении таблиц: {e}")
             self.conn.rollback()
@@ -237,11 +277,107 @@ class Database:
                     golden_enabled=EXCLUDED.golden_enabled, 
                     golden_season_id=EXCLUDED.golden_season_id,
                     golden_start_video=EXCLUDED.golden_start_video
-            ''', (chat_id, centris_enabled, centris_season_id, centris_start_video, golden_enabled, golden_season_id, golden_start_video))
+            ''', (str(chat_id), centris_enabled, centris_season_id, centris_start_video, golden_enabled, golden_season_id, golden_start_video))
             self.conn.commit()
             cursor.close()
         except Exception as e:
             logger.error(f"Ошибка при установке настроек видео для группы {chat_id}: {e}")
+            self.conn.rollback()
+
+    def update_group_name(self, chat_id: int, group_name: str):
+        """
+        Обновляет название группы в базе данных
+        """
+        try:
+            cursor = self.conn.cursor()
+            
+            # Обновляем название в group_video_settings
+            cursor.execute('''
+                UPDATE group_video_settings 
+                SET group_name = %s 
+                WHERE chat_id = %s
+            ''', (group_name, str(chat_id)))
+            
+            # Если группа не существует, создаем запись с названием
+            if cursor.rowcount == 0:
+                cursor.execute('''
+                    INSERT INTO group_video_settings (chat_id, group_name)
+                    VALUES (%s, %s)
+                ''', (str(chat_id), group_name))
+            
+            # Также обновляем название в таблице users
+            cursor.execute('''
+                UPDATE users 
+                SET name = %s 
+                WHERE user_id = %s AND is_group = 1
+            ''', (group_name, int(chat_id)))
+            
+            # Если группы нет в users, создаем запись
+            if cursor.rowcount == 0:
+                cursor.execute('''
+                    INSERT INTO users (user_id, name, phone, is_group, is_subscribed)
+                    VALUES (%s, %s, 'group', 1, 1)
+                    ON CONFLICT (user_id) DO UPDATE SET name = EXCLUDED.name
+                ''', (int(chat_id), group_name))
+            
+            self.conn.commit()
+            cursor.close()
+            logger.info(f"Название группы {chat_id} обновлено на '{group_name}' в обеих таблицах")
+            return True
+        except Exception as e:
+            logger.error(f"Ошибка при обновлении названия группы {chat_id}: {e}")
+            self.conn.rollback()
+            return False
+
+    def sync_group_names_from_users(self):
+        """
+        Синхронизирует названия групп из таблицы users в group_video_settings
+        """
+        try:
+            cursor = self.conn.cursor()
+            
+            # Получаем все группы с названиями из users
+            cursor.execute('''
+                SELECT user_id, name 
+                FROM users 
+                WHERE is_group = 1 AND name IS NOT NULL AND name != ''
+            ''')
+            groups_with_names = cursor.fetchall()
+            
+            if not groups_with_names:
+                logger.info("Нет групп с названиями для синхронизации")
+                cursor.close()
+                return
+            
+            updated_count = 0
+            for group_id, group_name in groups_with_names:
+                # Проверяем, есть ли группа в group_video_settings
+                cursor.execute('''
+                    SELECT 1 FROM group_video_settings WHERE chat_id = %s
+                ''', (str(group_id),))
+                
+                if cursor.fetchone():
+                    # Обновляем название
+                    cursor.execute('''
+                        UPDATE group_video_settings 
+                        SET group_name = %s 
+                        WHERE chat_id = %s
+                    ''', (group_name, str(group_id)))
+                else:
+                    # Создаем запись
+                    cursor.execute('''
+                        INSERT INTO group_video_settings (chat_id, group_name)
+                        VALUES (%s, %s)
+                    ''', (str(group_id), group_name))
+                
+                updated_count += 1
+            
+            self.conn.commit()
+            cursor.close()
+            logger.info(f"Синхронизировано названий групп: {updated_count}")
+            
+        except Exception as e:
+            logger.error(f"Ошибка при синхронизации названий групп: {e}")
             self.conn.rollback()
 
     def get_group_video_settings(self, chat_id: int):
@@ -365,11 +501,11 @@ class Database:
             cursor = self.conn.cursor()
             if project == 'centris':
                 cursor.execute('''
-                    UPDATE group_video_settings SET centris_start_season_id = %s, centris_start_video = %s WHERE chat_id = %s
+                    UPDATE group_video_settings SET centris_season_id = %s, centris_start_video = %s WHERE chat_id = %s
                 ''', (season_id, video_index, str(chat_id)))
             elif project == 'golden':
                 cursor.execute('''
-                    UPDATE group_video_settings SET golden_start_season_id = %s, golden_start_video = %s WHERE chat_id = %s
+                    UPDATE group_video_settings SET golden_season_id = %s, golden_start_video = %s WHERE chat_id = %s
                 ''', (season_id, video_index, str(chat_id)))
             self.conn.commit()
             cursor.close()
@@ -382,11 +518,11 @@ class Database:
             cursor = self.conn.cursor()
             if project == 'centris':
                 cursor.execute('''
-                    SELECT centris_start_season_id, centris_start_video FROM group_video_settings WHERE chat_id = %s
+                    SELECT centris_season_id, centris_start_video FROM group_video_settings WHERE chat_id = %s
                 ''', (str(chat_id),))
             elif project == 'golden':
                 cursor.execute('''
-                    SELECT golden_start_season_id, golden_start_video FROM group_video_settings WHERE chat_id = %s
+                    SELECT golden_season_id, golden_start_video FROM group_video_settings WHERE chat_id = %s
                 ''', (str(chat_id),))
             result = cursor.fetchone()
             cursor.close()
@@ -509,6 +645,20 @@ class Database:
             return [tuple(row) for row in result]
         except Exception as e:
             logger.error(f"Ошибка при получении видео сезона {season_id}: {e}")
+            return []
+
+    def get_all_seasons(self, project):
+        """
+        Получить все сезоны для проекта, отсортированные по ID
+        """
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute("SELECT id, project, name FROM seasons WHERE project = %s ORDER BY id", (project,))
+            result = cursor.fetchall()
+            cursor.close()
+            return result
+        except Exception as e:
+            logger.error(f"Ошибка при получении сезонов для проекта '{project}': {e}")
             return []
 
     def get_season_by_id(self, season_id):
@@ -843,15 +993,40 @@ class Database:
         try:
             cursor = self.conn.cursor()
             cursor.execute('''
-                SELECT chat_id, centris_enabled, centris_season, centris_start_season_id, centris_start_video, 
-                       golden_enabled, golden_start_season_id, golden_start_video, viewed_videos, is_subscribed
-                FROM group_video_settings
+                SELECT gvs.chat_id, gvs.centris_enabled, gvs.centris_season_id, gvs.centris_start_video, 
+                       gvs.golden_enabled, gvs.golden_season_id, gvs.golden_start_video, gvs.viewed_videos, gvs.is_subscribed, 
+                       COALESCE(gvs.group_name, u.name, 'Noma''lum guruh') as group_name
+                FROM group_video_settings gvs
+                LEFT JOIN users u ON gvs.chat_id::bigint = u.user_id AND u.is_group = 1
             ''')
             result = cursor.fetchall()
             cursor.close()
             return result
         except Exception as e:
             logger.error(f"Ошибка при получении настроек всех групп: {e}")
+            return []
+    
+    def get_all_whitelisted_groups(self):
+        """Получить все разрешенные группы с именами"""
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute('''
+                SELECT u.user_id, u.name
+                FROM users u
+                WHERE u.is_group = 1 AND u.is_banned = 0
+            ''')
+            all_groups = cursor.fetchall()
+            cursor.close()
+            
+            # Фильтруем только разрешенные группы (в whitelist)
+            whitelisted_groups = []
+            for group_id, name in all_groups:
+                if self.is_group_whitelisted(group_id):
+                    whitelisted_groups.append((group_id, name))
+            
+            return whitelisted_groups
+        except Exception as e:
+            logger.error(f"Ошибка при получении разрешенных групп: {e}")
             return []
 
     def unban_all_groups(self):
