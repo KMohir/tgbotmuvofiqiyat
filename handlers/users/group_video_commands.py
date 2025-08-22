@@ -3803,7 +3803,7 @@ async def process_season_selection(callback_query: types.CallbackQuery, state: F
             )
             await state.set_state(GroupVideoStates.waiting_for_centr_video.state)
             
-        elif project == "golden":
+        elif project == "golden" or (project == "both" and await state.get_state() == GroupVideoStates.waiting_for_golden_season.state):
             await state.update_data(golden_season_id=season_id)
             await callback_query.message.edit_text(
                 "🏢 **Golden Lake**\n"
@@ -3867,10 +3867,10 @@ async def process_video_selection(callback_query: types.CallbackQuery, state: FS
                 # Переходим к выбору группы
                 await state.set_state(GroupVideoStates.waiting_for_group_selection.state)
                 
-        elif project == "golden":
+        elif project == "golden" or (project == "both" and await state.get_state() == GroupVideoStates.waiting_for_golden_video.state):
             await state.update_data(golden_start_video=video_idx)
             
-            if data.get("both_mode"):
+            if data.get("both_mode") or project == "both":
                 # Оба проекта - сохраняем настройки
                 # Сохраняем настройки во временное состояние
                 await state.update_data(
