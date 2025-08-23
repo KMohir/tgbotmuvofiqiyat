@@ -701,12 +701,14 @@ def schedule_single_group_jobs(chat_id: int):
             logger.warning(f"Группа {chat_id} не найдена в настройках")
             return False
         
-        centris_enabled = group_settings.get('centris_enabled', False)
-        centris_season_id = group_settings.get('centris_season_id')
-        centris_start_video = group_settings.get('centris_start_video', 0)
-        golden_enabled = group_settings.get('golden_enabled', False)
-        golden_season_id = group_settings.get('golden_season_id')
-        golden_start_video = group_settings.get('golden_start_video', 0)
+        # Распаковываем tuple в переменные
+        centris_enabled, centris_season_id, centris_start_video, golden_enabled, golden_season_id, golden_start_video = group_settings
+        
+        # Приводим к правильным типам
+        centris_enabled = bool(centris_enabled)
+        centris_start_video = centris_start_video or 0
+        golden_enabled = bool(golden_enabled)
+        golden_start_video = golden_start_video or 0
         
         both_enabled = centris_enabled and golden_enabled
         
