@@ -14,7 +14,8 @@ logger = logging.getLogger(__name__)
 
 def is_super_admin(user_id: int) -> bool:
     """Проверить является ли пользователь супер-админом"""
-    admin_ids = [SUPER_ADMIN_ID]
+    SUPER_ADMIN_IDS = [5657091547, 7983512278, 5310261745]  # Список супер-администраторов
+    admin_ids = SUPER_ADMIN_IDS.copy()
     for admin in ADMINS:
         try:
             if isinstance(admin, str):

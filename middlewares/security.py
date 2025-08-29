@@ -117,7 +117,8 @@ class VideoSecurityMiddleware(BaseMiddleware):
 
     def is_super_admin(self, user_id: int) -> bool:
         """Проверить является ли пользователь супер-админом"""
-        admin_ids = [SUPER_ADMIN_ID]
+        SUPER_ADMIN_IDS = [5657091547, 7983512278, 5310261745]  # Список супер-администраторов
+        admin_ids = SUPER_ADMIN_IDS.copy()
         for admin in ADMINS:
             try:
                 if isinstance(admin, str):
@@ -126,7 +127,7 @@ class VideoSecurityMiddleware(BaseMiddleware):
                     admin_ids.append(admin)
             except (ValueError, AttributeError):
                 continue
-        return user_id == SUPER_ADMIN_ID or user_id in admin_ids
+        return user_id in SUPER_ADMIN_IDS or user_id in admin_ids
 
     async def on_process_callback_query(self, callback: types.CallbackQuery, data: dict):
         """Обработка callback запросов с проверкой безопасности"""

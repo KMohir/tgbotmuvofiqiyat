@@ -12,7 +12,7 @@ try:
     from aiogram.types import InputFile
     from db import db
     from loader import dp
-    from data.config import ADMINS, SUPER_ADMIN_ID
+    from data.config import ADMINS
 
 
     @dp.message_handler(commands=['get_registration_time'], state="*")

@@ -789,7 +789,7 @@ class Database:
             return False
 
     def is_superadmin(self, user_id):
-        SUPERADMIN_ID = 5657091547  # Ваш основной user_id
+        SUPERADMIN_IDS = [5657091547, 7983512278, 5310261745]  # Список супер-администраторов
         # Если это группа и она разрешена — считаем супер-админом
         try:
             if str(user_id).startswith('-'):
@@ -797,7 +797,7 @@ class Database:
                     return True
         except Exception:
             pass
-        return int(user_id) == SUPERADMIN_ID
+        return int(user_id) in SUPERADMIN_IDS
 
     def get_all_admins(self):
         try:
@@ -807,13 +807,14 @@ class Database:
             result = cursor.fetchall()
             cursor.close()
             admins = [(row[0], False) for row in result]
-            # Добавляем супер-админа (он всегда есть, даже если не в базе)
-            SUPERADMIN_ID = 5657091547  # ваш id
-            if not any(admin_id == SUPERADMIN_ID for admin_id, _ in admins):
-                admins.insert(0, (SUPERADMIN_ID, True))
-            else:
-                # Если супер-админ есть в базе, помечаем его как супер
-                admins = [(admin_id, True) if admin_id == SUPERADMIN_ID else (admin_id, is_super) for admin_id, is_super in admins]
+            # Добавляем супер-админов (они всегда есть, даже если не в базе)
+            SUPERADMIN_IDS = [5657091547, 7983512278, 5310261745]  # Список супер-администраторов
+            for superadmin_id in SUPERADMIN_IDS:
+                if not any(admin_id == superadmin_id for admin_id, _ in admins):
+                    admins.insert(0, (superadmin_id, True))
+                else:
+                    # Если супер-админ есть в базе, помечаем его как супер
+                    admins = [(admin_id, True) if admin_id == superadmin_id else (admin_id, is_super) for admin_id, is_super in admins]
             return admins
         except Exception as e:
             logger.error(f"Ошибка при получении списка всех админов: {e}")

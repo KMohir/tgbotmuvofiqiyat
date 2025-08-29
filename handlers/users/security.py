@@ -1,38 +1,41 @@
 """
-Обработчики безопасности для регистрации пользователей
+Система безопасности для Telegram бота
 """
 
 import logging
-from datetime import datetime
 from aiogram import types
 from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters import Command
 from loader import dp, bot
 from db import db
-from states import SecurityStates
-from data.config import ADMINS, SUPER_ADMIN_ID
-from keyboards.default.reply import main_menu_keyboard
+from data.config import ADMINS
+from datetime import datetime
+from states.security_states import SecurityStates
 
 logger = logging.getLogger(__name__)
+
+# Список супер-администраторов
+SUPER_ADMIN_IDS = [5657091547, 7983512278, 5310261745]
 
 async def notify_admins_about_registration(user_id: int, name: str, phone: str):
     """Уведомить админов о новой регистрации"""
     try:
         message_text = (
-            "🔐 **Yangi ro'yxatdan o'tish so'rovi**\n\n"
-            f"👤 **Foydalanuvchi**: {name}\n"
+            f"🆕 **Yangi ro'yxatdan o'tish arizasi**\n\n"
+            f"👤 **Ism**: {name}\n"
             f"🆔 **ID**: `{user_id}`\n"
-            f"📱 **Telefon**: {phone}\n\n"
-            "Harakatni tanlang:"
+            f"📱 **Telefon**: {phone}\n"
+            f"📅 **Sana**: {datetime.now().strftime('%d.%m.%Y %H:%M')}\n\n"
+            f"Tasdiqlash yoki rad etish uchun quyidagi tugmalardan birini bosing:"
         )
         
-        keyboard = types.InlineKeyboardMarkup()
+        keyboard = types.InlineKeyboardMarkup(row_width=2)
         keyboard.add(
             types.InlineKeyboardButton("✅ Tasdiqlash", callback_data=f"approve_user_{user_id}"),
             types.InlineKeyboardButton("❌ Rad etish", callback_data=f"deny_user_{user_id}")
         )
         
-        admin_ids = [SUPER_ADMIN_ID]
+        admin_ids = SUPER_ADMIN_IDS
         for admin in ADMINS:
             try:
                 if isinstance(admin, str):
@@ -122,7 +125,7 @@ async def process_approve_user(callback_query: types.CallbackQuery):
     """Обработка одобрения пользователя админом"""
     admin_id = callback_query.from_user.id
     
-    admin_ids = [SUPER_ADMIN_ID]
+    admin_ids = SUPER_ADMIN_IDS.copy()
     for admin in ADMINS:
         try:
             if isinstance(admin, str):
@@ -171,7 +174,7 @@ async def process_deny_user(callback_query: types.CallbackQuery):
     """Обработка отклонения пользователя админом"""
     admin_id = callback_query.from_user.id
     
-    admin_ids = [SUPER_ADMIN_ID]
+    admin_ids = SUPER_ADMIN_IDS.copy()
     for admin in ADMINS:
         try:
             if isinstance(admin, str):
@@ -214,3 +217,12 @@ async def process_deny_user(callback_query: types.CallbackQuery):
     except Exception as e:
         logger.error(f"Foydalanuvchini rad etishda xatolik: {e}")
         await callback_query.answer("❌ Tizim xatoligi", show_alert=True)
+
+def main_menu_keyboard():
+    """Клавиатура главного меню"""
+    keyboard = types.InlineKeyboardMarkup(row_width=2)
+    keyboard.add(
+        types.InlineKeyboardButton("🏢 Centris Towers", callback_data="project_centris"),
+        types.InlineKeyboardButton("🌊 Golden Lake", callback_data="project_golden")
+    )
+    return keyboard

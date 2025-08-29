@@ -16,7 +16,10 @@ from handlers.users.video_scheduler import schedule_single_group_jobs
 logger = logging.getLogger(__name__)
 
 # Импортируем необходимые переменные
-from data.config import ADMINS, SUPER_ADMIN_ID
+from data.config import ADMINS
+
+# Список супер-администраторов
+SUPER_ADMIN_IDS = [5657091547, 7983512278, 5310261745]
 
 logger.info(f"🔄 Регистрируем команды групп в group_video_commands.py, dp ID: {id(dp)}")
 
@@ -32,7 +35,7 @@ async def set_group_video_command(message: types.Message, state: FSMContext):
     
     # Проверяем права пользователя
     user_id = message.from_user.id
-    if user_id not in ADMINS + [SUPER_ADMIN_ID] and not db.is_admin(user_id):
+    if user_id not in ADMINS + SUPER_ADMIN_IDS and not db.is_admin(user_id):
         logger.warning(f"❌ Пользователь {user_id} не имеет прав")
         await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat adminlar foydalana oladi.")
         return
@@ -85,7 +88,7 @@ async def show_group_video_settings(message: types.Message):
         user_id = message.from_user.id
         
         # Проверяем права пользователя
-        if user_id not in ADMINS + [SUPER_ADMIN_ID] and not db.is_admin(user_id):
+        if user_id not in ADMINS + SUPER_ADMIN_IDS and not db.is_admin(user_id):
             logger.warning(f"❌ Пользователь {user_id} не имеет прав")
             await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat adminlar foydalana oladi.")
             return
@@ -191,7 +194,7 @@ async def start_group_video_command(message: types.Message):
         user_id = message.from_user.id
         
         # Проверяем права пользователя
-        if user_id not in ADMINS + [SUPER_ADMIN_ID] and not db.is_admin(user_id):
+        if user_id not in ADMINS + SUPER_ADMIN_IDS and not db.is_admin(user_id):
             logger.warning(f"❌ Пользователь {user_id} не имеет прав")
             await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat adminlar foydalana oladi.")
             return
@@ -267,7 +270,7 @@ async def stop_group_video_command(message: types.Message):
         user_id = message.from_user.id
         
         # Проверяем права пользователя
-        if user_id not in ADMINS + [SUPER_ADMIN_ID] and not db.is_admin(user_id):
+        if user_id not in ADMINS + SUPER_ADMIN_IDS and not db.is_admin(user_id):
             logger.warning(f"❌ Пользователь {user_id} не имеет прав")
             await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat adminlar foydalana oladi.")
             return
@@ -490,7 +493,7 @@ async def add_group_to_whitelist_command(message: types.Message):
         user_id = message.from_user.id
         
         # Проверяем права пользователя (только супер-админ)
-        if user_id != SUPER_ADMIN_ID:
+        if user_id not in SUPER_ADMIN_IDS:
             logger.warning(f"❌ Пользователь {user_id} не имеет прав")
             await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat super admin foydalana oladi.")
             return
@@ -529,7 +532,7 @@ async def remove_group_from_whitelist_command(message: types.Message):
         user_id = message.from_user.id
         
         # Проверяем права пользователя (только супер-админ)
-        if user_id != SUPER_ADMIN_ID:
+        if user_id not in SUPER_ADMIN_IDS:
             logger.warning(f"❌ Пользователь {user_id} не имеет прав")
             await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat super admin foydalana oladi.")
             return
@@ -568,7 +571,7 @@ async def test_group_video_command(message: types.Message):
         user_id = message.from_user.id
         
         # Проверяем права пользователя
-        if user_id not in ADMINS + [SUPER_ADMIN_ID] and not db.is_admin(user_id):
+        if user_id not in ADMINS + SUPER_ADMIN_IDS and not db.is_admin(user_id):
             logger.warning(f"❌ Пользователь {user_id} не имеет прав")
             await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat adminlar foydalana oladi.")
             return
@@ -645,7 +648,7 @@ async def reset_group_video_command(message: types.Message):
         user_id = message.from_user.id
         
         # Проверяем права пользователя
-        if user_id not in ADMINS + [SUPER_ADMIN_ID] and not db.is_admin(user_id):
+        if user_id not in ADMINS + SUPER_ADMIN_IDS and not db.is_admin(user_id):
             logger.warning(f"❌ Пользователь {user_id} не имеет прав")
             await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat adminlar foydalana oladi.")
             return
@@ -697,7 +700,7 @@ async def list_group_videos_command(message: types.Message):
         user_id = message.from_user.id
         
         # Проверяем права пользователя
-        if user_id not in ADMINS + [SUPER_ADMIN_ID] and not db.is_admin(user_id):
+        if user_id not in ADMINS + SUPER_ADMIN_IDS and not db.is_admin(user_id):
             logger.warning(f"❌ Пользователь {user_id} не имеет прав")
             await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat adminlar foydalana oladi.")
             return
@@ -795,7 +798,7 @@ async def next_group_video_command(message: types.Message):
         user_id = message.from_user.id
         
         # Проверяем права пользователя
-        if user_id not in ADMINS + [SUPER_ADMIN_ID] and not db.is_admin(user_id):
+        if user_id not in ADMINS + SUPER_ADMIN_IDS and not db.is_admin(user_id):
             logger.warning(f"❌ Пользователь {user_id} не имеет прав")
             await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat adminlar foydalana oladi.")
             return
@@ -871,7 +874,7 @@ async def skip_group_video_command(message: types.Message):
         user_id = message.from_user.id
         
         # Проверяем права пользователя
-        if user_id not in ADMINS + [SUPER_ADMIN_ID] and not db.is_admin(user_id):
+        if user_id not in ADMINS + SUPER_ADMIN_IDS and not db.is_admin(user_id):
             logger.warning(f"❌ Пользователь {user_id} не имеет прав")
             await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat adminlar foydalana oladi.")
             return
@@ -961,7 +964,7 @@ async def status_group_video_command(message: types.Message):
         user_id = message.from_user.id
         
         # Проверяем права пользователя
-        if user_id not in ADMINS + [SUPER_ADMIN_ID] and not db.is_admin(user_id):
+        if user_id not in ADMINS + SUPER_ADMIN_IDS and not db.is_admin(user_id):
             logger.warning(f"❌ Пользователь {user_id} не имеет прав")
             await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat adminlar foydalana oladi.")
             return
@@ -1068,7 +1071,7 @@ async def force_group_video_command(message: types.Message):
         user_id = message.from_user.id
         
         # Проверяем права пользователя (только супер-админ)
-        if user_id != SUPER_ADMIN_ID:
+        if user_id not in SUPER_ADMIN_IDS:
             logger.warning(f"❌ Пользователь {user_id} не имеет прав")
             await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat super admin foydalana oladi.")
             return
@@ -1154,7 +1157,7 @@ async def schedule_group_video_command(message: types.Message):
         user_id = message.from_user.id
         
         # Проверяем права пользователя
-        if user_id not in ADMINS + [SUPER_ADMIN_ID] and not db.is_admin(user_id):
+        if user_id not in ADMINS + SUPER_ADMIN_IDS and not db.is_admin(user_id):
             logger.warning(f"❌ Пользователь {user_id} не имеет прав")
             await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat adminlar foydalana oladi.")
             return
@@ -1216,7 +1219,7 @@ async def debug_group_video_command(message: types.Message):
         user_id = message.from_user.id
         
         # Проверяем права пользователя (только супер-админ)
-        if user_id != SUPER_ADMIN_ID:
+        if user_id not in SUPER_ADMIN_IDS:
             logger.warning(f"❌ Пользователь {user_id} не имеет прав")
             await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat super admin foydalana oladi.")
             return
@@ -1299,7 +1302,7 @@ async def all_group_commands_command(message: types.Message):
         user_id = message.from_user.id
         
         # Проверяем права пользователя
-        if user_id not in ADMINS + [SUPER_ADMIN_ID] and not db.is_admin(user_id):
+        if user_id not in ADMINS + SUPER_ADMIN_IDS and not db.is_admin(user_id):
             logger.warning(f"❌ Пользователь {user_id} не имеет прав")
             await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat adminlar foydalana oladi.")
             return
@@ -1342,7 +1345,7 @@ async def all_group_commands_command(message: types.Message):
         response += "   • /remove_group_from_whitelist - Whitelist dan olib tashlash\n\n"
         
         # Супер-админ команды
-        if user_id == SUPER_ADMIN_ID:
+        if user_id in SUPER_ADMIN_IDS:
             response += "💪 **SUPER ADMIN BUYRUQLARI:**\n"
             response += "   • /force_group_video - Video majburiy yuborish\n"
             response += "   • /debug_group_video - Debug ma'lumotlari\n"
@@ -1417,7 +1420,7 @@ async def ping_group_video_command(message: types.Message):
         user_id = message.from_user.id
         
         # Проверяем права пользователя
-        if user_id not in ADMINS + [SUPER_ADMIN_ID] and not db.is_admin(user_id):
+        if user_id not in ADMINS + SUPER_ADMIN_IDS and not db.is_admin(user_id):
             logger.warning(f"❌ Пользователь {user_id} не имеет прав")
             await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat adminlar foydalana oladi.")
             return
@@ -1506,7 +1509,7 @@ async def version_group_video_command(message: types.Message):
         user_id = message.from_user.id
         
         # Проверяем права пользователя
-        if user_id not in ADMINS + [SUPER_ADMIN_ID] and not db.is_admin(user_id):
+        if user_id not in ADMINS + SUPER_ADMIN_IDS and not db.is_admin(user_id):
             logger.warning(f"❌ Пользователь {user_id} не имеет прав")
             await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat adminlar foydalana oladi.")
             return
@@ -1591,7 +1594,7 @@ async def stats_group_video_command(message: types.Message):
         user_id = message.from_user.id
         
         # Проверяем права пользователя
-        if user_id not in ADMINS + [SUPER_ADMIN_ID] and not db.is_admin(user_id):
+        if user_id not in ADMINS + SUPER_ADMIN_IDS and not db.is_admin(user_id):
             logger.warning(f"❌ Пользователь {user_id} не имеет прав")
             await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat adminlar foydalana oladi.")
             return
@@ -1701,7 +1704,7 @@ async def cleanup_group_video_command(message: types.Message):
         user_id = message.from_user.id
         
         # Проверяем права пользователя (только супер-админ)
-        if user_id != SUPER_ADMIN_ID:
+        if user_id not in SUPER_ADMIN_IDS:
             logger.warning(f"❌ Пользователь {user_id} не имеет прав")
             await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat super admin foydalana oladi.")
             return
@@ -1782,7 +1785,7 @@ async def backup_group_video_command(message: types.Message):
         user_id = message.from_user.id
         
         # Проверяем права пользователя (только супер-админ)
-        if user_id != SUPER_ADMIN_ID:
+        if user_id not in SUPER_ADMIN_IDS:
             logger.warning(f"❌ Пользователь {user_id} не имеет прав")
             await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat super admin foydalana oladi.")
             return
@@ -1867,7 +1870,7 @@ async def restore_group_video_command(message: types.Message):
         user_id = message.from_user.id
         
         # Проверяем права пользователя (только супер-админ)
-        if user_id != SUPER_ADMIN_ID:
+        if user_id not in SUPER_ADMIN_IDS:
             logger.warning(f"❌ Пользователь {user_id} не имеет прав")
             await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat super admin foydalana oladi.")
             return
@@ -1984,7 +1987,7 @@ async def logs_group_video_command(message: types.Message):
         user_id = message.from_user.id
         
         # Проверяем права пользователя (только супер-админ)
-        if user_id != SUPER_ADMIN_ID:
+        if user_id not in SUPER_ADMIN_IDS:
             logger.warning(f"❌ Пользователь {user_id} не имеет прав")
             await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat super admin foydalana oladi.")
             return
@@ -2062,7 +2065,7 @@ async def monitor_group_video_command(message: types.Message):
         user_id = message.from_user.id
         
         # Проверяем права пользователя (только супер-админ)
-        if user_id != SUPER_ADMIN_ID:
+        if user_id not in SUPER_ADMIN_IDS:
             logger.warning(f"❌ Пользователь {user_id} не имеет прав")
             await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat super admin foydalana oladi.")
             return
@@ -2230,7 +2233,7 @@ async def emergency_group_video_command(message: types.Message):
         user_id = message.from_user.id
         
         # Проверяем права пользователя (только супер-админ)
-        if user_id != SUPER_ADMIN_ID:
+        if user_id not in SUPER_ADMIN_IDS:
             logger.warning(f"❌ Пользователь {user_id} не имеет прав")
             await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat super admin foydalana oladi.")
             return
@@ -2371,7 +2374,7 @@ async def reboot_group_video_command(message: types.Message):
         user_id = message.from_user.id
         
         # Проверяем права пользователя (только супер-админ)
-        if user_id != SUPER_ADMIN_ID:
+        if user_id not in SUPER_ADMIN_IDS:
             logger.warning(f"❌ Пользователь {user_id} не имеет прав")
             await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat super admin foydalana oladi.")
             return
@@ -2499,7 +2502,7 @@ async def info_group_video_command(message: types.Message):
         user_id = message.from_user.id
         
         # Проверяем права пользователя
-        if user_id not in ADMINS + [SUPER_ADMIN_ID] and not db.is_admin(user_id):
+        if user_id not in ADMINS + SUPER_ADMIN_IDS and not db.is_admin(user_id):
             logger.warning(f"❌ Пользователь {user_id} не имеет прав")
             await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat adminlar foydalana oladi.")
             return
@@ -2626,7 +2629,7 @@ async def support_group_video_command(message: types.Message):
         user_id = message.from_user.id
         
         # Проверяем права пользователя
-        if user_id not in ADMINS + [SUPER_ADMIN_ID] and not db.is_admin(user_id):
+        if user_id not in ADMINS + SUPER_ADMIN_IDS and not db.is_admin(user_id):
             logger.warning(f"❌ Пользователь {user_id} не имеет прав")
             await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat adminlar foydalana oladi.")
             return
@@ -2734,7 +2737,7 @@ async def about_group_video_command(message: types.Message):
         user_id = message.from_user.id
         
         # Проверяем права пользователя
-        if user_id not in ADMINS + [SUPER_ADMIN_ID] and not db.is_admin(user_id):
+        if user_id not in ADMINS + SUPER_ADMIN_IDS and not db.is_admin(user_id):
             logger.warning(f"❌ Пользователь {user_id} не имеет прав")
             await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat adminlar foydalana oladi.")
             return
@@ -2877,7 +2880,7 @@ async def credits_group_video_command(message: types.Message):
         user_id = message.from_user.id
         
         # Проверяем права пользователя
-        if user_id not in ADMINS + [SUPER_ADMIN_ID] and not db.is_admin(user_id):
+        if user_id not in ADMINS + SUPER_ADMIN_IDS and not db.is_admin(user_id):
             logger.warning(f"❌ Пользователь {user_id} не имеет прав")
             await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat adminlar foydalana oladi.")
             return
@@ -3019,7 +3022,7 @@ async def donate_group_video_command(message: types.Message):
         user_id = message.from_user.id
         
         # Проверяем права пользователя
-        if user_id not in ADMINS + [SUPER_ADMIN_ID] and not db.is_admin(user_id):
+        if user_id not in ADMINS + SUPER_ADMIN_IDS and not db.is_admin(user_id):
             logger.warning(f"❌ Пользователь {user_id} не имеет прав")
             await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat adminlar foydalana oladi.")
             return
@@ -3153,7 +3156,7 @@ async def changelog_group_video_command(message: types.Message):
         user_id = message.from_user.id
         
         # Проверяем права пользователя
-        if user_id not in ADMINS + [SUPER_ADMIN_ID] and not db.is_admin(user_id):
+        if user_id not in ADMINS + SUPER_ADMIN_IDS and not db.is_admin(user_id):
             logger.warning(f"❌ Пользователь {user_id} не имеет прав")
             await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat adminlar foydalana oladi.")
             return
@@ -3302,7 +3305,7 @@ async def license_group_video_command(message: types.Message):
         user_id = message.from_user.id
         
         # Проверяем права пользователя
-        if user_id not in ADMINS + [SUPER_ADMIN_ID] and not db.is_admin(user_id):
+        if user_id not in ADMINS + SUPER_ADMIN_IDS and not db.is_admin(user_id):
             logger.warning(f"❌ Пользователь {user_id} не имеет прав")
             await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat adminlar foydalana oladi.")
             return
@@ -3436,7 +3439,7 @@ async def privacy_group_video_command(message: types.Message):
         user_id = message.from_user.id
         
         # Проверяем права пользователя
-        if user_id not in ADMINS + [SUPER_ADMIN_ID] and not db.is_admin(user_id):
+        if user_id not in ADMINS + SUPER_ADMIN_IDS and not db.is_admin(user_id):
             logger.warning(f"❌ Пользователь {user_id} не имеет прав")
             await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat adminlar foydalana oladi.")
             return
@@ -3581,7 +3584,7 @@ async def terms_group_video_command(message: types.Message):
         user_id = message.from_user.id
         
         # Проверяем права пользователя
-        if user_id not in ADMINS + [SUPER_ADMIN_ID] and not db.is_admin(user_id):
+        if user_id not in ADMINS + SUPER_ADMIN_IDS and not db.is_admin(user_id):
             logger.warning(f"❌ Пользователь {user_id} не имеет прав")
             await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat adminlar foydalana oladi.")
             return
@@ -4820,7 +4823,7 @@ async def is_admin_or_super_admin(user_id: int) -> bool:
     """
     Проверяет, является ли пользователь админом или супер-админом
     """
-    return user_id in ADMINS or user_id == SUPER_ADMIN_ID or db.is_admin(user_id)
+    return user_id in ADMINS or user_id in SUPER_ADMIN_IDS or db.is_admin(user_id)
 
 # Команда для показа настроек всех групп (только для админов)
 @dp.message_handler(commands=["admin_show_all_groups_settings"])
