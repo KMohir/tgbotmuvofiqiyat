@@ -125,9 +125,19 @@ class Database:
                     golden_season_id INTEGER,            -- ID сезона в базе (не номер!)
                     golden_start_video INTEGER DEFAULT 0,
                     viewed_videos TEXT DEFAULT '[]',
+                    centris_viewed_videos TEXT DEFAULT '[]',  -- Отдельно для Centris
+                    golden_viewed_videos TEXT DEFAULT '[]',   -- Отдельно для Golden Lake
                     is_subscribed INTEGER DEFAULT 1
                 )
             ''')
+            
+            # Миграция: добавляем колонки для отдельного отслеживания просмотренных видео
+            try:
+                cursor.execute("ALTER TABLE group_video_settings ADD COLUMN IF NOT EXISTS centris_viewed_videos TEXT DEFAULT '[]'")
+                cursor.execute("ALTER TABLE group_video_settings ADD COLUMN IF NOT EXISTS golden_viewed_videos TEXT DEFAULT '[]'")
+                logger.info("Миграция: добавлены колонки для отдельного отслеживания просмотренных видео")
+            except Exception as e:
+                logger.error(f"Ошибка при добавлении колонок для отслеживания видео: {e}")
             
             # Проверяем и обновляем структуру существующей таблицы
             cursor.execute('''
@@ -456,6 +466,53 @@ class Database:
                 cursor.close()
         except Exception as e:
             logger.error(f"Ошибка при отметке видео как просмотренного группой {chat_id}: {e}")
+            self.conn.rollback()
+
+    def get_group_viewed_videos_by_project(self, chat_id, project):
+        """Получить просмотренные видео группы для конкретного проекта"""
+        try:
+            cursor = self.conn.cursor()
+            # Используем отдельные колонки для каждого проекта
+            if project == "centris":
+                cursor.execute("SELECT centris_viewed_videos FROM group_video_settings WHERE chat_id = %s", (str(chat_id),))
+            elif project == "golden_lake":
+                cursor.execute("SELECT golden_viewed_videos FROM group_video_settings WHERE chat_id = %s", (str(chat_id),))
+            else:
+                return []
+            
+            result = cursor.fetchone()
+            cursor.close()
+            if result and result[0]:
+                return json.loads(result[0])
+            return []
+        except Exception as e:
+            logger.error(f"Ошибка при получении просмотренных видео группой {chat_id} для проекта {project}: {e}")
+            return []
+
+    def mark_group_video_as_viewed_by_project(self, chat_id, video_position, project):
+        """Отметить видео как просмотренное для конкретного проекта"""
+        try:
+            viewed_videos = self.get_group_viewed_videos_by_project(chat_id, project)
+            if video_position not in viewed_videos:
+                viewed_videos.append(video_position)
+                cursor = self.conn.cursor()
+                
+                if project == "centris":
+                    cursor.execute(
+                        "UPDATE group_video_settings SET centris_viewed_videos = %s WHERE chat_id = %s",
+                        (json.dumps(viewed_videos), str(chat_id))
+                    )
+                elif project == "golden_lake":
+                    cursor.execute(
+                        "UPDATE group_video_settings SET golden_viewed_videos = %s WHERE chat_id = %s",
+                        (json.dumps(viewed_videos), str(chat_id))
+                    )
+                
+                self.conn.commit()
+                cursor.close()
+                logger.info(f"Видео {video_position} отмечено как просмотренное для группы {chat_id}, проект {project}")
+        except Exception as e:
+            logger.error(f"Ошибка при отметке видео как просмотренного группой {chat_id} для проекта {project}: {e}")
             self.conn.rollback()
 
     def get_next_unwatched_group_video_index(self, chat_id, all_videos_count):
