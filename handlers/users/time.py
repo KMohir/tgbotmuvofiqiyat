@@ -6,9 +6,9 @@ try:
     from aiogram.dispatcher import FSMContext
     from aiogram.dispatcher.filters import Command, Text
     from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove
-    from tgbotmuvofiqiyat.loader import dp, bot
-    from tgbotmuvofiqiyat.db import db
-    from tgbotmuvofiqiyat.states import TimeSelection
+    from loader import dp, bot
+    from db import db
+    from states import TimeSelection
     def get_lang_for_button(message):
         button = ReplyKeyboardMarkup(
             keyboard=[

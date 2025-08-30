@@ -6,8 +6,8 @@ try:
 
     from aiogram import types
     from aiogram.dispatcher.filters import Text
-    from tgbotmuvofiqiyat.loader import dp
-    from tgbotmuvofiqiyat.db import db
+    from loader import dp
+    from db import db
 
     @dp.message_handler(Text(equals="FAQ ?"))
     async def unsubscribe(message: types.Message):

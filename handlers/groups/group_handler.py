@@ -1,9 +1,9 @@
 from aiogram import types
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.dispatcher.filters import Command
-from tgbotmuvofiqiyat.data.config import ADMINS, SUPER_ADMIN_ID
-from tgbotmuvofiqiyat.loader import dp
-from tgbotmuvofiqiyat.db import db
+from data.config import ADMINS, SUPER_ADMIN_ID
+from loader import dp
+from db import db
 import logging
 
 # --- Удалены все проверки и действия, связанные с разрешением/запретом групп ---
@@ -163,7 +163,7 @@ async def group_subscribe(message: types.Message):
     user_id = message.from_user.id
     chat_id = message.chat.id
     member = await message.bot.get_chat_member(chat_id, user_id)
-    from tgbotmuvofiqiyat.data.config import ADMINS
+    from data.config import ADMINS
     if member.is_chat_admin() or user_id in ADMINS:
         db.set_subscription_status(chat_id, True)
         await message.reply('Группа успешно подписана на рассылку!')
@@ -175,7 +175,7 @@ async def group_unsubscribe(message: types.Message):
     user_id = message.from_user.id
     chat_id = message.chat.id
     member = await message.bot.get_chat_member(chat_id, user_id)
-    from tgbotmuvofiqiyat.data.config import ADMINS
+    from data.config import ADMINS
     if member.is_chat_admin() or user_id in ADMINS:
         db.set_subscription_status(chat_id, False)
         await message.reply('Группа отписана от рассылки!')
@@ -188,9 +188,9 @@ async def send_test_video(message: types.Message):
     user_id = message.from_user.id
     chat_id = message.chat.id
     member = await message.bot.get_chat_member(chat_id, user_id)
-    from tgbotmuvofiqiyat.data.config import ADMINS
+    from data.config import ADMINS
     if member.is_chat_admin() or user_id in ADMINS:
-        from tgbotmuvofiqiyat.handlers.users.video_scheduler import send_group_video_new
+        from handlers.users.video_scheduler import send_group_video_new
         # Получаем стартовые значения для Centris
         centris_start_season_id, centris_start_video = db.get_group_video_start(chat_id, 'centris')
         golden_start_season_id, golden_start_video = db.get_group_video_start(chat_id, 'golden')
@@ -211,7 +211,7 @@ async def send_test_video(message: types.Message):
 @dp.message_handler(Command('migrate_group_video_settings'), chat_type=[types.ChatType.GROUP, types.ChatType.SUPERGROUP])
 async def migrate_group_video_settings(message: types.Message):
     user_id = message.from_user.id
-    from tgbotmuvofiqiyat.data.config import ADMINS
+    from data.config import ADMINS
     if user_id not in ADMINS:
         await message.reply('Только супер-админ может использовать эту команду.')
         return
@@ -260,7 +260,7 @@ async def show_group_video_settings_command(message: types.Message):
         user_id = message.from_user.id
         
         # Проверяем права пользователя
-        from tgbotmuvofiqiyat.data.config import ADMINS
+        from data.config import ADMINS
         if user_id not in ADMINS:
             await message.reply('❌ Только супер-админ может использовать эту команду.')
             return
@@ -335,7 +335,7 @@ async def show_group_video_settings_command(message: types.Message):
 @dp.message_handler(Command('set_centr_season'), chat_type=[types.ChatType.GROUP, types.ChatType.SUPERGROUP])
 async def set_centr_season(message: types.Message):
     user_id = message.from_user.id
-    from tgbotmuvofiqiyat.data.config import ADMINS
+    from data.config import ADMINS
     if user_id not in ADMINS:
         await message.reply('Только супер-админ может использовать эту команду.')
         return
@@ -350,7 +350,7 @@ async def set_centr_season(message: types.Message):
 @dp.message_handler(Command('set_golden_season'), chat_type=[types.ChatType.GROUP, types.ChatType.SUPERGROUP])
 async def set_golden_season(message: types.Message):
     user_id = message.from_user.id
-    from tgbotmuvofiqiyat.data.config import ADMINS
+    from data.config import ADMINS
     if user_id not in ADMINS:
         await message.reply('Только супер-админ может использовать эту команду.')
         return
@@ -383,7 +383,7 @@ async def unban_all_groups_command(message: types.Message):
 async def debug_video_sending(message: types.Message):
     """Диагностика проблем с отправкой видео"""
     user_id = message.from_user.id
-    from tgbotmuvofiqiyat.data.config import ADMINS
+    from data.config import ADMINS
     if user_id not in ADMINS:
         await message.reply('Только супер-админ может использовать эту команду.')
         return
@@ -404,7 +404,7 @@ async def debug_video_sending(message: types.Message):
     viewed_videos = db.get_group_viewed_videos(chat_id)
     
     # Проверяем планировщик
-    from tgbotmuvofiqiyat.handlers.users.video_scheduler import scheduler
+    from handlers.users.video_scheduler import scheduler
     jobs = scheduler.get_jobs()
     group_jobs = [job for job in jobs if job.id.startswith(f"group_") and str(chat_id) in job.id]
     
@@ -437,13 +437,13 @@ async def debug_video_sending(message: types.Message):
 async def restart_scheduler_command(message: types.Message):
     """Принудительный перезапуск планировщика видео"""
     user_id = message.from_user.id
-    from tgbotmuvofiqiyat.data.config import ADMINS
+    from data.config import ADMINS
     if user_id not in ADMINS:
         await message.reply('Только супер-админ может использовать эту команду.')
         return
     
     try:
-        from tgbotmuvofiqiyat.handlers.users.video_scheduler import schedule_group_jobs, scheduler
+        from handlers.users.video_scheduler import schedule_group_jobs, scheduler
         
         # Перезапускаем планировщик
         if scheduler.running:
@@ -476,7 +476,7 @@ async def restart_scheduler_command(message: types.Message):
 async def test_video_sending_command(message: types.Message):
     """Тестовая отправка видео в группу"""
     user_id = message.from_user.id
-    from tgbotmuvofiqiyat.data.config import ADMINS
+    from data.config import ADMINS
     if user_id not in ADMINS:
         await message.reply('Только супер-админ может использовать эту команду.')
         return
@@ -484,7 +484,7 @@ async def test_video_sending_command(message: types.Message):
     chat_id = message.chat.id
     
     try:
-        from tgbotmuvofiqiyat.handlers.users.video_scheduler import send_group_video_new
+        from handlers.users.video_scheduler import send_group_video_new
         
         # Проверяем whitelist
         if not db.is_group_whitelisted(chat_id):

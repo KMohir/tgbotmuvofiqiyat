@@ -7,10 +7,10 @@ try:
     from aiogram.dispatcher import FSMContext
     from aiogram.dispatcher.filters.builtin import CommandStart
     from aiogram.types import ParseMode, Message, ReplyKeyboardRemove
-    from tgbotmuvofiqiyat.db import db
-    from tgbotmuvofiqiyat.keyboards.default.reply import key, get_lang_for_button
-    from tgbotmuvofiqiyat.loader import dp, bot
-    from tgbotmuvofiqiyat.states import RegistrationStates
+    from db import db
+    from keyboards.default.reply import key, get_lang_for_button
+    from loader import dp, bot
+    from states import RegistrationStates
 
     # Настройка логирования
     logger = logging.getLogger(__name__)

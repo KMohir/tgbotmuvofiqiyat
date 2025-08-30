@@ -1,12 +1,12 @@
 from aiogram import executor
-from tgbotmuvofiqiyat.loader import dp
-import tgbotmuvofiqiyat.middlewares as middlewares
-import tgbotmuvofiqiyat.filters as filters
-import tgbotmuvofiqiyat.handlers as handlers
-from tgbotmuvofiqiyat.utils.misc.set_bot_commands import set_default_commands
-from tgbotmuvofiqiyat.utils.notify_admins import on_startup_notify
-from tgbotmuvofiqiyat.handlers.users.video_scheduler import scheduler, init_scheduler
-from tgbotmuvofiqiyat.db import db
+from loader import dp
+import middlewares
+import filters
+import handlers
+from utils.misc.set_bot_commands import set_default_commands
+from utils.notify_admins import on_startup_notify
+from handlers.users.video_scheduler import scheduler, init_scheduler
+from db import db
 import logging
 
 # Настройка логирования
@@ -29,7 +29,7 @@ logging.getLogger('utils').setLevel(logging.INFO)
 db.create_tables()  # Автоматически создать все таблицы, если их нет
 
 # Явно импортируем модуль команд групп для их регистрации
-import tgbotmuvofiqiyat.handlers.users.group_video_commands
+import handlers.users.group_video_commands
 
 async def on_startup(dispatcher):
     # Установить команды бота

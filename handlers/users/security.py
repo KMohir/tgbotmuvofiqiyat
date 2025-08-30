@@ -6,11 +6,11 @@ import logging
 from aiogram import types
 from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters import Command
-from tgbotmuvofiqiyat.loader import dp, bot
-from tgbotmuvofiqiyat.db import db
-from tgbotmuvofiqiyat.data.config import ADMINS
+from loader import dp, bot
+from db import db
+from data.config import ADMINS
 from datetime import datetime
-from tgbotmuvofiqiyat.states.security_states import SecurityStates
+from states.security_states import SecurityStates
 
 logger = logging.getLogger(__name__)
 
@@ -61,16 +61,16 @@ async def security_start_registration(message: types.Message, state: FSMContext)
     security_status = db.get_user_security_status(user_id)
     
     if security_status == 'approved':
-        await message.answer("🎬 **Centris Towers & Golden Lake Botiga xush kelibsiz!**\n\nO'zingizga yoqqan loyihani tanlang:", reply_markup=main_menu_keyboard())
+        await message.answer("🎬 **Centris Towers & Golden Lake Botiga xush kelibsiz!**\n\nO'zingizga yoqqan loyihani tanlang:", reply_markup=main_menu_keyboard(), parse_mode="Markdown")
         await state.finish()
     elif security_status == 'pending':
-        await message.answer("⏳ **Sizning arizangiz ko'rib chiqilmoqda**\n\nAdministrator hali sizning arizangizni ko'rib chiqmagan.\nIltimos, tasdiqlashni kuting.")
+        await message.answer("⏳ **Sizning arizangiz ko'rib chiqilmoqda**\n\nAdministrator hali sizning arizangizni ko'rib chiqmagan.\nIltimos, tasdiqlashni kuting.", parse_mode="Markdown")
         await state.finish()
     elif security_status == 'denied':
-        await message.answer("❌ **Kirish taqiqlangan**\n\nSizning arizangiz administrator tomonidan rad etildi.\nMa'lumot olish uchun qo'llab-quvvatlash xizmatiga murojaat qiling.")
+        await message.answer("❌ **Kirish taqiqlangan**\n\nSizning arizangiz administrator tomonidan rad etildi.\nMa'lumot olish uchun qo'llab-quvvatlash xizmatiga murojaat qiling.", parse_mode="Markdown")
         await state.finish()
     else:
-        await message.answer("🔐 **Tizimda ro'yxatdan o'tish**\n\nBotga kirish uchun ro'yxatdan o'tish kerak.\n\n**1-qadam, 2 tadan**\n📝 Ismingizni kiriting:")
+        await message.answer("🔐 **Tizimda ro'yxatdan o'tish**\n\nBotga kirish uchun ro'yxatdan o'tish kerak.\n\n**1-qadam, 2 tadan**\n📝 Ismingizni kiriting:", parse_mode="Markdown")
         await SecurityStates.waiting_name.set()
 
 @dp.message_handler(state=SecurityStates.waiting_name, chat_type=types.ChatType.PRIVATE)
@@ -79,15 +79,15 @@ async def process_registration_name(message: types.Message, state: FSMContext):
     name = message.text.strip()
     
     if len(name) < 2:
-        await message.answer("❌ **Ism juda qisqa**\n\nIltimos, to'g'ri ism kiriting (kamida 2 ta belgi):")
+        await message.answer("❌ **Ism juda qisqa**\n\nIltimos, to'g'ri ism kiriting (kamida 2 ta belgi):", parse_mode="Markdown")
         return
         
     if len(name) > 100:
-        await message.answer("❌ **Ism juda uzun**\n\nIltimos, 100 belgidan kam bo'lgan ism kiriting:")
+        await message.answer("❌ **Ism juda uzun**\n\nIltimos, 100 belgidan kam bo'lgan ism kiriting:", parse_mode="Markdown")
         return
     
     await state.update_data(name=name)
-    await message.answer(f"✅ **Ism saqlandi**: {name}\n\n**2-qadam, 2 tadan**\n📱 Telefon raqamingizni kiriting:")
+    await message.answer(f"✅ **Ism saqlandi**: {name}\n\n**2-qadam, 2 tadan**\n📱 Telefon raqamingizni kiriting:", parse_mode="Markdown")
     await SecurityStates.waiting_phone.set()
 
 @dp.message_handler(state=SecurityStates.waiting_phone, chat_type=types.ChatType.PRIVATE)
@@ -96,11 +96,11 @@ async def process_registration_phone(message: types.Message, state: FSMContext):
     phone = message.text.strip()
     
     if len(phone) < 9:
-        await message.answer("❌ **Telefon raqami noto'g'ri**\n\nIltimos, to'g'ri telefon raqamini kiriting:")
+        await message.answer("❌ **Telefon raqami noto'g'ri**\n\nIltimos, to'g'ri telefon raqamini kiriting:", parse_mode="Markdown")
         return
         
     if len(phone) > 20:
-        await message.answer("❌ **Telefon raqami juda uzun**\n\nIltimos, 20 belgidan kam raqam kiriting:")
+        await message.answer("❌ **Telefon raqami juda uzun**\n\nIltimos, 20 belgidan kam raqam kiriting:", parse_mode="Markdown")
         return
     
     data = await state.get_data()
@@ -114,7 +114,7 @@ async def process_registration_phone(message: types.Message, state: FSMContext):
                         f"📱 **Telefon**: {phone}\n\n" +
                         "⏳ **Sizning arizangiz ko'rib chiqilish uchun yuborildi**\n\n" +
                         "Administrator sizning arizangizni yaqin vaqtda ko'rib chiqadi.\n" +
-                        "Qaror haqida xabar olasiz.")
+                        "Qaror haqida xabar olasiz.", parse_mode="Markdown")
     
     await notify_admins_about_registration(user_id, name, phone)
     await state.finish()

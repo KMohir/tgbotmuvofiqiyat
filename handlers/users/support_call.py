@@ -6,16 +6,16 @@ try:
     from aiogram.dispatcher.filters import Command, Text
     from aiogram.types import ReplyKeyboardRemove
 
-    from tgbotmuvofiqiyat.data.config import support_ids
-    from tgbotmuvofiqiyat.db import db
-    from tgbotmuvofiqiyat.keyboards.default.reply import get_lang_for_button
-    from tgbotmuvofiqiyat.keyboards.inline.support import support_keyboard, support_callback, cancel_support_callback
-    from tgbotmuvofiqiyat.loader import dp, bot
-    from tgbotmuvofiqiyat.states import RegistrationStates
+    from data.config import support_ids
+    from db import db
+    from keyboards.default.reply import get_lang_for_button
+    from keyboards.inline.support import support_keyboard, support_callback, cancel_support_callback
+    from loader import dp, bot
+    from states import RegistrationStates
     from aiogram import types
     from aiogram.dispatcher.filters import Text
-    from tgbotmuvofiqiyat.loader import dp, bot
-    from tgbotmuvofiqiyat.db import db
+    from loader import dp, bot
+    from db import db
 
     @dp.message_handler(Text(equals=["/takliflar", "Takliflarni yuborish"]))
     async def ask_support(message: types.Message, state: FSMContext):

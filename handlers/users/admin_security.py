@@ -5,9 +5,9 @@
 import logging
 from aiogram import types
 from aiogram.dispatcher.filters import Command
-from tgbotmuvofiqiyat.loader import dp
-from tgbotmuvofiqiyat.db import db
-from tgbotmuvofiqiyat.data.config import ADMINS, SUPER_ADMIN_ID
+from loader import dp
+from db import db
+from data.config import ADMINS, SUPER_ADMIN_ID
 from datetime import datetime
 
 logger = logging.getLogger(__name__)

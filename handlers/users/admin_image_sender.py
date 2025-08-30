@@ -1,8 +1,8 @@
 from datetime import datetime, timedelta
 import logging
-from tgbotmuvofiqiyat.handlers.users.group_video_states import GroupVideoStates
-from tgbotmuvofiqiyat.handlers.users.video_lists import VIDEO_LIST_1, VIDEO_LIST_2, VIDEO_LIST_3, VIDEO_LIST_4, VIDEO_LIST_5, VIDEO_LIST_GOLDEN_1
-from tgbotmuvofiqiyat.data.config import ADMINS, SUPER_ADMIN_ID
+from handlers.users.group_video_states import GroupVideoStates
+from handlers.users.video_lists import VIDEO_LIST_1, VIDEO_LIST_2, VIDEO_LIST_3, VIDEO_LIST_4, VIDEO_LIST_5, VIDEO_LIST_GOLDEN_1
+from data.config import ADMINS, SUPER_ADMIN_ID
 
 # Настройка логирования
 logger = logging.getLogger(__name__)
@@ -13,8 +13,8 @@ try:
     from aiogram.dispatcher.filters.builtin import Command
     from aiogram.types import MediaGroup
     import asyncio
-    from tgbotmuvofiqiyat.db import db
-    from tgbotmuvofiqiyat.loader import dp, bot
+    from db import db
+    from loader import dp, bot
     print("dp в admin_image_sender.py:", id(dp))
     from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
     from aiogram.dispatcher.filters.state import State, StatesGroup
@@ -123,7 +123,7 @@ try:
                 db.reset_group_viewed_videos(chat_id)
             
             # Планируем задачи
-            from tgbotmuvofiqiyat.handlers.users.video_scheduler import schedule_group_jobs
+            from handlers.users.video_scheduler import schedule_group_jobs
             schedule_group_jobs()
             
             logger.info(f"Группа {chat_id}: настройки сохранены - Centris: {centris_enabled}, Golden: {golden_enabled}")
@@ -409,7 +409,7 @@ try:
             
             # ДОПОЛНИТЕЛЬНО: Принудительно очищаем кэш для гарантии
             try:
-                from tgbotmuvofiqiyat.handlers.users.video_selector import clear_season_keyboard_cache
+                from handlers.users.video_selector import clear_season_keyboard_cache
                 logger.info(f"Дополнительная принудительная очистка кэша для проекта {project}")
                 clear_season_keyboard_cache(project)
                 logger.info(f"✅ Дополнительная очистка кэша завершена для проекта {project}")
@@ -430,7 +430,7 @@ try:
             
             # ОБНОВЛЯЕМ ГЛАВНОЕ МЕНЮ для всех активных чатов
             try:
-                from tgbotmuvofiqiyat.handlers.users.video_selector import force_update_main_menu
+                from handlers.users.video_selector import force_update_main_menu
                 logger.info("🔄 Принудительно обновляем главное меню для всех активных чатов...")
                 
                 # Принудительно обновляем главное меню
@@ -495,7 +495,7 @@ try:
         Команда для принудительного обновления клавиатуры сезонов во всех активных чатах
         """
         try:
-            from tgbotmuvofiqiyat.handlers.users.video_selector import clear_season_keyboard_cache
+            from handlers.users.video_selector import clear_season_keyboard_cache
             
             # Очищаем кэш для всех проектов
             clear_season_keyboard_cache()
@@ -513,7 +513,7 @@ try:
         Команда для просмотра статуса кэша клавиатуры сезонов
         """
         try:
-            from tgbotmuvofiqiyat.handlers.users.video_selector import _season_keyboard_cache, _cache_timestamp
+            from handlers.users.video_selector import _season_keyboard_cache, _cache_timestamp
             import time
             
             current_time = time.time()
@@ -545,7 +545,7 @@ try:
         Команда для тестирования системы кэширования и отображения сезонов
         """
         try:
-            from tgbotmuvofiqiyat.handlers.users.video_selector import get_season_keyboard, clear_season_keyboard_cache, _season_keyboard_cache, _cache_timestamp
+            from handlers.users.video_selector import get_season_keyboard, clear_season_keyboard_cache, _season_keyboard_cache, _cache_timestamp
             
             logger.info("=== НАЧАЛО ТЕСТИРОВАНИЯ КЭША ===")
             
@@ -617,7 +617,7 @@ try:
         Команда для принудительной синхронизации всех клавиатур с базой данных
         """
         try:
-            from tgbotmuvofiqiyat.handlers.users.video_selector import clear_season_keyboard_cache, get_season_keyboard
+            from handlers.users.video_selector import clear_season_keyboard_cache, get_season_keyboard
             
             logger.info("=== НАЧАЛО sync_keyboards ===")
             
@@ -681,7 +681,7 @@ try:
             
             # Проверяем, можем ли мы импортировать модуль
             try:
-                from tgbotmuvofiqiyat.handlers.users.video_selector import _season_keyboard_cache, _cache_timestamp
+                from handlers.users.video_selector import _season_keyboard_cache, _cache_timestamp
                 await message.answer("✅ Модуль video_selector импортирован успешно")
                 
                 if not _season_keyboard_cache:
@@ -716,7 +716,7 @@ try:
         Команда для мгновенного обновления клавиатуры в текущем чате
         """
         try:
-            from tgbotmuvofiqiyat.handlers.users.video_selector import get_season_keyboard
+            from handlers.users.video_selector import get_season_keyboard
             
             logger.info("=== НАЧАЛО instant_refresh ===")
             
@@ -763,7 +763,7 @@ try:
         Команда для принудительного обновления клавиатуры сезонов в текущем чате
         """
         try:
-            from tgbotmuvofiqiyat.handlers.users.video_selector import get_season_keyboard, clear_season_keyboard_cache
+            from handlers.users.video_selector import get_season_keyboard, clear_season_keyboard_cache
             
             logger.info("=== НАЧАЛО force_refresh_seasons ===")
             
@@ -1271,7 +1271,7 @@ try:
             
             # Импортируем функцию напрямую из БД
             try:
-                from tgbotmuvofiqiyat.db import db
+                from db import db
                 
                 # Получаем сезоны напрямую из БД
                 centris_seasons = db.get_seasons_by_project("centris")
@@ -1293,7 +1293,7 @@ try:
                 
                 # Теперь принудительно очищаем кэш
                 try:
-                    from tgbotmuvofiqiyat.handlers.users.video_selector import clear_season_keyboard_cache
+                    from handlers.users.video_selector import clear_season_keyboard_cache
                     clear_season_keyboard_cache()
                     await message.answer("✅ Кэш очищен! Теперь выберите проект в главном меню.")
                 except Exception as e:
@@ -1315,7 +1315,7 @@ try:
             
             # Проверяем, можем ли мы импортировать модуль
             try:
-                from tgbotmuvofiqiyat.handlers.users.video_selector import _season_keyboard_cache, _cache_timestamp
+                from handlers.users.video_selector import _season_keyboard_cache, _cache_timestamp
                 await message.answer("✅ Модуль video_selector импортирован успешно")
                 
                 if not _season_keyboard_cache:
@@ -1350,7 +1350,7 @@ try:
         Команда для мгновенного обновления клавиатуры в текущем чате
         """
         try:
-            from tgbotmuvofiqiyat.handlers.users.video_selector import get_season_keyboard
+            from handlers.users.video_selector import get_season_keyboard
             
             logger.info("=== НАЧАЛО instant_refresh ===")
             
@@ -1397,7 +1397,7 @@ try:
         Команда для принудительного обновления клавиатуры сезонов в текущем чате
         """
         try:
-            from tgbotmuvofiqiyat.handlers.users.video_selector import get_season_keyboard, clear_season_keyboard_cache
+            from handlers.users.video_selector import get_season_keyboard, clear_season_keyboard_cache
             
             logger.info("=== НАЧАЛО force_refresh_seasons ===")
             
@@ -1905,7 +1905,7 @@ try:
             
             # Импортируем функцию напрямую из БД
             try:
-                from tgbotmuvofiqiyat.db import db
+                from db import db
                 
                 # Получаем сезоны напрямую из БД
                 centris_seasons = db.get_seasons_by_project("centris")
@@ -1927,7 +1927,7 @@ try:
                 
                 # Теперь принудительно очищаем кэш
                 try:
-                    from tgbotmuvofiqiyat.handlers.users.video_selector import clear_season_keyboard_cache
+                    from handlers.users.video_selector import clear_season_keyboard_cache
                     clear_season_keyboard_cache()
                     await message.answer("✅ Кэш очищен! Теперь выберите проект в главном меню.")
                 except Exception as e:
@@ -1949,7 +1949,7 @@ try:
             
             # Проверяем, можем ли мы импортировать модуль
             try:
-                from tgbotmuvofiqiyat.handlers.users.video_selector import _season_keyboard_cache, _cache_timestamp
+                from handlers.users.video_selector import _season_keyboard_cache, _cache_timestamp
                 await message.answer("✅ Модуль video_selector импортирован успешно")
                 
                 if not _season_keyboard_cache:
@@ -1984,7 +1984,7 @@ try:
         Команда для мгновенного обновления клавиатуры в текущем чате
         """
         try:
-            from tgbotmuvofiqiyat.handlers.users.video_selector import get_season_keyboard
+            from handlers.users.video_selector import get_season_keyboard
             
             logger.info("=== НАЧАЛО instant_refresh ===")
             
@@ -2031,7 +2031,7 @@ try:
         Команда для принудительного обновления клавиатуры сезонов в текущем чате
         """
         try:
-            from tgbotmuvofiqiyat.handlers.users.video_selector import get_season_keyboard, clear_season_keyboard_cache
+            from handlers.users.video_selector import get_season_keyboard, clear_season_keyboard_cache
             
             logger.info("=== НАЧАЛО force_refresh_seasons ===")
             
@@ -2539,7 +2539,7 @@ try:
             
             # Импортируем функцию напрямую из БД
             try:
-                from tgbotmuvofiqiyat.db import db
+                from db import db
                 
                 # Получаем сезоны напрямую из БД
                 centris_seasons = db.get_seasons_by_project("centris")
@@ -2561,7 +2561,7 @@ try:
                 
                 # Теперь принудительно очищаем кэш
                 try:
-                    from tgbotmuvofiqiyat.handlers.users.video_selector import clear_season_keyboard_cache
+                    from handlers.users.video_selector import clear_season_keyboard_cache
                     clear_season_keyboard_cache()
                     await message.answer("✅ Кэш очищен! Теперь выберите проект в главном меню.")
                 except Exception as e:
@@ -2583,7 +2583,7 @@ try:
             
             # Проверяем, можем ли мы импортировать модуль
             try:
-                from tgbotmuvofiqiyat.handlers.users.video_selector import _season_keyboard_cache, _cache_timestamp
+                from handlers.users.video_selector import _season_keyboard_cache, _cache_timestamp
                 await message.answer("✅ Модуль video_selector импортирован успешно")
                 
                 if not _season_keyboard_cache:
@@ -2618,7 +2618,7 @@ try:
         Команда для мгновенного обновления клавиатуры в текущем чате
         """
         try:
-            from tgbotmuvofiqiyat.handlers.users.video_selector import get_season_keyboard
+            from handlers.users.video_selector import get_season_keyboard
             
             logger.info("=== НАЧАЛО instant_refresh ===")
             
@@ -2665,7 +2665,7 @@ try:
         Команда для принудительного обновления клавиатуры сезонов в текущем чате
         """
         try:
-            from tgbotmuvofiqiyat.handlers.users.video_selector import get_season_keyboard, clear_season_keyboard_cache
+            from handlers.users.video_selector import get_season_keyboard, clear_season_keyboard_cache
             
             logger.info("=== НАЧАЛО force_refresh_seasons ===")
             
@@ -3173,7 +3173,7 @@ try:
             
             # Импортируем функцию напрямую из БД
             try:
-                from tgbotmuvofiqiyat.db import db
+                from db import db
                 
                 # Получаем сезоны напрямую из БД
                 centris_seasons = db.get_seasons_by_project("centris")
@@ -3195,7 +3195,7 @@ try:
                 
                 # Теперь принудительно очищаем кэш
                 try:
-                    from tgbotmuvofiqiyat.handlers.users.video_selector import clear_season_keyboard_cache
+                    from handlers.users.video_selector import clear_season_keyboard_cache
                     clear_season_keyboard_cache()
                     await message.answer("✅ Кэш очищен! Теперь выберите проект в главном меню.")
                 except Exception as e:
@@ -3217,7 +3217,7 @@ try:
             
             # Проверяем, можем ли мы импортировать модуль
             try:
-                from tgbotmuvofiqiyat.handlers.users.video_selector import _season_keyboard_cache, _cache_timestamp
+                from handlers.users.video_selector import _season_keyboard_cache, _cache_timestamp
                 await message.answer("✅ Модуль video_selector импортирован успешно")
                 
                 if not _season_keyboard_cache:
@@ -3252,7 +3252,7 @@ try:
         Команда для мгновенного обновления клавиатуры в текущем чате
         """
         try:
-            from tgbotmuvofiqiyat.handlers.users.video_selector import get_season_keyboard
+            from handlers.users.video_selector import get_season_keyboard
             
             logger.info("=== НАЧАЛО instant_refresh ===")
             
@@ -3299,7 +3299,7 @@ try:
         Команда для принудительного обновления клавиатуры сезонов в текущем чате
         """
         try:
-            from tgbotmuvofiqiyat.handlers.users.video_selector import get_season_keyboard, clear_season_keyboard_cache
+            from handlers.users.video_selector import get_season_keyboard, clear_season_keyboard_cache
             
             logger.info("=== НАЧАЛО force_refresh_seasons ===")
             
@@ -3807,7 +3807,7 @@ try:
             
             # Импортируем функцию напрямую из БД
             try:
-                from tgbotmuvofiqiyat.db import db
+                from db import db
                 
                 # Получаем сезоны напрямую из БД
                 centris_seasons = db.get_seasons_by_project("centris")
@@ -3829,7 +3829,7 @@ try:
                 
                 # Теперь принудительно очищаем кэш
                 try:
-                    from tgbotmuvofiqiyat.handlers.users.video_selector import clear_season_keyboard_cache
+                    from handlers.users.video_selector import clear_season_keyboard_cache
                     clear_season_keyboard_cache()
                     await message.answer("✅ Кэш очищен! Теперь выберите проект в главном меню.")
                 except Exception as e:
@@ -3851,7 +3851,7 @@ try:
             
             # Проверяем, можем ли мы импортировать модуль
             try:
-                from tgbotmuvofiqiyat.handlers.users.video_selector import _season_keyboard_cache, _cache_timestamp
+                from handlers.users.video_selector import _season_keyboard_cache, _cache_timestamp
                 await message.answer("✅ Модуль video_selector импортирован успешно")
                 
                 if not _season_keyboard_cache:
@@ -3886,7 +3886,7 @@ try:
         Команда для мгновенного обновления клавиатуры в текущем чате
         """
         try:
-            from tgbotmuvofiqiyat.handlers.users.video_selector import get_season_keyboard
+            from handlers.users.video_selector import get_season_keyboard
             
             logger.info("=== НАЧАЛО instant_refresh ===")
             
@@ -3933,7 +3933,7 @@ try:
         Команда для принудительного обновления клавиатуры сезонов в текущем чате
         """
         try:
-            from tgbotmuvofiqiyat.handlers.users.video_selector import get_season_keyboard, clear_season_keyboard_cache
+            from handlers.users.video_selector import get_season_keyboard, clear_season_keyboard_cache
             
             logger.info("=== НАЧАЛО force_refresh_seasons ===")
             
@@ -4441,7 +4441,7 @@ try:
             
             # Импортируем функцию напрямую из БД
             try:
-                from tgbotmuvofiqiyat.db import db
+                from db import db
                 
                 # Получаем сезоны напрямую из БД
                 centris_seasons = db.get_seasons_by_project("centris")
@@ -4463,7 +4463,7 @@ try:
                 
                 # Теперь принудительно очищаем кэш
                 try:
-                    from tgbotmuvofiqiyat.handlers.users.video_selector import clear_season_keyboard_cache
+                    from handlers.users.video_selector import clear_season_keyboard_cache
                     clear_season_keyboard_cache()
                     await message.answer("✅ Кэш очищен! Теперь выберите проект в главном меню.")
                 except Exception as e:
@@ -4485,7 +4485,7 @@ try:
             
             # Проверяем, можем ли мы импортировать модуль
             try:
-                from tgbotmuvofiqiyat.handlers.users.video_selector import _season_keyboard_cache, _cache_timestamp
+                from handlers.users.video_selector import _season_keyboard_cache, _cache_timestamp
                 await message.answer("✅ Модуль video_selector импортирован успешно")
                 
                 if not _season_keyboard_cache:
@@ -4520,7 +4520,7 @@ try:
         Команда для мгновенного обновления клавиатуры в текущем чате
         """
         try:
-            from tgbotmuvofiqiyat.handlers.users.video_selector import get_season_keyboard
+            from handlers.users.video_selector import get_season_keyboard
             
             logger.info("=== НАЧАЛО instant_refresh ===")
             
@@ -4567,7 +4567,7 @@ try:
         Команда для принудительного обновления клавиатуры сезонов в текущем чате
         """
         try:
-            from tgbotmuvofiqiyat.handlers.users.video_selector import get_season_keyboard, clear_season_keyboard_cache
+            from handlers.users.video_selector import get_season_keyboard, clear_season_keyboard_cache
             
             logger.info("=== НАЧАЛО force_refresh_seasons ===")
             
@@ -5075,7 +5075,7 @@ try:
             
             # Импортируем функцию напрямую из БД
             try:
-                from tgbotmuvofiqiyat.db import db
+                from db import db
                 
                 # Получаем сезоны напрямую из БД
                 centris_seasons = db.get_seasons_by_project("centris")
@@ -5097,7 +5097,7 @@ try:
                 
                 # Теперь принудительно очищаем кэш
                 try:
-                    from tgbotmuvofiqiyat.handlers.users.video_selector import clear_season_keyboard_cache
+                    from handlers.users.video_selector import clear_season_keyboard_cache
                     clear_season_keyboard_cache()
                     await message.answer("✅ Кэш очищен! Теперь выберите проект в главном меню.")
                 except Exception as e:
@@ -5119,7 +5119,7 @@ try:
             
             # Проверяем, можем ли мы импортировать модуль
             try:
-                from tgbotmuvofiqiyat.handlers.users.video_selector import _season_keyboard_cache, _cache_timestamp
+                from handlers.users.video_selector import _season_keyboard_cache, _cache_timestamp
                 await message.answer("✅ Модуль video_selector импортирован успешно")
                 
                 if not _season_keyboard_cache:
@@ -5154,7 +5154,7 @@ try:
         Команда для мгновенного обновления клавиатуры в текущем чате
         """
         try:
-            from tgbotmuvofiqiyat.handlers.users.video_selector import get_season_keyboard
+            from handlers.users.video_selector import get_season_keyboard
             
             logger.info("=== НАЧАЛО instant_refresh ===")
             
@@ -5201,7 +5201,7 @@ try:
         Команда для принудительного обновления клавиатуры сезонов в текущем чате
         """
         try:
-            from tgbotmuvofiqiyat.handlers.users.video_selector import get_season_keyboard, clear_season_keyboard_cache
+            from handlers.users.video_selector import get_season_keyboard, clear_season_keyboard_cache
             
             logger.info("=== НАЧАЛО force_refresh_seasons ===")
             
@@ -5709,7 +5709,7 @@ try:
             
             # Импортируем функцию напрямую из БД
             try:
-                from tgbotmuvofiqiyat.db import db
+                from db import db
                 
                 # Получаем сезоны напрямую из БД
                 centris_seasons = db.get_seasons_by_project("centris")
@@ -5731,7 +5731,7 @@ try:
                 
                 # Теперь принудительно очищаем кэш
                 try:
-                    from tgbotmuvofiqiyat.handlers.users.video_selector import clear_season_keyboard_cache
+                    from handlers.users.video_selector import clear_season_keyboard_cache
                     clear_season_keyboard_cache()
                     await message.answer("✅ Кэш очищен! Теперь выберите проект в главном меню.")
                 except Exception as e:
@@ -5753,7 +5753,7 @@ try:
             
             # Проверяем, можем ли мы импортировать модуль
             try:
-                from tgbotmuvofiqiyat.handlers.users.video_selector import _season_keyboard_cache, _cache_timestamp
+                from handlers.users.video_selector import _season_keyboard_cache, _cache_timestamp
                 await message.answer("✅ Модуль video_selector импортирован успешно")
                 
                 if not _season_keyboard_cache:
@@ -5788,7 +5788,7 @@ try:
         Команда для мгновенного обновления клавиатуры в текущем чате
         """
         try:
-            from tgbotmuvofiqiyat.handlers.users.video_selector import get_season_keyboard
+            from handlers.users.video_selector import get_season_keyboard
             
             logger.info("=== НАЧАЛО instant_refresh ===")
             
@@ -5835,7 +5835,7 @@ try:
         Команда для принудительного обновления клавиатуры сезонов в текущем чате
         """
         try:
-            from tgbotmuvofiqiyat.handlers.users.video_selector import get_season_keyboard, clear_season_keyboard_cache
+            from handlers.users.video_selector import get_season_keyboard, clear_season_keyboard_cache
             
             logger.info("=== НАЧАЛО force_refresh_seasons ===")
             
@@ -6122,7 +6122,7 @@ async def update_main_menu_command(message: types.Message):
     Команда для принудительного обновления главного меню
     """
     try:
-        from tgbotmuvofiqiyat.handlers.users.video_selector import force_update_main_menu
+        from handlers.users.video_selector import force_update_main_menu
         
         logger.info("🔄 Принудительное обновление главного меню...")
         
@@ -6157,7 +6157,7 @@ async def check_menu_sync_command(message: types.Message):
     Команда для проверки синхронизации главного меню с базой данных
     """
     try:
-        from tgbotmuvofiqiyat.handlers.users.video_selector import get_main_menu_keyboard
+        from handlers.users.video_selector import get_main_menu_keyboard
         
         logger.info("🔍 Проверка синхронизации главного меню с БД...")
         
@@ -6220,7 +6220,7 @@ async def update_season_keyboards_for_all_chats(project):
     """Обновляет клавиатуры сезонов для всех активных чатов после добавления нового сезона"""
     logger.info(f'=== НАЧАЛО update_season_keyboards_for_all_chats для проекта {project} ===')
     try:
-        from tgbotmuvofiqiyat.handlers.users.video_selector import clear_season_keyboard_cache
+        from handlers.users.video_selector import clear_season_keyboard_cache
         clear_season_keyboard_cache(project)
         logger.info(f'✅ Кэш клавиатуры сезонов очищен для проекта {project}')
     except Exception as e:

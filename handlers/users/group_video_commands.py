@@ -2,21 +2,21 @@ import asyncio
 from aiogram import types
 from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters import Command
-from tgbotmuvofiqiyat.handlers import groups
-from tgbotmuvofiqiyat.db import db
-from tgbotmuvofiqiyat.loader import dp
+from handlers import groups
+from db import db
+from loader import dp
 import logging
 from datetime import datetime
 
 # Импортируем состояния
-from tgbotmuvofiqiyat.handlers.users.group_video_states import GroupVideoStates
-from tgbotmuvofiqiyat.handlers.users.video_scheduler import schedule_single_group_jobs
+from handlers.users.group_video_states import GroupVideoStates
+from handlers.users.video_scheduler import schedule_single_group_jobs
 
 # Настройка логирования
 logger = logging.getLogger(__name__)
 
 # Импортируем необходимые переменные
-from tgbotmuvofiqiyat.data.config import ADMINS
+from data.config import ADMINS
 
 # Список супер-администраторов
 SUPER_ADMIN_IDS = [5657091547, 7983512278, 5310261745]
@@ -37,7 +37,7 @@ async def set_group_video_command(message: types.Message, state: FSMContext):
     user_id = message.from_user.id
     if user_id not in ADMINS + SUPER_ADMIN_IDS and not db.is_admin(user_id):
         logger.warning(f"❌ Пользователь {user_id} не имеет прав")
-        await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat adminlar foydalana oladi.")
+        await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat adminlar foydalana oladi.", parse_mode="Markdown")
         return
     
     logger.info(f"✅ Пользователь {user_id} имеет права")
@@ -57,8 +57,7 @@ async def set_group_video_command(message: types.Message, state: FSMContext):
         await message.answer(
             "📹 **GURUH UCHUN VIDEO TARQATISH SOZLAMALARI**\n\n"
             "🏢 **Loyihani tanlang:**",
-            reply_markup=get_project_keyboard(),
-            parse_mode="Markdown"
+            reply_markup=get_project_keyboard()
         )
     else:
         logger.info("⚠️ Это не группа, отправляем личное меню")
@@ -66,8 +65,7 @@ async def set_group_video_command(message: types.Message, state: FSMContext):
         await message.answer(
             "📹 **VIDEO TARQATISH SOZLAMALARI**\n\n"
             "🏢 **Loyihani tanlang:**",
-            reply_markup=get_project_keyboard(),
-            parse_mode="Markdown"
+            reply_markup=get_project_keyboard()
         )
     
     await state.set_state(GroupVideoStates.waiting_for_project.state)
@@ -90,7 +88,7 @@ async def show_group_video_settings(message: types.Message):
         # Проверяем права пользователя
         if user_id not in ADMINS + SUPER_ADMIN_IDS and not db.is_admin(user_id):
             logger.warning(f"❌ Пользователь {user_id} не имеет прав")
-            await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat adminlar foydalana oladi.")
+            await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat adminlar foydalana oladi.", parse_mode="Markdown")
             return
         
         logger.info(f"✅ Пользователь {user_id} имеет права")
@@ -110,7 +108,7 @@ async def show_group_video_settings(message: types.Message):
                 "📹 **GURUH VIDEO SOZLAMALARI**\n\n"
                 "❌ **Hech qanday sozlamalar topilmadi!**\n\n"
                 "Video tarqatishni yoqish uchun /set_group_video buyrug'ini ishlating."
-            )
+            , parse_mode="Markdown")
             return
         
         # Получаем стартовые позиции
@@ -190,7 +188,7 @@ async def process_time_selection(callback_query: types.CallbackQuery, state: FSM
         temp_settings = data.get("temp_settings")
         
         if not temp_settings:
-            await callback_query.message.edit_text("❌ **Xatolik!**\n\nSozlamalar topilmadi. Qaytadan boshlang.")
+            await callback_query.message.edit_text("❌ **Xatolik!**\n\nSozlamalar topilmadi. Qaytadan boshlang.", parse_mode="Markdown")
             await state.finish()
             return
         
@@ -223,7 +221,7 @@ async def process_time_selection(callback_query: types.CallbackQuery, state: FSM
                 "Vaqtlarni HH:MM formatida kiriting, vergul bilan ajrating.\n"
                 "Masalan: 09:00, 15:00, 21:00\n\n"
                 "📝 **Eslatma:** Maksimal 5 ta vaqt kiritish mumkin."
-            )
+            , parse_mode="Markdown")
             await state.set_state(GroupVideoStates.waiting_for_send_times.state)
             await callback_query.answer()
             return
@@ -272,7 +270,7 @@ async def process_time_selection(callback_query: types.CallbackQuery, state: FSM
                 f"  📺 Sezon: {golden_season_name if saved_settings['golden_enabled'] else 'N/A'}\n"
                 f"  🎥 Video: {saved_settings['golden_start_video'] + 1 if saved_settings['golden_enabled'] else 'N/A'}\n\n"
                 f"⏰ **Yuborish vaqtlari:** {send_times_str}"
-            )
+            , parse_mode="Markdown")
             await state.finish()
             return
         
@@ -286,8 +284,7 @@ async def process_time_selection(callback_query: types.CallbackQuery, state: FSM
             f"• Centris: {'✅' if temp_settings.get('project') in ['centris', 'both'] else '❌'}\n"
             f"• Golden: {'✅' if temp_settings.get('project') in ['golden', 'both'] else '❌'}\n\n"
             f"⏰ **Tanlangan vaqt:** {current_times_str}",
-            reply_markup=get_time_selection_keyboard(),
-            parse_mode="Markdown"
+            reply_markup=get_time_selection_keyboard()
         )
         await state.update_data(temp_settings=temp_settings)
         
@@ -304,7 +301,7 @@ async def process_custom_time_input(message: types.Message, state: FSMContext):
         temp_settings = data.get("temp_settings")
         
         if not temp_settings:
-            await message.answer("❌ **Xatolik!**\n\nSozlamalar topilmadi. Qaytadan boshlang.")
+            await message.answer("❌ **Xatolik!**\n\nSozlamalar topilmadi. Qaytadan boshlang.", parse_mode="Markdown")
             await state.finish()
             return
         
@@ -329,16 +326,17 @@ async def process_custom_time_input(message: types.Message, state: FSMContext):
                 await message.answer(
                     f"❌ **Noto'g'ri vaqt formati:** {time_part}\n\n"
                     "Vaqtni HH:MM formatida kiriting (masalan: 09:30)\n"
-                    "Barcha vaqtlarni vergul bilan ajrating."
+                    "Barcha vaqtlarni vergul bilan ajrating.",
+                    parse_mode="Markdown"
                 )
                 return
         
         if len(valid_times) == 0:
-            await message.answer("❌ **Hech qanday to'g'ri vaqt topilmadi!**")
+            await message.answer("❌ **Hech qanday to'g'ri vaqt topilmadi!**", parse_mode="Markdown")
             return
             
         if len(valid_times) > 5:
-            await message.answer("❌ **Maksimal 5 ta vaqt kiritish mumkin!**")
+            await message.answer("❌ **Maksimal 5 ta vaqt kiritish mumkin!**", parse_mode="Markdown")
             return
         
         # Сохраняем времена
@@ -350,8 +348,7 @@ async def process_custom_time_input(message: types.Message, state: FSMContext):
             f"✅ **Maxsus vaqtlar tanlandi!**\n\n"
             f"⏰ **Vaqtlar:** {times_str}\n\n"
             f"Sozlamalarni saqlash uchun \"✅ Tayyor\" tugmasini bosing.",
-            reply_markup=get_time_selection_keyboard(),
-            parse_mode="Markdown"
+            reply_markup=get_time_selection_keyboard()
         )
         await state.update_data(temp_settings=temp_settings)
         
@@ -375,7 +372,7 @@ async def start_group_video_command(message: types.Message):
         # Проверяем права пользователя
         if user_id not in ADMINS + SUPER_ADMIN_IDS and not db.is_admin(user_id):
             logger.warning(f"❌ Пользователь {user_id} не имеет прав")
-            await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat adminlar foydalana oladi.")
+            await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat adminlar foydalana oladi.", parse_mode="Markdown")
             return
         
         logger.info(f"✅ Пользователь {user_id} имеет права")
@@ -395,7 +392,7 @@ async def start_group_video_command(message: types.Message):
                 "📹 **GURUH VIDEO SOZLAMALARI**\n\n"
                 "❌ **Hech qanday sozlamalar topilmadi!**\n\n"
                 "Video tarqatishni yoqish uchun /set_group_video buyrug'ini ishlating."
-            )
+            , parse_mode="Markdown")
             return
         
         # Проверяем что группа в whitelist
@@ -403,11 +400,11 @@ async def start_group_video_command(message: types.Message):
             await message.answer(
                 "🔒 **GURUH WHITELIST DA EMAS!**\n\n"
                 "Video yuborish uchun guruh whitelist ga qo'shilishi kerak."
-            )
+            , parse_mode="Markdown")
             return
         
         # Запускаем отправку видео
-        from tgbotmuvofiqiyat.handlers.users.video_scheduler import send_group_video_new
+        from handlers.users.video_scheduler import send_group_video_new
         
         centris_enabled = settings[0]
         golden_enabled = settings[4]
@@ -427,9 +424,9 @@ async def start_group_video_command(message: types.Message):
                 sent = sent or result
         
         if sent:
-            await message.answer("✅ **Video yuborildi!**\n\n🎬 Keyingi video avtomatik ravishda yuboriladi.")
+            await message.answer("✅ **Video yuborildi!**\n\n🎬 Keyingi video avtomatik ravishda yuboriladi.", parse_mode="Markdown")
         else:
-            await message.answer("⚠️ **Hech qanday yangi video topilmadi!**\n\nBarcha video allaqachon yuborilgan.")
+            await message.answer("⚠️ **Hech qanday yangi video topilmadi!**\n\nBarcha video allaqachon yuborilgan.", parse_mode="Markdown")
         
     except Exception as e:
         logger.error(f"Ошибка при запуске видео в группе: {e}")
@@ -451,7 +448,7 @@ async def stop_group_video_command(message: types.Message):
         # Проверяем права пользователя
         if user_id not in ADMINS + SUPER_ADMIN_IDS and not db.is_admin(user_id):
             logger.warning(f"❌ Пользователь {user_id} не имеет прав")
-            await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat adminlar foydalana oladi.")
+            await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat adminlar foydalana oladi.", parse_mode="Markdown")
             return
         
         logger.info(f"✅ Пользователь {user_id} имеет права")
@@ -468,7 +465,7 @@ async def stop_group_video_command(message: types.Message):
         db.set_group_video_settings(chat_id, False, None, 0, False, None, 0)
         
         # Удаляем запланированные задачи для этой группы
-        from tgbotmuvofiqiyat.handlers.users.video_scheduler import scheduler
+        from handlers.users.video_scheduler import scheduler
         jobs_to_remove = []
         for job in scheduler.get_jobs():
             if job.id.startswith(f"group_") and str(chat_id) in job.id:
@@ -478,7 +475,7 @@ async def stop_group_video_command(message: types.Message):
             scheduler.remove_job(job_id)
             logger.info(f"Удалена задача {job_id} для группы {chat_id}")
         
-        await message.answer("⏹️ **Avtomatik video yuborish to'xtatildi!**\n\nVideo yuborishni qayta yoqish uchun /set_group_video buyrug'ini ishlating.")
+        await message.answer("⏹️ **Avtomatik video yuborish to'xtatildi!**\n\nVideo yuborishni qayta yoqish uchun /set_group_video buyrug'ini ishlating.", parse_mode="Markdown")
         
     except Exception as e:
         logger.error(f"Ошибка при остановке видео в группе: {e}")
@@ -674,7 +671,7 @@ async def add_group_to_whitelist_command(message: types.Message):
         # Проверяем права пользователя (только супер-админ)
         if user_id not in SUPER_ADMIN_IDS:
             logger.warning(f"❌ Пользователь {user_id} не имеет прав")
-            await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat super admin foydalana oladi.")
+            await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat super admin foydalana oladi.", parse_mode="Markdown")
             return
         
         logger.info(f"✅ Пользователь {user_id} имеет права")
@@ -689,9 +686,9 @@ async def add_group_to_whitelist_command(message: types.Message):
         
         # Добавляем группу в whitelist
         if db.add_group_to_whitelist(chat_id):
-            await message.answer("✅ **Guruh whitelist ga qo'shildi!**\n\n🔓 Endi video yuborish mumkin.")
+            await message.answer("✅ **Guruh whitelist ga qo'shildi!**\n\n🔓 Endi video yuborish mumkin.", parse_mode="Markdown")
         else:
-            await message.answer("❌ **Xatolik yuz berdi!**\n\nGuruh whitelist ga qo'shilmadi.")
+            await message.answer("❌ **Xatolik yuz berdi!**\n\nGuruh whitelist ga qo'shilmadi.", parse_mode="Markdown")
         
     except Exception as e:
         logger.error(f"Ошибка при добавлении группы в whitelist: {e}")
@@ -713,7 +710,7 @@ async def remove_group_from_whitelist_command(message: types.Message):
         # Проверяем права пользователя (только супер-админ)
         if user_id not in SUPER_ADMIN_IDS:
             logger.warning(f"❌ Пользователь {user_id} не имеет прав")
-            await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat super admin foydalana oladi.")
+            await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat super admin foydalana oladi.", parse_mode="Markdown")
             return
         
         logger.info(f"✅ Пользователь {user_id} имеет права")
@@ -728,9 +725,9 @@ async def remove_group_from_whitelist_command(message: types.Message):
         
         # Удаляем группу из whitelist
         if db.remove_group_from_whitelist(chat_id):
-            await message.answer("❌ **Guruh whitelist dan olib tashlandi!**\n\n🔒 Endi video yuborish mumkin emas.")
+            await message.answer("❌ **Guruh whitelist dan olib tashlandi!**\n\n🔒 Endi video yuborish mumkin emas.", parse_mode="Markdown")
         else:
-            await message.answer("⚠️ **Guruh whitelist da emas edi!**")
+            await message.answer("⚠️ **Guruh whitelist da emas edi!**", parse_mode="Markdown")
         
     except Exception as e:
         logger.error(f"Ошибка при удалении группы из whitelist: {e}")
@@ -752,7 +749,7 @@ async def test_group_video_command(message: types.Message):
         # Проверяем права пользователя
         if user_id not in ADMINS + SUPER_ADMIN_IDS and not db.is_admin(user_id):
             logger.warning(f"❌ Пользователь {user_id} не имеет прав")
-            await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat adminlar foydalana oladi.")
+            await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat adminlar foydalana oladi.", parse_mode="Markdown")
             return
         
         logger.info(f"✅ Пользователь {user_id} имеет права")
@@ -772,7 +769,7 @@ async def test_group_video_command(message: types.Message):
                 "📹 **GURUH VIDEO SOZLAMALARI**\n\n"
                 "❌ **Hech qanday sozlamalar topilmadi!**\n\n"
                 "Video tarqatishni yoqish uchun /set_group_video buyrug'ini ishlating."
-            )
+            , parse_mode="Markdown")
             return
         
         # Проверяем что группа в whitelist
@@ -780,11 +777,11 @@ async def test_group_video_command(message: types.Message):
             await message.answer(
                 "🔒 **GURUH WHITELIST DA EMAS!**\n\n"
                 "Video yuborish uchun guruh whitelist ga qo'shilishi kerak."
-            )
+            , parse_mode="Markdown")
             return
         
         # Тестируем отправку видео
-        from tgbotmuvofiqiyat.handlers.users.video_scheduler import send_group_video_new
+        from handlers.users.video_scheduler import send_group_video_new
         
         centris_enabled = settings[0]
         golden_enabled = settings[4]
@@ -807,7 +804,7 @@ async def test_group_video_command(message: types.Message):
             response = "🧪 **TEST NATIJALARI:**\n\n" + "\n".join(test_results)
             await message.answer(response, parse_mode="Markdown")
         else:
-            await message.answer("⚠️ **Hech qanday faol loyiha topilmadi!**")
+            await message.answer("⚠️ **Hech qanday faol loyiha topilmadi!**", parse_mode="Markdown")
         
     except Exception as e:
         logger.error(f"Ошибка при тестировании видео в группе: {e}")
@@ -829,7 +826,7 @@ async def reset_group_video_command(message: types.Message):
         # Проверяем права пользователя
         if user_id not in ADMINS + SUPER_ADMIN_IDS and not db.is_admin(user_id):
             logger.warning(f"❌ Пользователь {user_id} не имеет прав")
-            await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat adminlar foydalana oladi.")
+            await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat adminlar foydalana oladi.", parse_mode="Markdown")
             return
         
         logger.info(f"✅ Пользователь {user_id} имеет права")
@@ -849,7 +846,7 @@ async def reset_group_video_command(message: types.Message):
         db.reset_group_viewed_videos(chat_id)
         
         # Удаляем запланированные задачи для этой группы
-        from tgbotmuvofiqiyat.handlers.users.video_scheduler import scheduler
+        from handlers.users.video_scheduler import scheduler
         jobs_to_remove = []
         for job in scheduler.get_jobs():
             if job.id.startswith(f"group_") and str(chat_id) in job.id:
@@ -859,7 +856,7 @@ async def reset_group_video_command(message: types.Message):
             scheduler.remove_job(job_id)
             logger.info(f"Удалена задача {job_id} для группы {chat_id}")
         
-        await message.answer("🔄 **Guruh video sozlamalari qayta o'rnatildi!**\n\nVideo yuborishni qayta yoqish uchun /set_group_video buyrug'ini ishlating.")
+        await message.answer("🔄 **Guruh video sozlamalari qayta o'rnatildi!**\n\nVideo yuborishni qayta yoqish uchun /set_group_video buyrug'ini ishlating.", parse_mode="Markdown")
         
     except Exception as e:
         logger.error(f"Ошибка при сбросе настроек группы: {e}")
@@ -881,7 +878,7 @@ async def list_group_videos_command(message: types.Message):
         # Проверяем права пользователя
         if user_id not in ADMINS + SUPER_ADMIN_IDS and not db.is_admin(user_id):
             logger.warning(f"❌ Пользователь {user_id} не имеет прав")
-            await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat adminlar foydalana oladi.")
+            await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat adminlar foydalana oladi.", parse_mode="Markdown")
             return
         
         logger.info(f"✅ Пользователь {user_id} имеет права")
@@ -901,7 +898,7 @@ async def list_group_videos_command(message: types.Message):
                 "📹 **GURUH VIDEO SOZLAMALARI**\n\n"
                 "❌ **Hech qanday sozlamalar topilmadi!**\n\n"
                 "Video tarqatishni yoqish uchun /set_group_video buyrug'ini ishlating."
-            )
+            , parse_mode="Markdown")
             return
         
         # Формируем список видео
@@ -979,7 +976,7 @@ async def next_group_video_command(message: types.Message):
         # Проверяем права пользователя
         if user_id not in ADMINS + SUPER_ADMIN_IDS and not db.is_admin(user_id):
             logger.warning(f"❌ Пользователь {user_id} не имеет прав")
-            await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat adminlar foydalana oladi.")
+            await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat adminlar foydalana oladi.", parse_mode="Markdown")
             return
         
         logger.info(f"✅ Пользователь {user_id} имеет права")
@@ -999,7 +996,7 @@ async def next_group_video_command(message: types.Message):
                 "📹 **GURUH VIDEO SOZLAMALARI**\n\n"
                 "❌ **Hech qanday sozlamalar topilmadi!**\n\n"
                 "Video tarqatishni yoqish uchun /set_group_video buyrug'ini ishlating."
-            )
+            , parse_mode="Markdown")
             return
         
         # Проверяем что группа в whitelist
@@ -1007,11 +1004,11 @@ async def next_group_video_command(message: types.Message):
             await message.answer(
                 "🔒 **GURUH WHITELIST DA EMAS!**\n\n"
                 "Video yuborish uchun guruh whitelist ga qo'shilishi kerak."
-            )
+            , parse_mode="Markdown")
             return
         
         # Отправляем следующее видео
-        from tgbotmuvofiqiyat.handlers.users.video_scheduler import send_group_video_new
+        from handlers.users.video_scheduler import send_group_video_new
         
         centris_enabled = settings[0]
         golden_enabled = settings[4]
@@ -1031,9 +1028,9 @@ async def next_group_video_command(message: types.Message):
                 sent = sent or result
         
         if sent:
-            await message.answer("✅ **Keyingi video yuborildi!**\n\n🎬 Avtomatik yuborish davom etadi.")
+            await message.answer("✅ **Keyingi video yuborildi!**\n\n🎬 Avtomatik yuborish davom etadi.", parse_mode="Markdown")
         else:
-            await message.answer("⚠️ **Hech qanday yangi video topilmadi!**\n\nBarcha video allaqachon yuborilgan.")
+            await message.answer("⚠️ **Hech qanday yangi video topilmadi!**\n\nBarcha video allaqachon yuborilgan.", parse_mode="Markdown")
         
     except Exception as e:
         logger.error(f"Ошибка при отправке следующего видео в группе: {e}")
@@ -1055,7 +1052,7 @@ async def skip_group_video_command(message: types.Message):
         # Проверяем права пользователя
         if user_id not in ADMINS + SUPER_ADMIN_IDS and not db.is_admin(user_id):
             logger.warning(f"❌ Пользователь {user_id} не имеет прав")
-            await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat adminlar foydalana oladi.")
+            await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat adminlar foydalana oladi.", parse_mode="Markdown")
             return
         
         logger.info(f"✅ Пользователь {user_id} имеет права")
@@ -1075,7 +1072,7 @@ async def skip_group_video_command(message: types.Message):
                 "📹 **GURUH VIDEO SOZLAMALARI**\n\n"
                 "❌ **Hech qanday sozlamalar topilmadi!**\n\n"
                 "Video tarqatishni yoqish uchun /set_group_video buyrug'ini ishlating."
-            )
+            , parse_mode="Markdown")
             return
         
         # Проверяем что группа в whitelist
@@ -1083,7 +1080,7 @@ async def skip_group_video_command(message: types.Message):
             await message.answer(
                 "🔒 **GURUH WHITELIST DA EMAS!**\n\n"
                 "Video yuborish uchun guruh whitelist ga qo'shilishi kerak."
-            )
+            , parse_mode="Markdown")
             return
         
         # Пропускаем текущее видео (отмечаем как просмотренное)
@@ -1121,9 +1118,9 @@ async def skip_group_video_command(message: types.Message):
                         break
         
         if skipped:
-            await message.answer("⏭️ **Video o'tkazib yuborildi!**\n\n🎬 Keyingi video avtomatik ravishda yuboriladi.")
+            await message.answer("⏭️ **Video o'tkazib yuborildi!**\n\n🎬 Keyingi video avtomatik ravishda yuboriladi.", parse_mode="Markdown")
         else:
-            await message.answer("⚠️ **Hech qanday video o'tkazib yuborilmadi!**\n\nBarcha video allaqachon ko'rilgan.")
+            await message.answer("⚠️ **Hech qanday video o'tkazib yuborilmadi!**\n\nBarcha video allaqachon ko'rilgan.", parse_mode="Markdown")
         
     except Exception as e:
         logger.error(f"Ошибка при пропуске видео в группе: {e}")
@@ -1145,7 +1142,7 @@ async def status_group_video_command(message: types.Message):
         # Проверяем права пользователя
         if user_id not in ADMINS + SUPER_ADMIN_IDS and not db.is_admin(user_id):
             logger.warning(f"❌ Пользователь {user_id} не имеет прав")
-            await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat adminlar foydalana oladi.")
+            await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat adminlar foydalana oladi.", parse_mode="Markdown")
             return
         
         logger.info(f"✅ Пользователь {user_id} имеет права")
@@ -1165,7 +1162,7 @@ async def status_group_video_command(message: types.Message):
                 "📹 **GURUH VIDEO SOZLAMALARI**\n\n"
                 "❌ **Hech qanday sozlamalar topilmadi!**\n\n"
                 "Video tarqatishni yoqish uchun /set_group_video buyrug'ini ishlating."
-            )
+            , parse_mode="Markdown")
             return
         
         # Формируем статус
@@ -1252,7 +1249,7 @@ async def force_group_video_command(message: types.Message):
         # Проверяем права пользователя (только супер-админ)
         if user_id not in SUPER_ADMIN_IDS:
             logger.warning(f"❌ Пользователь {user_id} не имеет прав")
-            await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat super admin foydalana oladi.")
+            await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat super admin foydalana oladi.", parse_mode="Markdown")
             return
         
         logger.info(f"✅ Пользователь {user_id} имеет права")
@@ -1272,11 +1269,11 @@ async def force_group_video_command(message: types.Message):
                 "📹 **GURUH VIDEO SOZLAMALARI**\n\n"
                 "❌ **Hech qanday sozlamalar topilmadi!**\n\n"
                 "Video tarqatishni yoqish uchun /set_group_video buyrug'ini ishlating."
-            )
+            , parse_mode="Markdown")
             return
         
         # Принудительно отправляем видео (игнорируем whitelist)
-        from tgbotmuvofiqiyat.handlers.users.video_scheduler import send_group_video_new
+        from handlers.users.video_scheduler import send_group_video_new
         
         centris_enabled = settings[0]
         golden_enabled = settings[4]
@@ -1314,9 +1311,9 @@ async def force_group_video_command(message: types.Message):
                     db.remove_group_from_whitelist(chat_id)
         
         if sent:
-            await message.answer("✅ **Video majburiy yuborildi!**\n\n🎬 Video yuborish muvaffaqiyatli.")
+            await message.answer("✅ **Video majburiy yuborildi!**\n\n🎬 Video yuborish muvaffaqiyatli.", parse_mode="Markdown")
         else:
-            await message.answer("⚠️ **Hech qanday yangi video topilmadi!**\n\nBarcha video allaqachon yuborilgan.")
+            await message.answer("⚠️ **Hech qanday yangi video topilmadi!**\n\nBarcha video allaqachon yuborilgan.", parse_mode="Markdown")
         
     except Exception as e:
         logger.error(f"Ошибка при принудительной отправке видео в группе: {e}")
@@ -1338,7 +1335,7 @@ async def schedule_group_video_command(message: types.Message):
         # Проверяем права пользователя
         if user_id not in ADMINS + SUPER_ADMIN_IDS and not db.is_admin(user_id):
             logger.warning(f"❌ Пользователь {user_id} не имеет прав")
-            await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat adminlar foydalana oladi.")
+            await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat adminlar foydalana oladi.", parse_mode="Markdown")
             return
         
         logger.info(f"✅ Пользователь {user_id} имеет права")
@@ -1358,14 +1355,14 @@ async def schedule_group_video_command(message: types.Message):
                 "📹 **GURUH VIDEO SOZLAMALARI**\n\n"
                 "❌ **Hech qanday sozlamalar topilmadi!**\n\n"
                 "Video tarqatishni yoqish uchun /set_group_video buyrug'ini ishlating."
-            )
+            , parse_mode="Markdown")
             return
         
         # Перепланируем задачи
-        from tgbotmuvofiqiyat.handlers.users.video_scheduler import schedule_group_jobs
+        from handlers.users.video_scheduler import schedule_group_jobs
         
         # Удаляем старые задачи для этой группы
-        from tgbotmuvofiqiyat.handlers.users.video_scheduler import scheduler
+        from handlers.users.video_scheduler import scheduler
         jobs_to_remove = []
         for job in scheduler.get_jobs():
             if job.id.startswith(f"group_") and str(chat_id) in job.id:
@@ -1378,7 +1375,7 @@ async def schedule_group_video_command(message: types.Message):
         # Создаем новые задачи
         schedule_group_jobs()
         
-        await message.answer("🔄 **Guruh video vazifalari qayta rejalashtirildi!**\n\n⏰ Avtomatik yuborish vaqti yangilandi.")
+        await message.answer("🔄 **Guruh video vazifalari qayta rejalashtirildi!**\n\n⏰ Avtomatik yuborish vaqti yangilandi.", parse_mode="Markdown")
         
     except Exception as e:
         logger.error(f"Ошибка при перепланировании задач группы: {e}")
@@ -1400,7 +1397,7 @@ async def debug_group_video_command(message: types.Message):
         # Проверяем права пользователя (только супер-админ)
         if user_id not in SUPER_ADMIN_IDS:
             logger.warning(f"❌ Пользователь {user_id} не имеет прав")
-            await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat super admin foydalana oladi.")
+            await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat super admin foydalana oladi.", parse_mode="Markdown")
             return
         
         logger.info(f"✅ Пользователь {user_id} имеет права")
@@ -1447,7 +1444,7 @@ async def debug_group_video_command(message: types.Message):
             response += f"   • Pozitsiyalar: {sorted(viewed_videos)[:10]}{'...' if len(viewed_videos) > 10 else ''}\n"
         
         # Запланированные задачи
-        from tgbotmuvofiqiyat.handlers.users.video_scheduler import scheduler
+        from handlers.users.video_scheduler import scheduler
         group_jobs = [job for job in scheduler.get_jobs() if job.id.startswith(f"group_") and str(chat_id) in job.id]
         response += f"⏰ **REJALANGAN VAZIFALAR:** {len(group_jobs)} ta\n"
         for job in group_jobs:
@@ -1483,7 +1480,7 @@ async def all_group_commands_command(message: types.Message):
         # Проверяем права пользователя
         if user_id not in ADMINS + SUPER_ADMIN_IDS and not db.is_admin(user_id):
             logger.warning(f"❌ Пользователь {user_id} не имеет прав")
-            await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat adminlar foydalana oladi.")
+            await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat adminlar foydalana oladi.", parse_mode="Markdown")
             return
         
         logger.info(f"✅ Пользователь {user_id} имеет права")
@@ -1601,7 +1598,7 @@ async def ping_group_video_command(message: types.Message):
         # Проверяем права пользователя
         if user_id not in ADMINS + SUPER_ADMIN_IDS and not db.is_admin(user_id):
             logger.warning(f"❌ Пользователь {user_id} не имеет прав")
-            await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat adminlar foydalana oladi.")
+            await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat adminlar foydalana oladi.", parse_mode="Markdown")
             return
         
         logger.info(f"✅ Пользователь {user_id} имеет права")
@@ -1621,7 +1618,7 @@ async def ping_group_video_command(message: types.Message):
         
         # Проверка планировщика
         try:
-            from tgbotmuvofiqiyat.handlers.users.video_scheduler import scheduler
+            from handlers.users.video_scheduler import scheduler
             jobs = scheduler.get_jobs()
             response += f"⏰ **REJALANGAN VAZIFALAR:** ✅ {len(jobs)} ta\n"
         except Exception as e:
@@ -1690,7 +1687,7 @@ async def version_group_video_command(message: types.Message):
         # Проверяем права пользователя
         if user_id not in ADMINS + SUPER_ADMIN_IDS and not db.is_admin(user_id):
             logger.warning(f"❌ Пользователь {user_id} не имеет прав")
-            await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat adminlar foydalana oladi.")
+            await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat adminlar foydalana oladi.", parse_mode="Markdown")
             return
         
         logger.info(f"✅ Пользователь {user_id} имеет права")
@@ -1775,7 +1772,7 @@ async def stats_group_video_command(message: types.Message):
         # Проверяем права пользователя
         if user_id not in ADMINS + SUPER_ADMIN_IDS and not db.is_admin(user_id):
             logger.warning(f"❌ Пользователь {user_id} не имеет прав")
-            await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat adminlar foydalana oladi.")
+            await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat adminlar foydalana oladi.", parse_mode="Markdown")
             return
         
         logger.info(f"✅ Пользователь {user_id} имеет права")
@@ -1831,7 +1828,7 @@ async def stats_group_video_command(message: types.Message):
             response += f"   • Jami videolar: {total_videos}\n\n"
             
             # Статистика планировщика
-            from tgbotmuvofiqiyat.handlers.users.video_scheduler import scheduler
+            from handlers.users.video_scheduler import scheduler
             jobs = scheduler.get_jobs()
             group_jobs = [job for job in jobs if job.id.startswith("group_")]
             centris_jobs = [job for job in group_jobs if "centris" in job.id]
@@ -1885,7 +1882,7 @@ async def cleanup_group_video_command(message: types.Message):
         # Проверяем права пользователя (только супер-админ)
         if user_id not in SUPER_ADMIN_IDS:
             logger.warning(f"❌ Пользователь {user_id} не имеет прав")
-            await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat super admin foydalana oladi.")
+            await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat super admin foydalana oladi.", parse_mode="Markdown")
             return
         
         logger.info(f"✅ Пользователь {user_id} имеет права")
@@ -1895,7 +1892,7 @@ async def cleanup_group_video_command(message: types.Message):
         
         try:
             # Очистка планировщика
-            from tgbotmuvofiqiyat.handlers.users.video_scheduler import scheduler
+            from handlers.users.video_scheduler import scheduler
             old_jobs = len(scheduler.get_jobs())
             
             # Удаляем все задачи групп
@@ -1929,7 +1926,7 @@ async def cleanup_group_video_command(message: types.Message):
             response += f"   • Guruhlar: {len(groups_with_settings)} ta\n\n"
             
             # Перепланирование задач
-            from tgbotmuvofiqiyat.handlers.users.video_scheduler import schedule_group_jobs
+            from handlers.users.video_scheduler import schedule_group_jobs
             schedule_group_jobs()
             
             response += "🔄 **QAYTA REJALASHTIRISH:** ✅ Bajarildi\n\n"
@@ -1966,7 +1963,7 @@ async def backup_group_video_command(message: types.Message):
         # Проверяем права пользователя (только супер-админ)
         if user_id not in SUPER_ADMIN_IDS:
             logger.warning(f"❌ Пользователь {user_id} не имеет прав")
-            await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat super admin foydalana oladi.")
+            await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat super admin foydalana oladi.", parse_mode="Markdown")
             return
         
         logger.info(f"✅ Пользователь {user_id} имеет права")
@@ -2051,7 +2048,7 @@ async def restore_group_video_command(message: types.Message):
         # Проверяем права пользователя (только супер-админ)
         if user_id not in SUPER_ADMIN_IDS:
             logger.warning(f"❌ Пользователь {user_id} не имеет прав")
-            await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat super admin foydalana oladi.")
+            await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat super admin foydalana oladi.", parse_mode="Markdown")
             return
         
         logger.info(f"✅ Пользователь {user_id} не имеет прав")
@@ -2065,7 +2062,7 @@ async def restore_group_video_command(message: types.Message):
                 "/restore_group_video <fayl_nomi>\n\n"
                 "📋 **Mavjud fayllar:**\n"
                 "Fayllarni ko'rish uchun /backup_group_video buyrug'ini ishlating"
-            )
+            , parse_mode="Markdown")
             return
         
         filename = args[1]
@@ -2079,7 +2076,7 @@ async def restore_group_video_command(message: types.Message):
             import os
             
             if not os.path.exists(filename):
-                await message.answer(f"❌ **Fayl topilmadi:** {filename}\n\nIltimos, to'g'ri fayl nomini kiriting.")
+                await message.answer(f"❌ **Fayl topilmadi:** {filename}\n\nIltimos, to'g'ri fayl nomini kiriting.", parse_mode="Markdown")
                 return
             
             with open(filename, 'r', encoding='utf-8') as f:
@@ -2137,7 +2134,7 @@ async def restore_group_video_command(message: types.Message):
             response += f"   • Xatoliklar: {len(backup_data.get('groups', [])) - restored_groups} ta\n\n"
             
             # Перепланирование задач
-            from tgbotmuvofiqiyat.handlers.users.video_scheduler import schedule_group_jobs
+            from handlers.users.video_scheduler import schedule_group_jobs
             schedule_group_jobs()
             
             response += "🔄 **QAYTA REJALASHTIRISH:** ✅ Bajarildi\n\n"
@@ -2168,7 +2165,7 @@ async def logs_group_video_command(message: types.Message):
         # Проверяем права пользователя (только супер-админ)
         if user_id not in SUPER_ADMIN_IDS:
             logger.warning(f"❌ Пользователь {user_id} не имеет прав")
-            await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat super admin foydalana oladi.")
+            await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat super admin foydalana oladi.", parse_mode="Markdown")
             return
         
         logger.info(f"✅ Пользователь {user_id} имеет права")
@@ -2181,7 +2178,7 @@ async def logs_group_video_command(message: types.Message):
             log_filename = 'bot.log'
             
             if not os.path.exists(log_filename):
-                await message.answer("❌ **Log fayli topilmadi:** bot.log\n\nIltimos, log faylini tekshiring.")
+                await message.answer("❌ **Log fayli topilmadi:** bot.log\n\nIltimos, log faylini tekshiring.", parse_mode="Markdown")
                 return
             
             # Читаем последние 20 строк
@@ -2246,7 +2243,7 @@ async def monitor_group_video_command(message: types.Message):
         # Проверяем права пользователя (только супер-админ)
         if user_id not in SUPER_ADMIN_IDS:
             logger.warning(f"❌ Пользователь {user_id} не имеет прав")
-            await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat super admin foydalana oladi.")
+            await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat super admin foydalana oladi.", parse_mode="Markdown")
             return
         
         logger.info(f"✅ Пользователь {user_id} имеет права")
@@ -2306,7 +2303,7 @@ async def monitor_group_video_command(message: types.Message):
             
             # Мониторинг планировщика
             try:
-                from tgbotmuvofiqiyat.handlers.users.video_scheduler import scheduler
+                from handlers.users.video_scheduler import scheduler
                 jobs = scheduler.get_jobs()
                 group_jobs = [job for job in jobs if job.id.startswith("group_")]
                 
@@ -2414,7 +2411,7 @@ async def emergency_group_video_command(message: types.Message):
         # Проверяем права пользователя (только супер-админ)
         if user_id not in SUPER_ADMIN_IDS:
             logger.warning(f"❌ Пользователь {user_id} не имеет прав")
-            await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat super admin foydalana oladi.")
+            await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat super admin foydalana oladi.", parse_mode="Markdown")
             return
         
         logger.info(f"✅ Пользователь {user_id} имеет права")
@@ -2424,7 +2421,7 @@ async def emergency_group_video_command(message: types.Message):
         
         try:
             # Останавливаем все задачи
-            from tgbotmuvofiqiyat.handlers.users.video_scheduler import scheduler
+            from handlers.users.video_scheduler import scheduler
             old_jobs = len(scheduler.get_jobs())
             
             # Удаляем все задачи групп
@@ -2555,7 +2552,7 @@ async def reboot_group_video_command(message: types.Message):
         # Проверяем права пользователя (только супер-админ)
         if user_id not in SUPER_ADMIN_IDS:
             logger.warning(f"❌ Пользователь {user_id} не имеет прав")
-            await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat super admin foydalana oladi.")
+            await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat super admin foydalana oladi.", parse_mode="Markdown")
             return
         
         logger.info(f"✅ Пользователь {user_id} имеет права")
@@ -2609,7 +2606,7 @@ async def reboot_group_video_command(message: types.Message):
                 response += f"   • Xatolik: {str(e)[:50]}...\n\n"
             
             # Останавливаем все задачи
-            from tgbotmuvofiqiyat.handlers.users.video_scheduler import scheduler
+            from handlers.users.video_scheduler import scheduler
             old_jobs = len(scheduler.get_jobs())
             
             # Удаляем все задачи групп
@@ -2626,7 +2623,7 @@ async def reboot_group_video_command(message: types.Message):
             
             # Перезапускаем планировщик
             try:
-                from tgbotmuvofiqiyat.handlers.users.video_scheduler import schedule_group_jobs
+                from handlers.users.video_scheduler import schedule_group_jobs
                 schedule_group_jobs()
                 
                 response += "🔄 **REJALASHTIRUVCHI:** ✅ Qayta ishga tushirildi\n\n"
@@ -2683,7 +2680,7 @@ async def info_group_video_command(message: types.Message):
         # Проверяем права пользователя
         if user_id not in ADMINS + SUPER_ADMIN_IDS and not db.is_admin(user_id):
             logger.warning(f"❌ Пользователь {user_id} не имеет прав")
-            await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat adminlar foydalana oladi.")
+            await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat adminlar foydalana oladi.", parse_mode="Markdown")
             return
         
         logger.info(f"✅ Пользователь {user_id} имеет права")
@@ -2810,7 +2807,7 @@ async def support_group_video_command(message: types.Message):
         # Проверяем права пользователя
         if user_id not in ADMINS + SUPER_ADMIN_IDS and not db.is_admin(user_id):
             logger.warning(f"❌ Пользователь {user_id} не имеет прав")
-            await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat adminlar foydalana oladi.")
+            await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat adminlar foydalana oladi.", parse_mode="Markdown")
             return
         
         logger.info(f"✅ Пользователь {user_id} имеет права")
@@ -2824,7 +2821,7 @@ async def support_group_video_command(message: types.Message):
             response += "   • Telegram: @mohirbek\n"
             response += "   • Email: support@centris.uz\n"
             response += "   • Website: https://centris.uz\n"
-            response += "   • Loyiha: Centris Towers & Golden Lake\n\n"
+            response += "   • Loyihalar: Centris Towers & Golden Lake\n\n"
             
             # Часто задаваемые вопросы
             response += "❓ **KO'P BERILADIGAN SAVOLLAR:**\n"
@@ -2918,7 +2915,7 @@ async def about_group_video_command(message: types.Message):
         # Проверяем права пользователя
         if user_id not in ADMINS + SUPER_ADMIN_IDS and not db.is_admin(user_id):
             logger.warning(f"❌ Пользователь {user_id} не имеет прав")
-            await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat adminlar foydalana oladi.")
+            await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat adminlar foydalana oladi.", parse_mode="Markdown")
             return
         
         logger.info(f"✅ Пользователь {user_id} имеет права")
@@ -3019,7 +3016,7 @@ async def about_group_video_command(message: types.Message):
             response += "📄 **LITSENZIYA:**\n"
             response += "   • Turi: Proprietary\n"
             response += "   • Egasi: Centris Towers & Golden Lake\n"
-            response += "   • Foydalanish: Faqat loyiha uchun\n"
+            response += "   • Foydalanish: Faqat ushbu loyihalar uchun\n"
             response += "   • Tahrirlash: Ruxsat yo'q\n\n"
             
             # Контакты
@@ -3030,7 +3027,7 @@ async def about_group_video_command(message: types.Message):
             response += "   • Address: Toshkent, O'zbekiston\n\n"
             
             # Статус
-            response += "🎯 **LOYIHA HOLATI:**\n"
+            response += "🎯 **LOYIHALAR HOLATI:**\n"
             response += "   • Holat: ✅ Faol va ishlayapti\n"
             response += "   • Versiya: 2.0.0\n"
             response += "   • Yangilanish: " + str(datetime.now().strftime("%Y-%m-%d")) + "\n"
@@ -3038,7 +3035,7 @@ async def about_group_video_command(message: types.Message):
             
         except Exception as e:
             response += f"❌ **Xatolik:** {str(e)[:100]}...\n\n"
-            response += "⚠️ Loyiha ma'lumotlari to'liq yig'ilmadi"
+            response += "⚠️ Loyihalar ma'lumotlari to'liq yig'ilmadi"
         
         await message.answer(response, parse_mode="Markdown")
         
@@ -3061,7 +3058,7 @@ async def credits_group_video_command(message: types.Message):
         # Проверяем права пользователя
         if user_id not in ADMINS + SUPER_ADMIN_IDS and not db.is_admin(user_id):
             logger.warning(f"❌ Пользователь {user_id} не имеет прав")
-            await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat adminlar foydalana oladi.")
+            await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat adminlar foydalana oladi.", parse_mode="Markdown")
             return
         
         logger.info(f"✅ Пользователь {user_id} имеет права")
@@ -3168,7 +3165,7 @@ async def credits_group_video_command(message: types.Message):
             
             # Финальные слова
             response += "🎯 **YAKUNIY SO'ZLAR:**\n"
-            response += "   • Bu loyiha ko'p odamlar yordami bilan yaratildi\n"
+            response += "   • Bu loyihalar ko'p odamlar yordami bilan yaratildi\n"
             response += "   • Barcha texnologiyalar ochiq manbaa\n"
             response += "   • Jamiyat hissasi katta\n"
             response += "   • Kelajakda ham rivojlanadi\n"
@@ -3203,7 +3200,7 @@ async def donate_group_video_command(message: types.Message):
         # Проверяем права пользователя
         if user_id not in ADMINS + SUPER_ADMIN_IDS and not db.is_admin(user_id):
             logger.warning(f"❌ Пользователь {user_id} не имеет прав")
-            await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat adminlar foydalana oladi.")
+            await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat adminlar foydalana oladi.", parse_mode="Markdown")
             return
         
         logger.info(f"✅ Пользователь {user_id} имеет права")
@@ -3302,9 +3299,9 @@ async def donate_group_video_command(message: types.Message):
             
             # Финальные слова
             response += "💝 **YAKUNIY SO'ZLAR:**\n"
-            response += "   • Saxovatingiz loyiha rivojiga yordam beradi\n"
+            response += "   • Saxovatingiz loyihalar rivojiga yordam beradi\n"
             response += "   • Barcha saxovatchilar rahmat!\n"
-            response += "   • Loyiha rivojlanib boradi\n"
+            response += "   • Loyihalar rivojlanib boradi\n"
             response += "   • Yangi funksiyalar qo'shiladi\n"
             response += "   • Rahmat sizning yordamingiz uchun! 🙏\n\n"
             
@@ -3337,7 +3334,7 @@ async def changelog_group_video_command(message: types.Message):
         # Проверяем права пользователя
         if user_id not in ADMINS + SUPER_ADMIN_IDS and not db.is_admin(user_id):
             logger.warning(f"❌ Пользователь {user_id} не имеет прав")
-            await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat adminlar foydalana oladi.")
+            await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat adminlar foydalana oladi.", parse_mode="Markdown")
             return
         
         logger.info(f"✅ Пользователь {user_id} имеет права")
@@ -3486,7 +3483,7 @@ async def license_group_video_command(message: types.Message):
         # Проверяем права пользователя
         if user_id not in ADMINS + SUPER_ADMIN_IDS and not db.is_admin(user_id):
             logger.warning(f"❌ Пользователь {user_id} не имеет прав")
-            await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat adminlar foydalana oladi.")
+            await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat adminlar foydalana oladi.", parse_mode="Markdown")
             return
         
         logger.info(f"✅ Пользователь {user_id} имеет права")
@@ -3620,7 +3617,7 @@ async def privacy_group_video_command(message: types.Message):
         # Проверяем права пользователя
         if user_id not in ADMINS + SUPER_ADMIN_IDS and not db.is_admin(user_id):
             logger.warning(f"❌ Пользователь {user_id} не имеет прав")
-            await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat adminlar foydalana oladi.")
+            await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat adminlar foydalana oladi.", parse_mode="Markdown")
             return
         
         logger.info(f"✅ Пользователь {user_id} имеет права")
@@ -3765,7 +3762,7 @@ async def terms_group_video_command(message: types.Message):
         # Проверяем права пользователя
         if user_id not in ADMINS + SUPER_ADMIN_IDS and not db.is_admin(user_id):
             logger.warning(f"❌ Пользователь {user_id} не имеет прав")
-            await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat adminlar foydalana oladi.")
+            await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat adminlar foydalana oladi.", parse_mode="Markdown")
             return
         
         logger.info(f"✅ Пользователь {user_id} имеет права")
@@ -3945,8 +3942,7 @@ async def process_project_selection(callback_query: types.CallbackQuery, state: 
             await callback_query.message.edit_text(
                 "🏢 **Centris Towers**\n\n"
                 "📺 **Sesonni tanlang:**",
-                reply_markup=get_season_keyboard("centris"),
-                parse_mode="Markdown"
+                reply_markup=get_season_keyboard("centris")
             )
             await state.set_state(GroupVideoStates.waiting_for_centr_season.state)
             
@@ -3956,15 +3952,14 @@ async def process_project_selection(callback_query: types.CallbackQuery, state: 
                 await callback_query.message.edit_text(
                     "❌ **Golden Lake uchun hech qanday seson topilmadi!**\n\n"
                     "Iltimos, avval seson qo'shing."
-                )
+                , parse_mode="Markdown")
                 await state.finish()
                 return
                 
             await callback_query.message.edit_text(
                 "🏢 **Golden Lake**\n\n"
                 "📺 **Sesonni tanlang:**",
-                reply_markup=get_season_keyboard("golden"),
-                parse_mode="Markdown"
+                reply_markup=get_season_keyboard("golden")
             )
             await state.set_state(GroupVideoStates.waiting_for_golden_season.state)
             
@@ -3972,8 +3967,7 @@ async def process_project_selection(callback_query: types.CallbackQuery, state: 
             await callback_query.message.edit_text(
                 "🏢 **Centris + Golden**\n\n"
                 "📺 **Centris Towers uchun sesonni tanlang:**",
-                reply_markup=get_season_keyboard("centris"),
-                parse_mode="Markdown"
+                reply_markup=get_season_keyboard("centris")
             )
             await state.set_state(GroupVideoStates.waiting_for_centr_season.state)
             await state.update_data(both_selected=True, both_mode=True)
@@ -3992,7 +3986,7 @@ async def process_season_selection(callback_query: types.CallbackQuery, state: F
             await callback_query.message.edit_text(
                 "❌ **Hech qanday seson topilmadi!**\n\n"
                 "Iltimos, avval seson qo'shing."
-            )
+            , parse_mode="Markdown")
             await state.finish()
             return
             
@@ -4006,8 +4000,7 @@ async def process_season_selection(callback_query: types.CallbackQuery, state: F
                 "🏢 **Centris Towers**\n"
                 f"📺 **Seson:** {db.get_season_name(season_id)}\n\n"
                 "🎬 **Boshlash uchun videoni tanlang:**",
-                reply_markup=get_video_keyboard_from_db(db.get_videos_by_season(season_id), []),
-                parse_mode="Markdown"
+                reply_markup=get_video_keyboard_from_db(db.get_videos_by_season(season_id), [], parse_mode="Markdown")
             )
             await state.set_state(GroupVideoStates.waiting_for_centr_video.state)
             
@@ -4017,8 +4010,7 @@ async def process_season_selection(callback_query: types.CallbackQuery, state: F
                 "🏢 **Golden Lake**\n"
                 f"📺 **Seson:** {db.get_season_name(season_id)}\n\n"
                 "🎬 **Boshlash uchun videoni tanlang:**",
-                reply_markup=get_video_keyboard_from_db(db.get_videos_by_season(season_id), []),
-                parse_mode="Markdown"
+                reply_markup=get_video_keyboard_from_db(db.get_videos_by_season(season_id), [], parse_mode="Markdown")
             )
             await state.set_state(GroupVideoStates.waiting_for_golden_video.state)
             
@@ -4036,7 +4028,7 @@ async def process_video_selection(callback_query: types.CallbackQuery, state: FS
             await callback_query.message.edit_text(
                 "❌ **Barcha video allaqachon yuborilgan!**\n\n"
                 "Boshqa seson tanlang yoki yangi video qo'shing."
-            )
+            , parse_mode="Markdown")
             await state.finish()
             return
             
@@ -4054,8 +4046,7 @@ async def process_video_selection(callback_query: types.CallbackQuery, state: FS
                 await callback_query.message.edit_text(
                     "🏢 **Centris Towers sozlandi!**\n\n"
                     "📺 **Golden Lake uchun sesonni tanlang:**",
-                    reply_markup=get_season_keyboard("golden"),
-                    parse_mode="Markdown"
+                    reply_markup=get_season_keyboard("golden")
                 )
                 await state.set_state(GroupVideoStates.waiting_for_golden_season.state)
             else:
@@ -4136,7 +4127,7 @@ async def process_group_selection(callback_query: types.CallbackQuery, state: FS
         temp_settings = data.get("temp_settings")
         
         if not temp_settings:
-            await callback_query.message.edit_text("❌ **Xatolik!**\n\nSozlamalar topilmadi. Qaytadan boshlang.")
+            await callback_query.message.edit_text("❌ **Xatolik!**\n\nSozlamalar topilmadi. Qaytadan boshlang.", parse_mode="Markdown")
             await state.finish()
             return
         
@@ -4155,8 +4146,7 @@ async def process_group_selection(callback_query: types.CallbackQuery, state: FS
                     f"• Loyiha: {temp_settings.get('project', 'N/A')}\n"
                     f"• Centris: {'✅' if temp_settings.get('project') in ['centris', 'both'] else '❌'}\n"
                     f"• Golden: {'✅' if temp_settings.get('project') in ['golden', 'both'] else '❌'}",
-                    reply_markup=get_time_selection_keyboard(),
-                    parse_mode="Markdown"
+                    reply_markup=get_time_selection_keyboard()
                 )
                 await state.set_state(GroupVideoStates.waiting_for_send_times.state)
                 await state.update_data(temp_settings=temp_settings)
@@ -4165,7 +4155,7 @@ async def process_group_selection(callback_query: types.CallbackQuery, state: FS
             else:
                 await callback_query.message.edit_text(
                     "❌ **Xatolik!**\n\nBu buyruq faqat guruhlarda ishlaydi."
-                )
+                , parse_mode="Markdown")
                 await state.finish()
         
         elif action == "group_manual":
@@ -4173,7 +4163,8 @@ async def process_group_selection(callback_query: types.CallbackQuery, state: FS
             await callback_query.message.edit_text(
                 "📝 **Guruh ID sini kiriting:**\n\n"
                 "Guruh ID sini yuboring (masalan: -1001234567890)\n\n"
-                "⚠️ **Eslatma:** Guruh ID si manfiy son bo'lishi kerak."
+                "⚠️ **Eslatma:** Guruh ID si manfiy son bo'lishi kerak.",
+                parse_mode="Markdown"
             )
             await state.set_state(GroupVideoStates.waiting_for_group_selection.state)
             await state.update_data(waiting_for_manual_id=True)
@@ -4206,7 +4197,7 @@ async def process_group_selection(callback_query: types.CallbackQuery, state: FS
                 await callback_query.message.edit_text(
                     "❌ **Guruhlar topilmadi!**\n\n"
                     "Ma'lumotlar bazasida guruhlar yo'q yoki hech biri whitelist da emas."
-                )
+                , parse_mode="Markdown")
                 await state.finish()
         
         elif action == "group_cancel":
@@ -4214,7 +4205,7 @@ async def process_group_selection(callback_query: types.CallbackQuery, state: FS
             await callback_query.message.edit_text(
                 "❌ **Sozlamalar bekor qilindi!**\n\n"
                 "Hech qanday o'zgarish saqlanmadi."
-            )
+            , parse_mode="Markdown")
             await state.finish()
         
         elif action.startswith("select_group_"):
@@ -4230,8 +4221,7 @@ async def process_group_selection(callback_query: types.CallbackQuery, state: FS
                 f"• Loyiha: {temp_settings.get('project', 'N/A')}\n"
                 f"• Centris: {'✅' if temp_settings.get('project') in ['centris', 'both'] else '❌'}\n"
                 f"• Golden: {'✅' if temp_settings.get('project') in ['golden', 'both'] else '❌'}",
-                reply_markup=get_time_selection_keyboard(),
-                parse_mode="Markdown"
+                reply_markup=get_time_selection_keyboard()
             )
             await state.set_state(GroupVideoStates.waiting_for_send_times.state)
             await state.update_data(temp_settings=temp_settings)
@@ -4282,7 +4272,7 @@ async def process_manual_group_id(message: types.Message, state: FSMContext):
         waiting_for_manual_id = data.get("waiting_for_manual_id", False)
         
         if not temp_settings or not waiting_for_manual_id:
-            await message.answer("❌ **Xatolik!**\n\nSozlamalar topilmadi yoki noto'g'ri holat.")
+            await message.answer("❌ **Xatolik!**\n\nSozlamalar topilmadi yoki noto'g'ri holat.", parse_mode="Markdown")
             await state.finish()
             return
         
@@ -4294,7 +4284,7 @@ async def process_manual_group_id(message: types.Message, state: FSMContext):
                 "❌ **Noto'g'ri format!**\n\n"
                 "Guruh ID si son bo'lishi kerak.\n"
                 "Masalan: -1001234567890"
-            )
+            , parse_mode="Markdown")
             return
         
         # Проверяем, что ID группы отрицательный (группы имеют отрицательные ID)
@@ -4303,7 +4293,7 @@ async def process_manual_group_id(message: types.Message, state: FSMContext):
                 "❌ **Noto'g'ri ID!**\n\n"
                 "Guruh ID si manfiy son bo'lishi kerak.\n"
                 "Masalan: -1001234567890"
-            )
+            , parse_mode="Markdown")
             return
         
         # Обновляем chat_id в настройках
@@ -4317,8 +4307,7 @@ async def process_manual_group_id(message: types.Message, state: FSMContext):
             f"• Loyiha: {temp_settings.get('project', 'N/A')}\n"
             f"• Centris: {'✅' if temp_settings.get('project') in ['centris', 'both'] else '❌'}\n"
             f"• Golden: {'✅' if temp_settings.get('project') in ['golden', 'both'] else '❌'}",
-            reply_markup=get_time_selection_keyboard(),
-            parse_mode="Markdown"
+            reply_markup=get_time_selection_keyboard()
         )
         await state.set_state(GroupVideoStates.waiting_for_send_times.state)
         await state.update_data(temp_settings=temp_settings)
@@ -4337,7 +4326,7 @@ async def update_video_progress_command(message: types.Message):
     try:
         # Проверяем права админа
         if not await is_admin_or_super_admin(message.from_user.id):
-            await message.answer("❌ **Ruxsat yo'q!**\n\nBu buyruq faqat administratorlar uchun.")
+            await message.answer("❌ **Ruxsat yo'q!**\n\nBu buyruq faqat administratorlar uchun.", parse_mode="Markdown")
             return
         
         # Парсим команду: /update_video_progress <group_id> <project> <season_id> <video_position>
@@ -4349,7 +4338,7 @@ async def update_video_progress_command(message: types.Message):
                 "**Masalan:**\n"
                 "`/update_video_progress -4964612772 centris 3 9`\n\n"
                 "**Loyihalar:** `centris`, `golden`"
-            )
+            , parse_mode="Markdown")
             return
         
         try:
@@ -4358,15 +4347,15 @@ async def update_video_progress_command(message: types.Message):
             season_id = int(args[3])
             video_position = int(args[4])
         except ValueError:
-            await message.answer("❌ **Noto'g'ri format!**\n\nBarcha raqamlar son bo'lishi kerak.")
+            await message.answer("❌ **Noto'g'ri format!**\n\nBarcha raqamlar son bo'lishi kerak.", parse_mode="Markdown")
             return
         
         if project not in ['centris', 'golden']:
-            await message.answer("❌ **Noto'g'ri loyiha!**\n\nFaqat `centris` yoki `golden` bo'lishi mumkin.")
+            await message.answer("❌ **Noto'g'ri loyiha!**\n\nFaqat `centris` yoki `golden` bo'lishi mumkin.", parse_mode="Markdown")
             return
         
         if video_position < 0:
-            await message.answer("❌ **Noto'g'ri pozitsiya!**\n\nVideo pozitsiyasi 0 dan katta bo'lishi kerak.")
+            await message.answer("❌ **Noto'g'ri pozitsiya!**\n\nVideo pozitsiyasi 0 dan katta bo'lishi kerak.", parse_mode="Markdown")
             return
         
         # Обновляем прогресс
@@ -4382,11 +4371,11 @@ async def update_video_progress_command(message: types.Message):
                 f"Endi guruh {video_position + 1}-video dan boshlab video olishi mumkin."
             )
         else:
-            await message.answer("❌ **Xatolik yuz berdi!**\n\nProgress yangilanmadi.")
+            await message.answer("❌ **Xatolik yuz berdi!**\n\nProgress yangilanmadi.", parse_mode="Markdown")
             
     except Exception as e:
         logger.error(f"Ошибка при обновлении прогресса видео: {e}")
-        await message.answer(f"❌ **Xatolik yuz berdi!**\n\n{e}")
+        await message.answer(f"❌ **Xatolik yuz berdi!**\n\n{e}", parse_mode="Markdown")
 
 # Команда для автоматического обновления прогресса (для админов)
 @dp.message_handler(commands=["auto_update_progress"])
@@ -4397,21 +4386,21 @@ async def auto_update_progress_command(message: types.Message):
     try:
         # Проверяем права админа
         if not await is_admin_or_super_admin(message.from_user.id):
-            await message.answer("❌ **Ruxsat yo'q!**\n\nBu buyruq faqat administratorlar uchun.")
+            await message.answer("❌ **Ruxsat yo'q!**\n\nBu buyruq faqat administratorlar uchun.", parse_mode="Markdown")
             return
         
         # Получаем все группы с настройками
         groups_settings = db.get_all_groups_with_settings()
         
         if not groups_settings:
-            await message.answer("📋 **Guruhlar sozlamalari:**\n\n❌ Hech qanday guruh sozlamalari topilmadi.")
+            await message.answer("📋 **Guruhlar sozlamalari:**\n\n❌ Hech qanday guruh sozlamalari topilmadi.", parse_mode="Markdown")
             return
         
         updated_count = 0
         response = "🔄 **Avtomatik yangilash natijalari:**\n\n"
         
         for group in groups_settings:
-            chat_id, centris_enabled, centris_season_id, centris_start_video, golden_enabled, golden_season_id, golden_start_video, viewed_videos, is_subscribed, group_name = group
+            chat_id, centris_enabled, centris_season_id, centris_start_video, golden_enabled, golden_season_id, golden_start_video, viewed_videos, is_subscribed, group_name, send_times = group
             
             try:
                 # Название группы уже получено из базы данных
@@ -4473,7 +4462,7 @@ async def auto_update_progress_command(message: types.Message):
             
     except Exception as e:
         logger.error(f"Ошибка при автоматическом обновлении прогресса: {e}")
-        await message.answer(f"❌ **Xatolik yuz berdi!**\n\n{e}")
+        await message.answer(f"❌ **Xatolik yuz berdi!**\n\n{e}", parse_mode="Markdown")
 
 # Команда для обновления названий групп (для админов)
 @dp.message_handler(commands=["update_group_names"])
@@ -4484,14 +4473,14 @@ async def update_group_names_command(message: types.Message):
     try:
         # Проверяем права админа
         if not await is_admin_or_super_admin(message.from_user.id):
-            await message.answer("❌ **Ruxsat yo'q!**\n\nBu buyruq faqat administratorlar uchun.")
+            await message.answer("❌ **Ruxsat yo'q!**\n\nBu buyruq faqat administratorlar uchun.", parse_mode="Markdown")
             return
         
         # Получаем все группы с настройками
         groups_settings = db.get_all_groups_with_settings()
         
         if not groups_settings:
-            await message.answer("📋 **Guruhlar sozlamalari:**\n\n❌ Hech qanday guruh sozlamalari topilmadi.")
+            await message.answer("📋 **Guruhlar sozlamalari:**\n\n❌ Hech qanday guruh sozlamalari topilmadi.", parse_mode="Markdown")
             return
         
         updated_count = 0
@@ -4499,7 +4488,7 @@ async def update_group_names_command(message: types.Message):
         response = "🔄 **Nama'lum guruhlar yangilash natijalari:**\n\n"
         
         for group in groups_settings:
-            chat_id, centris_enabled, centris_season_id, centris_start_video, golden_enabled, golden_season_id, golden_start_video, viewed_videos, is_subscribed, group_name = group
+            chat_id, centris_enabled, centris_season_id, centris_start_video, golden_enabled, golden_season_id, golden_start_video, viewed_videos, is_subscribed, group_name, send_times = group
             
             # Пропускаем группы, у которых уже есть название
             if group_name and group_name != "Noma'lum guruh":
@@ -4550,7 +4539,7 @@ async def update_group_names_command(message: types.Message):
             
     except Exception as e:
         logger.error(f"Ошибка при обновлении названий групп: {e}")
-        await message.answer(f"❌ **Xatolik yuz berdi!**\n\n{e}")
+        await message.answer(f"❌ **Xatolik yuz berdi!**\n\n{e}", parse_mode="Markdown")
 
 # Тестовая команда для отправки видео всем группам (для админов)
 @dp.message_handler(commands=["test_send_video_all_groups"])
@@ -4561,7 +4550,7 @@ async def test_send_video_all_groups_command(message: types.Message):
     try:
         # Проверяем права админа
         if not await is_admin_or_super_admin(message.from_user.id):
-            await message.answer("❌ **Ruxsat yo'q!**\n\nBu buyruq faqat administratorlar uchun.")
+            await message.answer("❌ **Ruxsat yo'q!**\n\nBu buyruq faqat administratorlar uchun.", parse_mode="Markdown")
             return
         
         # Парсим команду: /test_send_video_all_groups <project> <season_id> <video_position>
@@ -4573,7 +4562,7 @@ async def test_send_video_all_groups_command(message: types.Message):
                 "**Masalan:**\n"
                 "`/test_send_video_all_groups centris 2 5`\n\n"
                 "**Loyihalar:** `centris`, `golden`"
-            )
+            , parse_mode="Markdown")
             return
         
         try:
@@ -4581,28 +4570,28 @@ async def test_send_video_all_groups_command(message: types.Message):
             season_id = int(args[2])
             video_position = int(args[3])
         except ValueError:
-            await message.answer("❌ **Noto'g'ri format!**\n\nBarcha raqamlar son bo'lishi kerak.")
+            await message.answer("❌ **Noto'g'ri format!**\n\nBarcha raqamlar son bo'lishi kerak.", parse_mode="Markdown")
             return
         
         if project not in ['centris', 'golden']:
-            await message.answer("❌ **Noto'g'ri loyiha!**\n\nFaqat `centris` yoki `golden` bo'lishi mumkin.")
+            await message.answer("❌ **Noto'g'ri loyiha!**\n\nFaqat `centris` yoki `golden` bo'lishi mumkin.", parse_mode="Markdown")
             return
         
         if video_position < 0:
-            await message.answer("❌ **Noto'g'ri pozitsiya!**\n\nVideo pozitsiyasi 0 dan katta bo'lishi kerak.")
+            await message.answer("❌ **Noto'g'ri pozitsiya!**\n\nVideo pozitsiyasi 0 dan katta bo'lishi kerak.", parse_mode="Markdown")
             return
         
         # Получаем все группы с настройками
         groups_settings = db.get_all_groups_with_settings()
         
         if not groups_settings:
-            await message.answer("📋 **Guruhlar sozlamalari:**\n\n❌ Hech qanday guruh sozlamalari topilmadi.")
+            await message.answer("📋 **Guruhlar sozlamalari:**\n\n❌ Hech qanday guruh sozlamalari topilmadi.", parse_mode="Markdown")
             return
         
         # Получаем видео для указанного сезона
         videos = db.get_videos_by_season(season_id)
         if not videos or video_position >= len(videos):
-            await message.answer(f"❌ **Xatolik!**\n\nSezon {season_id} da {video_position + 1}-video mavjud emas.")
+            await message.answer(f"❌ **Xatolik!**\n\nSezon {season_id} da {video_position + 1}-video mavjud emas.", parse_mode="Markdown")
             return
         
         video_url, video_title, video_pos = videos[video_position]
@@ -4616,7 +4605,7 @@ async def test_send_video_all_groups_command(message: types.Message):
         response += f"🔗 **URL:** {video_url}\n\n"
         
         for group in groups_settings:
-            chat_id, centris_enabled, centris_season_id, centris_start_video, golden_enabled, golden_season_id, golden_start_video, viewed_videos, is_subscribed, group_name = group
+            chat_id, centris_enabled, centris_season_id, centris_start_video, golden_enabled, golden_season_id, golden_start_video, viewed_videos, is_subscribed, group_name, send_times = group
             
             # Проверяем, включен ли проект для этой группы
             project_enabled = False
@@ -4629,7 +4618,7 @@ async def test_send_video_all_groups_command(message: types.Message):
                     project_enabled = True
             
             if not project_enabled:
-                response += f"⚠️ **{group_name}**: Loyiha o'chirilgan yoki sezon mos kelmaydi\n"
+                response += f"⚠️ **{group_name}**: Loyihalar o'chirilgan yoki sezon mos kelmaydi\n"
                 failed_count += 1
                 continue
             
@@ -4671,7 +4660,7 @@ async def test_send_video_all_groups_command(message: types.Message):
             
     except Exception as e:
         logger.error(f"Ошибка при тестовой отправке видео: {e}")
-        await message.answer(f"❌ **Xatolik yuz berdi!**\n\n{e}")
+        await message.answer(f"❌ **Xatolik yuz berdi!**\n\n{e}", parse_mode="Markdown")
 
 # Команда для отправки всех запланированных видео во все группы (для админов)
 @dp.message_handler(commands=["send_all_planned_videos"])
@@ -4682,14 +4671,14 @@ async def send_all_planned_videos_command(message: types.Message):
     try:
         # Проверяем права админа
         if not await is_admin_or_super_admin(message.from_user.id):
-            await message.answer("❌ **Ruxsat yo'q!**\n\nBu buyruq faqat administratorlar uchun.")
+            await message.answer("❌ **Ruxsat yo'q!**\n\nBu buyruq faqat administratorlar uchun.", parse_mode="Markdown")
             return
         
         # Получаем все группы с настройками
         groups_settings = db.get_all_groups_with_settings()
         
         if not groups_settings:
-            await message.answer("📋 **Guruhlar sozlamalari:**\n\n❌ Hech qanday guruh sozlamalari topilmadi.")
+            await message.answer("📋 **Guruhlar sozlamalari:**\n\n❌ Hech qanday guruh sozlamalari topilmadi.", parse_mode="Markdown")
             return
         
         # Отправляем видео всем группам
@@ -4698,7 +4687,7 @@ async def send_all_planned_videos_command(message: types.Message):
         response = f"🎬 **Barcha rejalashtirilgan videolar yuborish natijalari:**\n\n"
         
         for group in groups_settings:
-            chat_id, centris_enabled, centris_season_id, centris_start_video, golden_enabled, golden_season_id, golden_start_video, viewed_videos, is_subscribed, group_name = group
+            chat_id, centris_enabled, centris_season_id, centris_start_video, golden_enabled, golden_season_id, golden_start_video, viewed_videos, is_subscribed, group_name, send_times = group
             
             group_sent = 0
             group_failed = 0
@@ -4821,7 +4810,7 @@ async def send_all_planned_videos_command(message: types.Message):
                     response += f"❌ **{group_name}**: {group_failed} xatolik\n"
                     failed_count += group_failed
                 else:
-                    response += f"⚠️ **{group_name}**: Loyihalar o'chirilgan\n"
+                    response += f"⚠️ **{group_name}**: Barcha loyihalar o'chirilgan\n"
                 
             except Exception as e:
                 logger.error(f"Ошибка при обработке группы {chat_id}: {e}")
@@ -4843,7 +4832,7 @@ async def send_all_planned_videos_command(message: types.Message):
             
     except Exception as e:
         logger.error(f"Ошибка при отправке всех запланированных видео: {e}")
-        await message.answer(f"❌ **Xatolik yuz berdi!**\n\n{e}")
+        await message.answer(f"❌ **Xatolik yuz berdi!**\n\n{e}", parse_mode="Markdown")
 
 # Вспомогательные функции
 def get_season_keyboard(project):
@@ -4980,20 +4969,20 @@ async def admin_show_all_groups_settings(message: types.Message):
     try:
         # Проверяем права админа
         if not await is_admin_or_super_admin(message.from_user.id):
-            await message.answer("❌ **Ruxsat yo'q!**\n\nBu buyruq faqat administratorlar uchun.")
+            await message.answer("❌ **Ruxsat yo'q!**\n\nBu buyruq faqat administratorlar uchun.", parse_mode="Markdown")
             return
         
         # Получаем все группы с настройками
         groups_settings = db.get_all_groups_with_settings()
         
         if not groups_settings:
-            await message.answer("📋 **Guruhlar sozlamalari:**\n\n❌ Hech qanday guruh sozlamalari topilmadi.")
+            await message.answer("📋 **Guruhlar sozlamalari:**\n\n❌ Hech qanday guruh sozlamalari topilmadi.", parse_mode="Markdown")
             return
         
         response = "📋 **Barcha guruhlar sozlamalari:**\n\n"
         
         for group in groups_settings:
-            chat_id, centris_enabled, centris_season_id, centris_start_video, golden_enabled, golden_season_id, golden_start_video, viewed_videos, is_subscribed, group_name = group
+            chat_id, centris_enabled, centris_season_id, centris_start_video, golden_enabled, golden_season_id, golden_start_video, viewed_videos, is_subscribed, group_name, send_times = group
             
             # Логируем значения для отладки
             logger.info(f"Группа {chat_id}: centris_start_video={centris_start_video}, golden_start_video={golden_start_video}")
@@ -5059,7 +5048,7 @@ async def admin_show_all_groups_settings(message: types.Message):
             
     except Exception as e:
         logger.error(f"Ошибка при показе настроек всех групп: {e}")
-        await message.answer("❌ **Xatolik yuz berdi!**\n\nIltimos, qaytadan urinib ko'ring.")
+        await message.answer("❌ **Xatolik yuz berdi!**\n\nIltimos, qaytadan urinib ko'ring.", parse_mode="Markdown")
 
 
 # Команда для отправки конкретного видео по номеру во все группы (только для админов)
@@ -5073,7 +5062,7 @@ async def send_specific_video_by_number(message: types.Message):
     try:
         # Проверяем права админа
         if not await is_admin_or_super_admin(message.from_user.id):
-            await message.answer("❌ **Ruxsat yo'q!**\n\nBu buyruq faqat administratorlar uchun.")
+            await message.answer("❌ **Ruxsat yo'q!**\n\nBu buyruq faqat administratorlar uchun.", parse_mode="Markdown")
             return
         
         # Парсим аргументы команды
@@ -5081,14 +5070,14 @@ async def send_specific_video_by_number(message: types.Message):
         if len(args) != 4:
             await message.answer(
                 "📝 **To'g'ri foydalanish:**\n\n"
-                "`/send_specific_video <loyiha> <sezon> <video_number>`\n\n"
+                "`/send_specific_video <loyiha_nomi> <sezon> <video_number>`\n\n"
                 "**Misol:**\n"
                 "`/send_specific_video centris 2 5` - Centris 2-sezon 5-video\n"
                 "`/send_specific_video golden 1 3` - Golden 1-sezon 3-video\n\n"
                 "**Loyihalar:** centris, golden\n"
                 "**Sezonlar:** 1, 2, 3, 4...\n"
                 "**Video raqami:** 1, 2, 3, 4..."
-            )
+            , parse_mode="Markdown")
             return
         
         project = args[1].lower()
@@ -5096,30 +5085,30 @@ async def send_specific_video_by_number(message: types.Message):
             season_id = int(args[2])
             video_number = int(args[3])
         except ValueError:
-            await message.answer("❌ **Xatolik!** Sezon va video raqami son bo'lishi kerak.")
+            await message.answer("❌ **Xatolik!** Sezon va video raqami son bo'lishi kerak.", parse_mode="Markdown")
             return
         
         # Проверяем корректность проекта
         if project not in ['centris', 'golden']:
-            await message.answer("❌ **Xatolik!** Loyiha `centris` yoki `golden` bo'lishi kerak.")
+            await message.answer("❌ **Xatolik!** Loyiha `centris` yoki `golden` bo'lishi kerak.", parse_mode="Markdown")
             return
         
         # Проверяем корректность номера видео
         if video_number < 1:
-            await message.answer("❌ **Xatolik!** Video raqami 1 dan katta bo'lishi kerak.")
+            await message.answer("❌ **Xatolik!** Video raqami 1 dan katta bo'lishi kerak.", parse_mode="Markdown")
             return
         
         # Получаем все группы с настройками
         groups_settings = db.get_all_groups_with_settings()
         
         if not groups_settings:
-            await message.answer("📋 **Guruhlar sozlamalari:**\n\n❌ Hech qanday guruh sozlamalari topilmadi.")
+            await message.answer("📋 **Guruhlar sozlamalari:**\n\n❌ Hech qanday guruh sozlamalari topilmadi.", parse_mode="Markdown")
             return
         
         # Получаем видео по сезону
         videos = db.get_videos_by_season(season_id)
         if not videos:
-            await message.answer(f"❌ **Video topilmadi!**\n\nSezon {season_id} da video mavjud emas.")
+            await message.answer(f"❌ **Video topilmadi!**\n\nSezon {season_id} da video mavjud emas.", parse_mode="Markdown")
             return
         
         # Проверяем, существует ли указанный номер видео
@@ -5146,7 +5135,7 @@ async def send_specific_video_by_number(message: types.Message):
         response += f"🏷️ **Nomi:** {video_title}\n\n"
         
         for group in groups_settings:
-            chat_id, centris_enabled, centris_season_id, centris_start_video, golden_enabled, golden_season_id, golden_start_video, viewed_videos, is_subscribed, group_name = group
+            chat_id, centris_enabled, centris_season_id, centris_start_video, golden_enabled, golden_season_id, golden_start_video, viewed_videos, is_subscribed, group_name, send_times = group
             
             # Проверяем, включен ли проект для этой группы И настроен ли для указанного сезона
             project_enabled = False
@@ -5207,7 +5196,7 @@ async def send_specific_video_by_number(message: types.Message):
             
     except Exception as e:
         logger.error(f"Ошибка при отправке конкретного видео: {e}")
-        await message.answer(f"❌ **Xatolik yuz berdi!**\n\n{e}")
+        await message.answer(f"❌ **Xatolik yuz berdi!**\n\n{e}", parse_mode="Markdown")
 
 @dp.message_handler(commands=['send_now'])
 async def send_video_now(message: types.Message):
@@ -5215,7 +5204,7 @@ async def send_video_now(message: types.Message):
     user_id = message.from_user.id
     
     try:
-        from tgbotmuvofiqiyat.handlers.users.video_scheduler import send_group_video_new
+        from handlers.users.video_scheduler import send_group_video_new
         
         # Проверяем whitelist
         chat_id = message.chat.id

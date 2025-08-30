@@ -10,9 +10,9 @@ try:
     import pandas as pd
     import io
     from aiogram.types import InputFile
-    from tgbotmuvofiqiyat.db import db
-    from tgbotmuvofiqiyat.loader import dp
-    from tgbotmuvofiqiyat.data.config import ADMINS
+    from db import db
+    from loader import dp
+    from data.config import ADMINS
 
 
     @dp.message_handler(commands=['get_registration_time'], state="*")
@@ -137,7 +137,7 @@ try:
     #     if not args:
     #         # Запустить мастер с клавиатурой выбора проекта
     #         from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-    #         from tgbotmuvofiqiyat.handlers.users.admin_image_sender import GroupVideoStates
+    #         from handlers.users.admin_image_sender import GroupVideoStates
     #         kb = InlineKeyboardMarkup(row_width=2)
     #         kb.add(
     #             InlineKeyboardButton("Centris Towers", callback_data="project_centr"),

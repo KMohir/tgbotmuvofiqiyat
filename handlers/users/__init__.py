@@ -11,6 +11,6 @@ from . import security
 from . import admin_security
 
 # Импортируем dp из одного модуля
-from tgbotmuvofiqiyat.loader import dp
+from loader import dp
 
 __all__ = ["dp"]

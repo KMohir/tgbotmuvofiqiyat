@@ -1,16 +1,16 @@
-from tgbotmuvofiqiyat.handlers import groups
+from handlers import groups
 
 from aiogram import types
 import asyncio
 from datetime import datetime, timedelta, time
-from tgbotmuvofiqiyat.db import db
-from tgbotmuvofiqiyat.loader import dp, bot
+from db import db
+from loader import dp, bot
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 import pytz
 import logging
 import json
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
-from tgbotmuvofiqiyat.handlers.users.video_lists import VIDEO_LIST_1, VIDEO_LIST_2, VIDEO_LIST_3, VIDEO_LIST_4, VIDEO_LIST_5, VIDEO_LIST_GOLDEN_1
+from handlers.users.video_lists import VIDEO_LIST_1, VIDEO_LIST_2, VIDEO_LIST_3, VIDEO_LIST_4, VIDEO_LIST_5, VIDEO_LIST_GOLDEN_1
 from aiogram.utils.exceptions import MigrateToChat
 
 # Настройка логирования

@@ -4,12 +4,12 @@ from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters.state import State, StatesGroup
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
 from aiogram.dispatcher.filters import Text, Command
-from tgbotmuvofiqiyat.loader import bot, dp
-from tgbotmuvofiqiyat.db import db
-from tgbotmuvofiqiyat.keyboards.default.reply import key, get_lang_for_button
+from loader import bot, dp
+from db import db
+from keyboards.default.reply import key, get_lang_for_button
 from datetime import datetime
-from tgbotmuvofiqiyat.handlers.users.video_lists import VIDEO_LIST_1, VIDEO_LIST_2, VIDEO_LIST_3, VIDEO_LIST_4, CAPTION_LIST_1, CAPTION_LIST_2, CAPTION_LIST_3, CAPTION_LIST_4, VIDEO_LIST_GOLDEN_1, GOLDEN_LIST, CAPTION_LIST_6, VIDEO_LIST_6
-from tgbotmuvofiqiyat.data.config import ADMINS
+from handlers.users.video_lists import VIDEO_LIST_1, VIDEO_LIST_2, VIDEO_LIST_3, VIDEO_LIST_4, CAPTION_LIST_1, CAPTION_LIST_2, CAPTION_LIST_3, CAPTION_LIST_4, VIDEO_LIST_GOLDEN_1, GOLDEN_LIST, CAPTION_LIST_6, VIDEO_LIST_6
+from data.config import ADMINS
 
 # Настройка логирования
 logger = logging.getLogger(__name__)

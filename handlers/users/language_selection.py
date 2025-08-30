@@ -4,9 +4,9 @@ try:
 
     from aiogram import types
     from aiogram.dispatcher import FSMContext
-    from tgbotmuvofiqiyat.loader import dp, bot
-    from tgbotmuvofiqiyat.states import RegistrationStates
-    from tgbotmuvofiqiyat.db import db
+    from loader import dp, bot
+    from states import RegistrationStates
+    from db import db
 
     @dp.callback_query_handler(text_contains="lang_", state=RegistrationStates.lang)
     async def set_lang(call: types.CallbackQuery, state: FSMContext):

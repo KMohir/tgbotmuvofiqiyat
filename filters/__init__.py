@@ -1,6 +1,6 @@
 from aiogram import Dispatcher
 
-from tgbotmuvofiqiyat.loader import dp
+from loader import dp
 # from .is_admin import AdminFilter
 
 
