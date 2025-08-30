@@ -4000,7 +4000,8 @@ async def process_season_selection(callback_query: types.CallbackQuery, state: F
                 "🏢 **Centris Towers**\n"
                 f"📺 **Seson:** {db.get_season_name(season_id)}\n\n"
                 "🎬 **Boshlash uchun videoni tanlang:**",
-                reply_markup=get_video_keyboard_from_db(db.get_videos_by_season(season_id), [], parse_mode="Markdown")
+                reply_markup=get_video_keyboard_from_db(db.get_videos_by_season(season_id), []),
+                parse_mode="Markdown"
             )
             await state.set_state(GroupVideoStates.waiting_for_centr_video.state)
             
@@ -4010,7 +4011,8 @@ async def process_season_selection(callback_query: types.CallbackQuery, state: F
                 "🏢 **Golden Lake**\n"
                 f"📺 **Seson:** {db.get_season_name(season_id)}\n\n"
                 "🎬 **Boshlash uchun videoni tanlang:**",
-                reply_markup=get_video_keyboard_from_db(db.get_videos_by_season(season_id), [], parse_mode="Markdown")
+                reply_markup=get_video_keyboard_from_db(db.get_videos_by_season(season_id), []),
+                parse_mode="Markdown"
             )
             await state.set_state(GroupVideoStates.waiting_for_golden_video.state)
             
