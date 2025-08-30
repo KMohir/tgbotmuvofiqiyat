@@ -1,2 +1,2 @@
-from loader import dp, bot
+from tgbotmuvofiqiyat.loader import dp, bot
 

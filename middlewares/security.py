@@ -6,8 +6,8 @@ import logging
 from aiogram import types
 from aiogram.dispatcher.middlewares import BaseMiddleware
 from aiogram.dispatcher.handler import CancelHandler
-from data.config import SUPER_ADMIN_ID, ADMINS
-from db import db
+from tgbotmuvofiqiyat.data.config import SUPER_ADMIN_ID, ADMINS
+from tgbotmuvofiqiyat.db import db
 
 logger = logging.getLogger(__name__)
 

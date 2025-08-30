@@ -7,13 +7,13 @@ try:
     from aiogram.dispatcher import FSMContext
     from aiogram.dispatcher.filters.builtin import CommandStart
     from aiogram.types import ParseMode, Message, ReplyKeyboardRemove
-    from db import db
-    from loader import dp, bot
-    from states import RegistrationStates
-    from keyboards.default.reply import key, get_lang_for_button
+    from tgbotmuvofiqiyat.db import db
+    from tgbotmuvofiqiyat.loader import dp, bot
+    from tgbotmuvofiqiyat.states import RegistrationStates
+    from tgbotmuvofiqiyat.keyboards.default.reply import key, get_lang_for_button
     import time
     from aiogram.dispatcher.storage import DELTA
-    from data.config import SUPER_ADMIN_ID, ADMINS
+    from tgbotmuvofiqiyat.data.config import SUPER_ADMIN_ID, ADMINS
     from aiogram.dispatcher.handler import CancelHandler
 
     # Настройка логирования

@@ -6,11 +6,11 @@ try:
     from aiogram.dispatcher.filters.builtin import CommandHelp, Command
     from aiogram.types import ReplyKeyboardRemove
     import pandas as pd
-    from db import db
-    from loader import dp
-    from states import RegistrationStates
+    from tgbotmuvofiqiyat.db import db
+    from tgbotmuvofiqiyat.loader import dp
+    from tgbotmuvofiqiyat.states import RegistrationStates
     import os
-    from keyboards.default.reply import key, get_lang_for_button
+    from tgbotmuvofiqiyat.keyboards.default.reply import key, get_lang_for_button
 
     @dp.message_handler(Command("help"))
     async def bot_help(message: types.Message, state: FSMContext):

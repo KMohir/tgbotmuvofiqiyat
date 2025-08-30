@@ -1,8 +1,8 @@
 from aiogram import Bot, Dispatcher, types
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
 import logging
-from data import config
-from db import db
+from tgbotmuvofiqiyat.data import config
+from tgbotmuvofiqiyat.db import db
 
 # Логирование настраивается в app.py
 logger = logging.getLogger(__name__)

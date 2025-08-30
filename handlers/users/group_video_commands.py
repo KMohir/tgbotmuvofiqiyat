@@ -2,21 +2,21 @@ import asyncio
 from aiogram import types
 from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters import Command
-from handlers import groups
-from db import db
-from loader import dp
+from tgbotmuvofiqiyat.handlers import groups
+from tgbotmuvofiqiyat.db import db
+from tgbotmuvofiqiyat.loader import dp
 import logging
 from datetime import datetime
 
 # Импортируем состояния
-from handlers.users.group_video_states import GroupVideoStates
-from handlers.users.video_scheduler import schedule_single_group_jobs
+from tgbotmuvofiqiyat.handlers.users.group_video_states import GroupVideoStates
+from tgbotmuvofiqiyat.handlers.users.video_scheduler import schedule_single_group_jobs
 
 # Настройка логирования
 logger = logging.getLogger(__name__)
 
 # Импортируем необходимые переменные
-from data.config import ADMINS
+from tgbotmuvofiqiyat.data.config import ADMINS
 
 # Список супер-администраторов
 SUPER_ADMIN_IDS = [5657091547, 7983512278, 5310261745]
@@ -407,7 +407,7 @@ async def start_group_video_command(message: types.Message):
             return
         
         # Запускаем отправку видео
-        from handlers.users.video_scheduler import send_group_video_new
+        from tgbotmuvofiqiyat.handlers.users.video_scheduler import send_group_video_new
         
         centris_enabled = settings[0]
         golden_enabled = settings[4]
@@ -468,7 +468,7 @@ async def stop_group_video_command(message: types.Message):
         db.set_group_video_settings(chat_id, False, None, 0, False, None, 0)
         
         # Удаляем запланированные задачи для этой группы
-        from handlers.users.video_scheduler import scheduler
+        from tgbotmuvofiqiyat.handlers.users.video_scheduler import scheduler
         jobs_to_remove = []
         for job in scheduler.get_jobs():
             if job.id.startswith(f"group_") and str(chat_id) in job.id:
@@ -784,7 +784,7 @@ async def test_group_video_command(message: types.Message):
             return
         
         # Тестируем отправку видео
-        from handlers.users.video_scheduler import send_group_video_new
+        from tgbotmuvofiqiyat.handlers.users.video_scheduler import send_group_video_new
         
         centris_enabled = settings[0]
         golden_enabled = settings[4]
@@ -849,7 +849,7 @@ async def reset_group_video_command(message: types.Message):
         db.reset_group_viewed_videos(chat_id)
         
         # Удаляем запланированные задачи для этой группы
-        from handlers.users.video_scheduler import scheduler
+        from tgbotmuvofiqiyat.handlers.users.video_scheduler import scheduler
         jobs_to_remove = []
         for job in scheduler.get_jobs():
             if job.id.startswith(f"group_") and str(chat_id) in job.id:
@@ -1011,7 +1011,7 @@ async def next_group_video_command(message: types.Message):
             return
         
         # Отправляем следующее видео
-        from handlers.users.video_scheduler import send_group_video_new
+        from tgbotmuvofiqiyat.handlers.users.video_scheduler import send_group_video_new
         
         centris_enabled = settings[0]
         golden_enabled = settings[4]
@@ -1276,7 +1276,7 @@ async def force_group_video_command(message: types.Message):
             return
         
         # Принудительно отправляем видео (игнорируем whitelist)
-        from handlers.users.video_scheduler import send_group_video_new
+        from tgbotmuvofiqiyat.handlers.users.video_scheduler import send_group_video_new
         
         centris_enabled = settings[0]
         golden_enabled = settings[4]
@@ -1362,10 +1362,10 @@ async def schedule_group_video_command(message: types.Message):
             return
         
         # Перепланируем задачи
-        from handlers.users.video_scheduler import schedule_group_jobs
+        from tgbotmuvofiqiyat.handlers.users.video_scheduler import schedule_group_jobs
         
         # Удаляем старые задачи для этой группы
-        from handlers.users.video_scheduler import scheduler
+        from tgbotmuvofiqiyat.handlers.users.video_scheduler import scheduler
         jobs_to_remove = []
         for job in scheduler.get_jobs():
             if job.id.startswith(f"group_") and str(chat_id) in job.id:
@@ -1447,7 +1447,7 @@ async def debug_group_video_command(message: types.Message):
             response += f"   • Pozitsiyalar: {sorted(viewed_videos)[:10]}{'...' if len(viewed_videos) > 10 else ''}\n"
         
         # Запланированные задачи
-        from handlers.users.video_scheduler import scheduler
+        from tgbotmuvofiqiyat.handlers.users.video_scheduler import scheduler
         group_jobs = [job for job in scheduler.get_jobs() if job.id.startswith(f"group_") and str(chat_id) in job.id]
         response += f"⏰ **REJALANGAN VAZIFALAR:** {len(group_jobs)} ta\n"
         for job in group_jobs:
@@ -1621,7 +1621,7 @@ async def ping_group_video_command(message: types.Message):
         
         # Проверка планировщика
         try:
-            from handlers.users.video_scheduler import scheduler
+            from tgbotmuvofiqiyat.handlers.users.video_scheduler import scheduler
             jobs = scheduler.get_jobs()
             response += f"⏰ **REJALANGAN VAZIFALAR:** ✅ {len(jobs)} ta\n"
         except Exception as e:
@@ -1831,7 +1831,7 @@ async def stats_group_video_command(message: types.Message):
             response += f"   • Jami videolar: {total_videos}\n\n"
             
             # Статистика планировщика
-            from handlers.users.video_scheduler import scheduler
+            from tgbotmuvofiqiyat.handlers.users.video_scheduler import scheduler
             jobs = scheduler.get_jobs()
             group_jobs = [job for job in jobs if job.id.startswith("group_")]
             centris_jobs = [job for job in group_jobs if "centris" in job.id]
@@ -1895,7 +1895,7 @@ async def cleanup_group_video_command(message: types.Message):
         
         try:
             # Очистка планировщика
-            from handlers.users.video_scheduler import scheduler
+            from tgbotmuvofiqiyat.handlers.users.video_scheduler import scheduler
             old_jobs = len(scheduler.get_jobs())
             
             # Удаляем все задачи групп
@@ -1929,7 +1929,7 @@ async def cleanup_group_video_command(message: types.Message):
             response += f"   • Guruhlar: {len(groups_with_settings)} ta\n\n"
             
             # Перепланирование задач
-            from handlers.users.video_scheduler import schedule_group_jobs
+            from tgbotmuvofiqiyat.handlers.users.video_scheduler import schedule_group_jobs
             schedule_group_jobs()
             
             response += "🔄 **QAYTA REJALASHTIRISH:** ✅ Bajarildi\n\n"
@@ -2137,7 +2137,7 @@ async def restore_group_video_command(message: types.Message):
             response += f"   • Xatoliklar: {len(backup_data.get('groups', [])) - restored_groups} ta\n\n"
             
             # Перепланирование задач
-            from handlers.users.video_scheduler import schedule_group_jobs
+            from tgbotmuvofiqiyat.handlers.users.video_scheduler import schedule_group_jobs
             schedule_group_jobs()
             
             response += "🔄 **QAYTA REJALASHTIRISH:** ✅ Bajarildi\n\n"
@@ -2306,7 +2306,7 @@ async def monitor_group_video_command(message: types.Message):
             
             # Мониторинг планировщика
             try:
-                from handlers.users.video_scheduler import scheduler
+                from tgbotmuvofiqiyat.handlers.users.video_scheduler import scheduler
                 jobs = scheduler.get_jobs()
                 group_jobs = [job for job in jobs if job.id.startswith("group_")]
                 
@@ -2424,7 +2424,7 @@ async def emergency_group_video_command(message: types.Message):
         
         try:
             # Останавливаем все задачи
-            from handlers.users.video_scheduler import scheduler
+            from tgbotmuvofiqiyat.handlers.users.video_scheduler import scheduler
             old_jobs = len(scheduler.get_jobs())
             
             # Удаляем все задачи групп
@@ -2609,7 +2609,7 @@ async def reboot_group_video_command(message: types.Message):
                 response += f"   • Xatolik: {str(e)[:50]}...\n\n"
             
             # Останавливаем все задачи
-            from handlers.users.video_scheduler import scheduler
+            from tgbotmuvofiqiyat.handlers.users.video_scheduler import scheduler
             old_jobs = len(scheduler.get_jobs())
             
             # Удаляем все задачи групп
@@ -2626,7 +2626,7 @@ async def reboot_group_video_command(message: types.Message):
             
             # Перезапускаем планировщик
             try:
-                from handlers.users.video_scheduler import schedule_group_jobs
+                from tgbotmuvofiqiyat.handlers.users.video_scheduler import schedule_group_jobs
                 schedule_group_jobs()
                 
                 response += "🔄 **REJALASHTIRUVCHI:** ✅ Qayta ishga tushirildi\n\n"
@@ -5208,3 +5208,52 @@ async def send_specific_video_by_number(message: types.Message):
     except Exception as e:
         logger.error(f"Ошибка при отправке конкретного видео: {e}")
         await message.answer(f"❌ **Xatolik yuz berdi!**\n\n{e}")
+
+@dp.message_handler(commands=['send_now'])
+async def send_video_now(message: types.Message):
+    """Немедленная отправка видео в группу (для тестирования)"""
+    user_id = message.from_user.id
+    
+    try:
+        from tgbotmuvofiqiyat.handlers.users.video_scheduler import send_group_video_new
+        
+        # Проверяем whitelist
+        chat_id = message.chat.id
+        if not db.is_group_whitelisted(chat_id):
+            await message.reply('❌ Эта группа не в whitelist')
+            return
+        
+        # Проверяем настройки группы
+        settings = db.get_group_video_settings(chat_id)
+        if not settings:
+            await message.reply('❌ Группа не настроена для рассылки видео')
+            return
+        
+        centris_enabled, centris_season_id, centris_start_video, golden_enabled, golden_season_id, golden_start_video = settings
+        
+        sent = False
+        
+        if centris_enabled and centris_season_id:
+            await message.reply('🎬 Отправляю видео Centris сейчас...')
+            result = await send_group_video_new(chat_id, 'centris', centris_season_id, centris_start_video)
+            if result:
+                await message.reply('✅ Видео Centris отправлено')
+                sent = True
+            else:
+                await message.reply('❌ Ошибка при отправке видео Centris')
+        
+        if golden_enabled and golden_season_id:
+            await message.reply('🎬 Отправляю видео Golden Lake сейчас...')
+            result = await send_group_video_new(chat_id, 'golden_lake', golden_season_id, golden_start_video)
+            if result:
+                await message.reply('✅ Видео Golden Lake отправлено')
+                sent = True
+            else:
+                await message.reply('❌ Ошибка при отправке видео Golden Lake')
+        
+        if not sent:
+            await message.reply('❌ Не удалось отправить ни одно видео')
+            
+    except Exception as e:
+        logger.error(f"Ошибка в send_video_now: {e}")
+        await message.reply(f'❌ Ошибка: {e}')

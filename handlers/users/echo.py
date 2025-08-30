@@ -3,9 +3,9 @@ from datetime import datetime, timedelta
 try:
     from aiogram import types
     from aiogram.dispatcher import FSMContext
-    from db import db
-    from loader import dp
-    from states import TimeSelection, RegistrationStates, answer, questions, language, ImageCollection
+    from tgbotmuvofiqiyat.db import db
+    from tgbotmuvofiqiyat.loader import dp
+    from tgbotmuvofiqiyat.states import TimeSelection, RegistrationStates, answer, questions, language, ImageCollection
 
     # Список состояний, которые нужно исключить из обработки
     EXCLUDED_STATES = [

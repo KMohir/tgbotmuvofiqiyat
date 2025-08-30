@@ -6,11 +6,11 @@ import logging
 from aiogram import types
 from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters import Command
-from loader import dp, bot
-from db import db
-from data.config import ADMINS
+from tgbotmuvofiqiyat.loader import dp, bot
+from tgbotmuvofiqiyat.db import db
+from tgbotmuvofiqiyat.data.config import ADMINS
 from datetime import datetime
-from states.security_states import SecurityStates
+from tgbotmuvofiqiyat.states.security_states import SecurityStates
 
 logger = logging.getLogger(__name__)
 

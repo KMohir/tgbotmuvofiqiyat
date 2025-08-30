@@ -1,16 +1,16 @@
-from handlers import groups
+from tgbotmuvofiqiyat.handlers import groups
 
 from aiogram import types
 import asyncio
 from datetime import datetime, timedelta, time
-from db import db
-from loader import dp, bot
+from tgbotmuvofiqiyat.db import db
+from tgbotmuvofiqiyat.loader import dp, bot
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 import pytz
 import logging
 import json
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
-from handlers.users.video_lists import VIDEO_LIST_1, VIDEO_LIST_2, VIDEO_LIST_3, VIDEO_LIST_4, VIDEO_LIST_5, VIDEO_LIST_GOLDEN_1
+from tgbotmuvofiqiyat.handlers.users.video_lists import VIDEO_LIST_1, VIDEO_LIST_2, VIDEO_LIST_3, VIDEO_LIST_4, VIDEO_LIST_5, VIDEO_LIST_GOLDEN_1
 from aiogram.utils.exceptions import MigrateToChat
 
 # Настройка логирования
@@ -21,6 +21,37 @@ VIDEO_LIST = VIDEO_LIST_1
 
 # Инициализация планировщика
 scheduler = AsyncIOScheduler(timezone="Asia/Tashkent")
+
+def schedule_job_with_immediate_check(scheduler, func, hour, minute, args, job_id, timezone="Asia/Tashkent"):
+    """
+    Планирует задачу с проверкой: если время уже прошло, выполняет немедленно
+    """
+    try:
+        current_time = datetime.now(pytz.timezone(timezone))
+        target_time = current_time.replace(hour=hour, minute=minute, second=0, microsecond=0)
+        
+        if current_time >= target_time:
+            # Время уже прошло, отправляем немедленно
+            logger.info(f"Время {hour:02d}:{minute:02d} уже прошло, отправляем видео немедленно для {job_id}")
+            asyncio.create_task(func(*args))
+            # Планируем на завтра
+            target_time = target_time + timedelta(days=1)
+        
+        # Планируем задачу
+        scheduler.add_job(
+            func,
+            'cron',
+            hour=hour, minute=minute,
+            args=args,
+            id=job_id,
+            timezone=timezone,
+            misfire_grace_time=None  # Выполнять даже если время прошло
+        )
+        
+        logger.info(f"Задача {job_id} запланирована на {hour:02d}:{minute:02d}")
+        
+    except Exception as e:
+        logger.error(f"Ошибка при планировании задачи {job_id}: {e}")
 
 def get_video_list_by_project_and_season(project: str, season: str):
     if project == "centris":
@@ -679,13 +710,13 @@ def schedule_group_jobs_v2():
             for i, send_time in enumerate(send_times):
                 try:
                     hour, minute = map(int, send_time.split(':'))
-                    scheduler.add_job(
+                    schedule_job_with_immediate_check(
+                        scheduler,
                         send_group_video_new,
-                        'cron',
-                        hour=hour, minute=minute,
-                        args=[chat_id, 'centris', centris_season_id, centris_start_video],
-                        id=f'group_{chat_id}_centris_{i}',
-                        timezone="Asia/Tashkent"
+                        hour, minute,
+                        [chat_id, 'centris', centris_season_id, centris_start_video],
+                        f'group_{chat_id}_centris_{i}',
+                        "Asia/Tashkent"
                     )
                 except ValueError:
                     logger.error(f"Неверный формат времени {send_time} для группы {chat_id}")
@@ -697,13 +728,13 @@ def schedule_group_jobs_v2():
             for i, send_time in enumerate(send_times):
                 try:
                     hour, minute = map(int, send_time.split(':'))
-                    scheduler.add_job(
+                    schedule_job_with_immediate_check(
+                        scheduler,
                         send_group_video_new,
-                        'cron',
-                        hour=hour, minute=minute,
-                        args=[chat_id, 'golden_lake', golden_season_id, golden_start_video],
-                        id=f'group_{chat_id}_golden_{i}',
-                        timezone="Asia/Tashkent"
+                        hour, minute,
+                        [chat_id, 'golden_lake', golden_season_id, golden_start_video],
+                        f'group_{chat_id}_golden_{i}',
+                        "Asia/Tashkent"
                     )
                 except ValueError:
                     logger.error(f"Неверный формат времени {send_time} для группы {chat_id}")
@@ -716,13 +747,13 @@ def schedule_group_jobs_v2():
             for i, send_time in enumerate(send_times):
                 try:
                     hour, minute = map(int, send_time.split(':'))
-                    scheduler.add_job(
+                    schedule_job_with_immediate_check(
+                        scheduler,
                         send_group_video_new,
-                        'cron',
-                        hour=hour, minute=minute,
-                        args=[chat_id, 'centris', centris_season_id, centris_start_video],
-                        id=f'group_{chat_id}_centris_{i}',
-                        timezone="Asia/Tashkent"
+                        hour, minute,
+                        [chat_id, 'centris', centris_season_id, centris_start_video],
+                        f'group_{chat_id}_centris_{i}',
+                        "Asia/Tashkent"
                     )
                 except ValueError:
                     logger.error(f"Неверный формат времени {send_time} для группы {chat_id}")
@@ -736,33 +767,33 @@ def schedule_group_jobs_v2():
                     golden_hour = (first_hour + second_hour) // 2
                     if golden_hour == first_hour:
                         golden_hour = first_hour + 3  # Добавляем 3 часа
-                    scheduler.add_job(
+                    schedule_job_with_immediate_check(
+                        scheduler,
                         send_group_video_new,
-                        'cron',
-                        hour=golden_hour, minute=0,
-                        args=[chat_id, 'golden_lake', golden_season_id, golden_start_video],
-                        id=f'group_{chat_id}_golden_mid',
-                        timezone="Asia/Tashkent"
+                        golden_hour, 0,
+                        [chat_id, 'golden_lake', golden_season_id, golden_start_video],
+                        f'group_{chat_id}_golden_mid',
+                        "Asia/Tashkent"
                     )
                 except:
                     # Fallback: 11:00
-                    scheduler.add_job(
+                    schedule_job_with_immediate_check(
+                        scheduler,
                         send_group_video_new,
-                        'cron',
-                        hour=11, minute=0,
-                        args=[chat_id, 'golden_lake', golden_season_id, golden_start_video],
-                        id=f'group_{chat_id}_golden_mid',
-                        timezone="Asia/Tashkent"
+                        11, 0,
+                        [chat_id, 'golden_lake', golden_season_id, golden_start_video],
+                        f'group_{chat_id}_golden_mid',
+                        "Asia/Tashkent"
                     )
             else:
                 # Если только одно время для Centris, Golden Lake в 11:00
-                scheduler.add_job(
+                schedule_job_with_immediate_check(
+                    scheduler,
                     send_group_video_new,
-                    'cron',
-                    hour=11, minute=0,
-                    args=[chat_id, 'golden_lake', golden_season_id, golden_start_video],
-                    id=f'group_{chat_id}_golden_mid',
-                    timezone="Asia/Tashkent"
+                    11, 0,
+                    [chat_id, 'golden_lake', golden_season_id, golden_start_video],
+                    f'group_{chat_id}_golden_mid',
+                    "Asia/Tashkent"
                 )
             logger.info(f"Группа {chat_id}: Оба проекта - Centris {send_times}, Golden промежуточное время")
     
@@ -820,13 +851,13 @@ def schedule_single_group_jobs(chat_id: int):
             for i, send_time in enumerate(send_times):
                 try:
                     hour, minute = map(int, send_time.split(':'))
-                    scheduler.add_job(
+                    schedule_job_with_immediate_check(
+                        scheduler,
                         send_group_video_new,
-                        'cron',
-                        hour=hour, minute=minute,
-                        args=[chat_id, 'centris', centris_season_id, centris_start_video],
-                        id=f'group_{chat_id}_centris_{i}',
-                        timezone="Asia/Tashkent"
+                        hour, minute,
+                        [chat_id, 'centris', centris_season_id, centris_start_video],
+                        f'group_{chat_id}_centris_{i}',
+                        "Asia/Tashkent"
                     )
                 except ValueError:
                     logger.error(f"Неверный формат времени {send_time} для группы {chat_id}")
@@ -838,13 +869,13 @@ def schedule_single_group_jobs(chat_id: int):
             for i, send_time in enumerate(send_times):
                 try:
                     hour, minute = map(int, send_time.split(':'))
-                    scheduler.add_job(
+                    schedule_job_with_immediate_check(
+                        scheduler,
                         send_group_video_new,
-                        'cron',
-                        hour=hour, minute=minute,
-                        args=[chat_id, 'golden_lake', golden_season_id, golden_start_video],
-                        id=f'group_{chat_id}_golden_{i}',
-                        timezone="Asia/Tashkent"
+                        hour, minute,
+                        [chat_id, 'golden_lake', golden_season_id, golden_start_video],
+                        f'group_{chat_id}_golden_{i}',
+                        "Asia/Tashkent"
                     )
                 except ValueError:
                     logger.error(f"Неверный формат времени {send_time} для группы {chat_id}")
@@ -857,13 +888,13 @@ def schedule_single_group_jobs(chat_id: int):
             for i, send_time in enumerate(send_times):
                 try:
                     hour, minute = map(int, send_time.split(':'))
-                    scheduler.add_job(
+                    schedule_job_with_immediate_check(
+                        scheduler,
                         send_group_video_new,
-                        'cron',
-                        hour=hour, minute=minute,
-                        args=[chat_id, 'centris', centris_season_id, centris_start_video],
-                        id=f'group_{chat_id}_centris_{i}',
-                        timezone="Asia/Tashkent"
+                        hour, minute,
+                        [chat_id, 'centris', centris_season_id, centris_start_video],
+                        f'group_{chat_id}_centris_{i}',
+                        "Asia/Tashkent"
                     )
                 except ValueError:
                     logger.error(f"Неверный формат времени {send_time} для группы {chat_id}")
@@ -877,33 +908,33 @@ def schedule_single_group_jobs(chat_id: int):
                     golden_hour = (first_hour + second_hour) // 2
                     if golden_hour == first_hour:
                         golden_hour = first_hour + 3  # Добавляем 3 часа
-                    scheduler.add_job(
+                    schedule_job_with_immediate_check(
+                        scheduler,
                         send_group_video_new,
-                        'cron',
-                        hour=golden_hour, minute=0,
-                        args=[chat_id, 'golden_lake', golden_season_id, golden_start_video],
-                        id=f'group_{chat_id}_golden_mid',
-                        timezone="Asia/Tashkent"
+                        golden_hour, 0,
+                        [chat_id, 'golden_lake', golden_season_id, golden_start_video],
+                        f'group_{chat_id}_golden_mid',
+                        "Asia/Tashkent"
                     )
                 except:
                     # Fallback: 11:00
-                    scheduler.add_job(
+                    schedule_job_with_immediate_check(
+                        scheduler,
                         send_group_video_new,
-                        'cron',
-                        hour=11, minute=0,
-                        args=[chat_id, 'golden_lake', golden_season_id, golden_start_video],
-                        id=f'group_{chat_id}_golden_mid',
-                        timezone="Asia/Tashkent"
+                        11, 0,
+                        [chat_id, 'golden_lake', golden_season_id, golden_start_video],
+                        f'group_{chat_id}_golden_mid',
+                        "Asia/Tashkent"
                     )
             else:
                 # Если только одно время для Centris, Golden Lake в 11:00
-                scheduler.add_job(
+                schedule_job_with_immediate_check(
+                    scheduler,
                     send_group_video_new,
-                    'cron',
-                    hour=11, minute=0,
-                    args=[chat_id, 'golden_lake', golden_season_id, golden_start_video],
-                    id=f'group_{chat_id}_golden_mid',
-                    timezone="Asia/Tashkent"
+                    11, 0,
+                    [chat_id, 'golden_lake', golden_season_id, golden_start_video],
+                    f'group_{chat_id}_golden_mid',
+                    "Asia/Tashkent"
                 )
             logger.info(f"Группа {chat_id}: Оба проекта - Centris {send_times}, Golden промежуточное время")
         

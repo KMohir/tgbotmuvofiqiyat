@@ -1,12 +1,16 @@
-from .video_selector import dp
-from .start import dp
-from .user_commands import dp
-from .user_registration import dp
-from .video_scheduler import dp
-from .help import dp
-from .admin_image_sender import dp
-from .group_video_commands import dp
-from .security import dp
-from .admin_security import dp
+# Импортируем все обработчики для их регистрации
+from . import video_selector
+from . import start  
+from . import user_commands
+from . import user_registration
+from . import video_scheduler
+from . import help
+from . import admin_image_sender
+from . import group_video_commands
+from . import security
+from . import admin_security
+
+# Импортируем dp из одного модуля
+from tgbotmuvofiqiyat.loader import dp
 
 __all__ = ["dp"]
