@@ -24,18 +24,16 @@ scheduler = AsyncIOScheduler(timezone="Asia/Tashkent")
 
 def schedule_job_with_immediate_check(scheduler, func, hour, minute, args, job_id, timezone="Asia/Tashkent"):
     """
-    Планирует задачу с проверкой: если время уже прошло, выполняет немедленно
+    Планирует задачу: если время уже прошло, планирует на завтра
     """
     try:
         current_time = datetime.now(pytz.timezone(timezone))
         target_time = current_time.replace(hour=hour, minute=minute, second=0, microsecond=0)
         
         if current_time >= target_time:
-            # Время уже прошло, отправляем немедленно
-            logger.info(f"Время {hour:02d}:{minute:02d} уже прошло, отправляем видео немедленно для {job_id}")
-            asyncio.create_task(func(*args))
-            # Планируем на завтра
-            target_time = target_time + timedelta(days=1)
+            # Время уже прошло, планируем на завтра
+            logger.info(f"Время {hour:02d}:{minute:02d} уже прошло, планируем на завтра для {job_id}")
+            # НЕ отправляем немедленно!
         
         # Планируем задачу
         scheduler.add_job(
@@ -45,7 +43,7 @@ def schedule_job_with_immediate_check(scheduler, func, hour, minute, args, job_i
             args=args,
             id=job_id,
             timezone=timezone,
-            misfire_grace_time=None  # Выполнять даже если время прошло
+            misfire_grace_time=None
         )
         
         logger.info(f"Задача {job_id} запланирована на {hour:02d}:{minute:02d}")
