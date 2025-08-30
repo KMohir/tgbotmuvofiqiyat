@@ -127,7 +127,8 @@ class Database:
                     viewed_videos TEXT DEFAULT '[]',
                     centris_viewed_videos TEXT DEFAULT '[]',  -- Отдельно для Centris
                     golden_viewed_videos TEXT DEFAULT '[]',   -- Отдельно для Golden Lake
-                    is_subscribed INTEGER DEFAULT 1
+                    is_subscribed INTEGER DEFAULT 1,
+                    send_times TEXT DEFAULT '["08:00", "20:00"]'  -- Время отправки в формате JSON
                 )
             ''')
             
@@ -135,9 +136,10 @@ class Database:
             try:
                 cursor.execute("ALTER TABLE group_video_settings ADD COLUMN IF NOT EXISTS centris_viewed_videos TEXT DEFAULT '[]'")
                 cursor.execute("ALTER TABLE group_video_settings ADD COLUMN IF NOT EXISTS golden_viewed_videos TEXT DEFAULT '[]'")
-                logger.info("Миграция: добавлены колонки для отдельного отслеживания просмотренных видео")
+                cursor.execute("ALTER TABLE group_video_settings ADD COLUMN IF NOT EXISTS send_times TEXT DEFAULT '[\"08:00\", \"20:00\"]'")
+                logger.info("Миграция: добавлены колонки для отдельного отслеживания просмотренных видео и времени отправки")
             except Exception as e:
-                logger.error(f"Ошибка при добавлении колонок для отслеживания видео: {e}")
+                logger.error(f"Ошибка при добавлении колонок для отслеживания видео и времени: {e}")
             
             # Проверяем и обновляем структуру существующей таблицы
             cursor.execute('''
@@ -394,7 +396,7 @@ class Database:
         try:
             cursor = self.conn.cursor()
             cursor.execute('''
-                SELECT centris_enabled, centris_season_id, centris_start_video, golden_enabled, golden_season_id, golden_start_video
+                SELECT centris_enabled, centris_season_id, centris_start_video, golden_enabled, golden_season_id, golden_start_video, send_times
                 FROM group_video_settings WHERE chat_id = %s
             ''', (str(chat_id),))
             result = cursor.fetchone()
@@ -1053,7 +1055,7 @@ class Database:
             cursor.execute('''
                 SELECT gvs.chat_id, gvs.centris_enabled, gvs.centris_season_id, gvs.centris_start_video, 
                        gvs.golden_enabled, gvs.golden_season_id, gvs.golden_start_video, gvs.viewed_videos, gvs.is_subscribed, 
-                       COALESCE(gvs.group_name, u.name, 'Noma''lum guruh') as group_name
+                       COALESCE(gvs.group_name, u.name, 'Noma''lum guruh') as group_name, gvs.send_times
                 FROM group_video_settings gvs
                 LEFT JOIN users u ON gvs.chat_id::bigint = u.user_id AND u.is_group = 1
             ''')
@@ -1443,6 +1445,40 @@ class Database:
         except Exception as e:
             logger.error(f"Ошибка при автоматическом добавлении группы {chat_id} в whitelist: {e}")
             return False
+
+    # === МЕТОДЫ ДЛЯ РАБОТЫ С ВРЕМЕНЕМ ОТПРАВКИ ===
+    
+    def set_group_send_times(self, chat_id: int, send_times: list) -> bool:
+        """Установить время отправки для группы"""
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute("""
+                INSERT INTO group_video_settings (chat_id, send_times)
+                VALUES (%s, %s)
+                ON CONFLICT (chat_id) DO UPDATE SET send_times = EXCLUDED.send_times
+            """, (str(chat_id), json.dumps(send_times)))
+            self.conn.commit()
+            cursor.close()
+            logger.info(f"Время отправки для группы {chat_id} установлено: {send_times}")
+            return True
+        except Exception as e:
+            logger.error(f"Ошибка при установке времени отправки для группы {chat_id}: {e}")
+            self.conn.rollback()
+            return False
+
+    def get_group_send_times(self, chat_id: int) -> list:
+        """Получить время отправки для группы"""
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute("SELECT send_times FROM group_video_settings WHERE chat_id = %s", (str(chat_id),))
+            result = cursor.fetchone()
+            cursor.close()
+            if result and result[0]:
+                return json.loads(result[0])
+            return ["08:00", "20:00"]  # Время по умолчанию
+        except Exception as e:
+            logger.error(f"Ошибка при получении времени отправки для группы {chat_id}: {e}")
+            return ["08:00", "20:00"]
 
 # create_security_tables метод уже определен в классе Database
 

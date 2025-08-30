@@ -180,6 +180,185 @@ async def show_group_video_settings(message: types.Message):
 
 logger.info("✅ Команды групп зарегистрированы успешно!")
 
+# Обработчики для выбора времени отправки
+@dp.callback_query_handler(lambda c: c.data.startswith("time_"), state=GroupVideoStates.waiting_for_send_times)
+async def process_time_selection(callback_query: types.CallbackQuery, state: FSMContext):
+    """Обработчик выбора времени отправки"""
+    try:
+        action = callback_query.data
+        data = await state.get_data()
+        temp_settings = data.get("temp_settings")
+        
+        if not temp_settings:
+            await callback_query.message.edit_text("❌ **Xatolik!**\n\nSozlamalar topilmadi. Qaytadan boshlang.")
+            await state.finish()
+            return
+        
+        # Получаем текущие времена отправки
+        current_times = temp_settings.get("send_times", ["08:00", "20:00"])
+        
+        if action == "time_preset_default":
+            temp_settings["send_times"] = ["08:00", "20:00"]
+            await callback_query.answer("🌅 Standart vaqt tanlandi: 08:00, 20:00")
+            
+        elif action == "time_preset_early":
+            temp_settings["send_times"] = ["07:00", "19:00"]
+            await callback_query.answer("🌅 Erta vaqt tanlandi: 07:00, 19:00")
+            
+        elif action == "time_preset_late":
+            temp_settings["send_times"] = ["09:00", "21:00"]
+            await callback_query.answer("🌅 Kech vaqt tanlandi: 09:00, 21:00")
+            
+        elif action == "time_preset_mid":
+            temp_settings["send_times"] = ["10:00", "18:00"]
+            await callback_query.answer("🌅 O'rta vaqt tanlandi: 10:00, 18:00")
+            
+        elif action == "time_three_times":
+            temp_settings["send_times"] = ["08:00", "14:00", "20:00"]
+            await callback_query.answer("📅 Kuniga 3 marta: 08:00, 14:00, 20:00")
+            
+        elif action == "time_custom":
+            await callback_query.message.edit_text(
+                "⏰ **Maxsus vaqtlarni kiriting:**\n\n"
+                "Vaqtlarni HH:MM formatida kiriting, vergul bilan ajrating.\n"
+                "Masalan: 09:00, 15:00, 21:00\n\n"
+                "📝 **Eslatma:** Maksimal 5 ta vaqt kiritish mumkin."
+            )
+            await state.set_state(GroupVideoStates.waiting_for_send_times.state)
+            await callback_query.answer()
+            return
+            
+        elif action == "time_confirm":
+            # Сохраняем настройки с выбранным временем
+            saved_settings = await save_group_settings(temp_settings)
+            
+            # Получаем название группы
+            group_name = "Noma'lum guruh"
+            chat_id = temp_settings.get("chat_id")
+            try:
+                group_info = await callback_query.bot.get_chat(chat_id)
+                group_name = group_info.title or group_info.first_name or f"Guruh {chat_id}"
+            except:
+                pass
+            
+            # Получаем названия сезонов
+            centris_season_name = "Noma'lum"
+            golden_season_name = "Noma'lum"
+            try:
+                if saved_settings["centris_enabled"] and saved_settings["centris_season_id"]:
+                    centris_season = db.get_season_by_id(saved_settings["centris_season_id"])
+                    if centris_season:
+                        centris_season_name = centris_season[2]  # season_name
+                if saved_settings["golden_enabled"] and saved_settings["golden_season_id"]:
+                    golden_season = db.get_season_by_id(saved_settings["golden_season_id"])
+                    if golden_season:
+                        golden_season_name = golden_season[2]  # season_name
+            except:
+                pass
+            
+            send_times = temp_settings.get("send_times", ["08:00", "20:00"])
+            send_times_str = ", ".join(send_times)
+            
+            await callback_query.message.edit_text(
+                f"✅ **Sozlamalar saqlandi!**\n\n"
+                f"🏢 **Guruh:** {group_name}\n"
+                f"🆔 **ID:** {chat_id}\n\n"
+                f"🎬 Video tarqatish faollashtirildi.\n\n"
+                f"📋 **Sozlamalar:**\n"
+                f"• Centris: {'✅ Yoqilgan' if saved_settings['centris_enabled'] else '❌ O''chirilgan'}\n"
+                f"  📺 Sezon: {centris_season_name if saved_settings['centris_enabled'] else 'N/A'}\n"
+                f"  🎥 Video: {saved_settings['centris_start_video'] + 1 if saved_settings['centris_enabled'] else 'N/A'}\n"
+                f"• Golden: {'✅ Yoqilgan' if saved_settings['golden_enabled'] else '❌ O''chirilgan'}\n"
+                f"  📺 Sezon: {golden_season_name if saved_settings['golden_enabled'] else 'N/A'}\n"
+                f"  🎥 Video: {saved_settings['golden_start_video'] + 1 if saved_settings['golden_enabled'] else 'N/A'}\n\n"
+                f"⏰ **Yuborish vaqtlari:** {send_times_str}"
+            )
+            await state.finish()
+            return
+        
+        # Обновляем клавиатуру с новыми временами
+        current_times_str = ", ".join(temp_settings.get("send_times", ["08:00", "20:00"]))
+        await callback_query.message.edit_text(
+            f"⏰ **Yuborish vaqtini tanlang:**\n\n"
+            f"Video qachon yuborilishini tanlang. Bir nechta vaqt tanlashingiz mumkin.\n\n"
+            f"📋 **Joriy sozlamalar:**\n"
+            f"• Loyiha: {temp_settings.get('project', 'N/A')}\n"
+            f"• Centris: {'✅' if temp_settings.get('project') in ['centris', 'both'] else '❌'}\n"
+            f"• Golden: {'✅' if temp_settings.get('project') in ['golden', 'both'] else '❌'}\n\n"
+            f"⏰ **Tanlangan vaqt:** {current_times_str}",
+            reply_markup=get_time_selection_keyboard(),
+            parse_mode="Markdown"
+        )
+        await state.update_data(temp_settings=temp_settings)
+        
+    except Exception as e:
+        logger.error(f"Ошибка при выборе времени: {e}")
+        await callback_query.answer("❌ Xatolik yuz berdi!")
+
+# Обработчик для пользовательского ввода времени
+@dp.message_handler(state=GroupVideoStates.waiting_for_send_times)
+async def process_custom_time_input(message: types.Message, state: FSMContext):
+    """Обработчик пользовательского ввода времени"""
+    try:
+        data = await state.get_data()
+        temp_settings = data.get("temp_settings")
+        
+        if not temp_settings:
+            await message.answer("❌ **Xatolik!**\n\nSozlamalar topilmadi. Qaytadan boshlang.")
+            await state.finish()
+            return
+        
+        # Парсим введенные времена
+        time_text = message.text.strip()
+        time_parts = [t.strip() for t in time_text.split(',')]
+        
+        # Валидируем формат времени
+        valid_times = []
+        for time_part in time_parts:
+            try:
+                # Проверяем формат HH:MM
+                if len(time_part) == 5 and time_part[2] == ':':
+                    hour, minute = map(int, time_part.split(':'))
+                    if 0 <= hour <= 23 and 0 <= minute <= 59:
+                        valid_times.append(time_part)
+                    else:
+                        raise ValueError("Invalid time range")
+                else:
+                    raise ValueError("Invalid time format")
+            except ValueError:
+                await message.answer(
+                    f"❌ **Noto'g'ri vaqt formati:** {time_part}\n\n"
+                    "Vaqtni HH:MM formatida kiriting (masalan: 09:30)\n"
+                    "Barcha vaqtlarni vergul bilan ajrating."
+                )
+                return
+        
+        if len(valid_times) == 0:
+            await message.answer("❌ **Hech qanday to'g'ri vaqt topilmadi!**")
+            return
+            
+        if len(valid_times) > 5:
+            await message.answer("❌ **Maksimal 5 ta vaqt kiritish mumkin!**")
+            return
+        
+        # Сохраняем времена
+        temp_settings["send_times"] = valid_times
+        
+        # Показываем подтверждение
+        times_str = ", ".join(valid_times)
+        await message.answer(
+            f"✅ **Maxsus vaqtlar tanlandi!**\n\n"
+            f"⏰ **Vaqtlar:** {times_str}\n\n"
+            f"Sozlamalarni saqlash uchun \"✅ Tayyor\" tugmasini bosing.",
+            reply_markup=get_time_selection_keyboard(),
+            parse_mode="Markdown"
+        )
+        await state.update_data(temp_settings=temp_settings)
+        
+    except Exception as e:
+        logger.error(f"Ошибка при обработке пользовательского времени: {e}")
+        await message.answer("❌ Xatolik yuz berdi!")
+
 # Команда для запуска отправки видео в группе
 @dp.message_handler(commands=['start_group_video'])
 async def start_group_video_command(message: types.Message):
@@ -3728,6 +3907,32 @@ def get_project_keyboard():
     )
     return keyboard
 
+# Функция для получения клавиатуры выбора времени отправки
+def get_time_selection_keyboard():
+    from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+    
+    keyboard = InlineKeyboardMarkup(row_width=2)
+    
+    # Предустановленные варианты времени
+    keyboard.add(
+        InlineKeyboardButton("🌅 08:00, 20:00", callback_data="time_preset_default"),
+        InlineKeyboardButton("🌅 07:00, 19:00", callback_data="time_preset_early"),
+    )
+    keyboard.add(
+        InlineKeyboardButton("🌅 09:00, 21:00", callback_data="time_preset_late"),
+        InlineKeyboardButton("🌅 10:00, 18:00", callback_data="time_preset_mid"),
+    )
+    keyboard.add(
+        InlineKeyboardButton("⏰ Boshqa vaqt", callback_data="time_custom"),
+        InlineKeyboardButton("📅 3 marta kuniga", callback_data="time_three_times"),
+    )
+    keyboard.add(
+        InlineKeyboardButton("✅ Tayyor", callback_data="time_confirm"),
+        InlineKeyboardButton("❌ Bekor qilish", callback_data="group_cancel")
+    )
+    
+    return keyboard
+
 # Обработчики callback-запросов для set_group_video
 @dp.callback_query_handler(lambda c: c.data.startswith("project_"), state="*")
 async def process_project_selection(callback_query: types.CallbackQuery, state: FSMContext):
@@ -3941,37 +4146,22 @@ async def process_group_selection(callback_query: types.CallbackQuery, state: FS
             if callback_query.message.chat.type in [types.ChatType.GROUP, types.ChatType.SUPERGROUP]:
                 # Обновляем chat_id в настройках
                 temp_settings["chat_id"] = chat_id
-                saved_settings = await save_group_settings(temp_settings)
                 
-                # Получаем названия сезонов
-                centris_season_name = "Noma'lum"
-                golden_season_name = "Noma'lum"
-                try:
-                    if saved_settings["centris_enabled"] and saved_settings["centris_season_id"]:
-                        centris_season = db.get_season_by_id(saved_settings["centris_season_id"])
-                        if centris_season:
-                            centris_season_name = centris_season[1]  # season_name
-                    if saved_settings["golden_enabled"] and saved_settings["golden_season_id"]:
-                        golden_season = db.get_season_by_id(saved_settings["golden_season_id"])
-                        if golden_season:
-                            golden_season_name = golden_season[1]  # season_name
-                except:
-                    pass
-                
+                # Переходим к выбору времени отправки
                 await callback_query.message.edit_text(
-                    f"✅ **Sozlamalar saqlandi!**\n\n"
-                    f"🏢 **Guruh:** {callback_query.message.chat.title}\n"
-                    f"🆔 **ID:** {chat_id}\n\n"
-                    f"🎬 Video tarqatish faollashtirildi.\n\n"
-                    f"📋 **Sozlamalar:**\n"
-                    f"• Centris: {'✅ Yoqilgan' if saved_settings['centris_enabled'] else '❌ O''chirilgan'}\n"
-                    f"  📺 Sezon: {centris_season_name if saved_settings['centris_enabled'] else 'N/A'}\n"
-                    f"  🎥 Video: {saved_settings['centris_start_video'] + 1 if saved_settings['centris_enabled'] else 'N/A'}\n"
-                    f"• Golden: {'✅ Yoqilgan' if saved_settings['golden_enabled'] else '❌ O''chirilgan'}\n"
-                    f"  📺 Sezon: {golden_season_name if saved_settings['golden_enabled'] else 'N/A'}\n"
-                    f"  🎥 Video: {saved_settings['golden_start_video'] + 1 if saved_settings['golden_enabled'] else 'N/A'}"
+                    "⏰ **Yuborish vaqtini tanlang:**\n\n"
+                    "Video qachon yuborilishini tanlang. Bir nechta vaqt tanlashingiz mumkin.\n\n"
+                    "📋 **Joriy sozlamalar:**\n"
+                    f"• Loyiha: {temp_settings.get('project', 'N/A')}\n"
+                    f"• Centris: {'✅' if temp_settings.get('project') in ['centris', 'both'] else '❌'}\n"
+                    f"• Golden: {'✅' if temp_settings.get('project') in ['golden', 'both'] else '❌'}",
+                    reply_markup=get_time_selection_keyboard(),
+                    parse_mode="Markdown"
                 )
-                await state.finish()
+                await state.set_state(GroupVideoStates.waiting_for_send_times.state)
+                await state.update_data(temp_settings=temp_settings)
+                await callback_query.answer()
+                return
             else:
                 await callback_query.message.edit_text(
                     "❌ **Xatolik!**\n\nBu buyruq faqat guruhlarda ishlaydi."
@@ -4031,45 +4221,22 @@ async def process_group_selection(callback_query: types.CallbackQuery, state: FS
             # Выбираем группу из списка
             group_id = action.replace("select_group_", "")
             temp_settings["chat_id"] = int(group_id)
-            saved_settings = await save_group_settings(temp_settings)
             
-            # Получаем название группы
-            group_name = "Noma'lum guruh"
-            try:
-                group_info = await callback_query.bot.get_chat(int(group_id))
-                group_name = group_info.title or group_info.first_name or f"Guruh {group_id}"
-            except:
-                pass
-            
-            # Получаем названия сезонов
-            centris_season_name = "Noma'lum"
-            golden_season_name = "Noma'lum"
-            try:
-                if saved_settings["centris_enabled"] and saved_settings["centris_season_id"]:
-                    centris_season = db.get_season_by_id(saved_settings["centris_season_id"])
-                    if centris_season:
-                        centris_season_name = centris_season[1]  # season_name
-                if saved_settings["golden_enabled"] and saved_settings["golden_season_id"]:
-                    golden_season = db.get_season_by_id(saved_settings["golden_season_id"])
-                    if golden_season:
-                        golden_season_name = golden_season[1]  # season_name
-            except:
-                pass
-            
+            # Переходим к выбору времени отправки
             await callback_query.message.edit_text(
-                f"✅ **Sozlamalar saqlandi!**\n\n"
-                f"🏢 **Guruh:** {group_name}\n"
-                f"🆔 **ID:** {group_id}\n\n"
-                f"🎬 Video tarqatish faollashtirildi.\n\n"
-                f"📋 **Sozlamalar:**\n"
-                f"• Centris: {'✅ Yoqilgan' if saved_settings['centris_enabled'] else '❌ O''chirilgan'}\n"
-                f"  📺 Sezon: {centris_season_name if saved_settings['centris_enabled'] else 'N/A'}\n"
-                f"  🎥 Video: {saved_settings['centris_start_video'] + 1 if saved_settings['centris_enabled'] else 'N/A'}\n"
-                f"• Golden: {'✅ Yoqilgan' if saved_settings['golden_enabled'] else '❌ O''chirilgan'}\n"
-                f"  📺 Sezon: {golden_season_name if saved_settings['golden_enabled'] else 'N/A'}\n"
-                f"  🎥 Video: {saved_settings['golden_start_video'] + 1 if saved_settings['golden_enabled'] else 'N/A'}"
+                "⏰ **Yuborish vaqtini tanlang:**\n\n"
+                "Video qachon yuborilishini tanlang. Bir nechta vaqt tanlashingiz mumkin.\n\n"
+                "📋 **Joriy sozlamalar:**\n"
+                f"• Loyiha: {temp_settings.get('project', 'N/A')}\n"
+                f"• Centris: {'✅' if temp_settings.get('project') in ['centris', 'both'] else '❌'}\n"
+                f"• Golden: {'✅' if temp_settings.get('project') in ['golden', 'both'] else '❌'}",
+                reply_markup=get_time_selection_keyboard(),
+                parse_mode="Markdown"
             )
-            await state.finish()
+            await state.set_state(GroupVideoStates.waiting_for_send_times.state)
+            await state.update_data(temp_settings=temp_settings)
+            await callback_query.answer()
+            return
         
         await callback_query.answer()
         
@@ -4141,45 +4308,20 @@ async def process_manual_group_id(message: types.Message, state: FSMContext):
         
         # Обновляем chat_id в настройках
         temp_settings["chat_id"] = group_id
-        saved_settings = await save_group_settings(temp_settings)
         
-        # Получаем название группы
-        group_name = "Noma'lum guruh"
-        try:
-            group_info = await message.bot.get_chat(group_id)
-            group_name = group_info.title or group_info.first_name or f"Guruh {group_id}"
-        except:
-            pass
-        
-        # Получаем названия сезонов
-        centris_season_name = "Noma'lum"
-        golden_season_name = "Noma'lum"
-        try:
-            if saved_settings["centris_enabled"] and saved_settings["centris_season_id"]:
-                centris_season = db.get_season_by_id(saved_settings["centris_season_id"])
-                if centris_season:
-                    centris_season_name = centris_season[1]  # season_name
-            if saved_settings["golden_enabled"] and saved_settings["golden_season_id"]:
-                golden_season = db.get_season_by_id(saved_settings["golden_season_id"])
-                if golden_season:
-                    golden_season_name = golden_season[1]  # season_name
-        except:
-            pass
-        
+        # Переходим к выбору времени отправки
         await message.answer(
-            f"✅ **Sozlamalar saqlandi!**\n\n"
-            f"🏢 **Guruh:** {group_name}\n"
-            f"🆔 **ID:** {group_id}\n\n"
-            f"🎬 Video tarqatish faollashtirildi.\n\n"
-            f"📋 **Sozlamalar:**\n"
-            f"• Centris: {'✅ Yoqilgan' if saved_settings['centris_enabled'] else '❌ O''chirilgan'}\n"
-            f"  📺 Sezon: {centris_season_name if saved_settings['centris_enabled'] else 'N/A'}\n"
-            f"  🎥 Video: {saved_settings['centris_start_video'] + 1 if saved_settings['centris_enabled'] else 'N/A'}\n"
-            f"• Golden: {'✅ Yoqilgan' if saved_settings['golden_enabled'] else '❌ O''chirilgan'}\n"
-            f"  📺 Sezon: {golden_season_name if saved_settings['golden_enabled'] else 'N/A'}\n"
-            f"  🎥 Video: {saved_settings['golden_start_video'] + 1 if saved_settings['golden_enabled'] else 'N/A'}"
+            "⏰ **Yuborish vaqtini tanlang:**\n\n"
+            "Video qachon yuborilishini tanlang. Bir nechta vaqt tanlashingiz mumkin.\n\n"
+            "📋 **Joriy sozlamalar:**\n"
+            f"• Loyiha: {temp_settings.get('project', 'N/A')}\n"
+            f"• Centris: {'✅' if temp_settings.get('project') in ['centris', 'both'] else '❌'}\n"
+            f"• Golden: {'✅' if temp_settings.get('project') in ['golden', 'both'] else '❌'}",
+            reply_markup=get_time_selection_keyboard(),
+            parse_mode="Markdown"
         )
-        await state.finish()
+        await state.set_state(GroupVideoStates.waiting_for_send_times.state)
+        await state.update_data(temp_settings=temp_settings)
         
     except Exception as e:
         logger.error(f"Ошибка при обработке ID группы: {e}")
@@ -4771,6 +4913,7 @@ async def save_group_settings(data):
         centris_start_video = data.get("centris_start_video", 0)
         golden_season_id = data.get("golden_season_id") if golden_enabled else None
         golden_start_video = data.get("golden_start_video", 0)
+        send_times = data.get("send_times", ["08:00", "20:00"])
         
         # Убеждаемся что у нас есть все необходимые данные
         if centris_enabled and centris_season_id is None:
@@ -4799,6 +4942,9 @@ async def save_group_settings(data):
         if golden_enabled and golden_season_id is not None:
             db.set_group_video_start(chat_id, 'golden', golden_season_id, golden_start_video)
             db.reset_group_viewed_videos(chat_id)
+        
+        # Сохраняем время отправки
+        db.set_group_send_times(chat_id, send_times)
         
         # Планируем задачи для конкретной группы
         schedule_single_group_jobs(chat_id)

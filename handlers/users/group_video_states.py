@@ -8,6 +8,7 @@ class GroupVideoStates(StatesGroup):
     waiting_for_golden_video = State()
     waiting_for_golden_season = State()
     waiting_for_group_selection = State()
+    waiting_for_send_times = State()  # Новое состояние для выбора времени отправки
 
 
 class AddSeasonStates(StatesGroup):
