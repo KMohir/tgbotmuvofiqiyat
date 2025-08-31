@@ -1,4 +1,5 @@
 import asyncio
+import os
 from aiogram import types
 from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters import Command
@@ -4053,9 +4054,11 @@ async def process_video_selection(callback_query: types.CallbackQuery, state: FS
                 await state.set_state(GroupVideoStates.waiting_for_golden_season.state)
             else:
                 # Только Centris - сохраняем настройки
+                # Получаем обновленные данные с выбранным видео
+                updated_data = await state.get_data()
                 # Сохраняем настройки во временное состояние
                 await state.update_data(
-                    temp_settings=data,
+                    temp_settings=updated_data,
                     settings_complete=True
                 )
                 
@@ -4075,9 +4078,11 @@ async def process_video_selection(callback_query: types.CallbackQuery, state: FS
             
             if project == "both":
                 # Оба проекта - сохраняем настройки
+                # Получаем обновленные данные с выбранным видео
+                updated_data = await state.get_data()
                 # Сохраняем настройки во временное состояние
                 await state.update_data(
-                    temp_settings=data,
+                    temp_settings=updated_data,
                     settings_complete=True
                 )
                 
@@ -4093,9 +4098,11 @@ async def process_video_selection(callback_query: types.CallbackQuery, state: FS
                 await state.set_state(GroupVideoStates.waiting_for_group_selection.state)
             else:
                 # Только Golden - сохраняем настройки
+                # Получаем обновленные данные с выбранным видео
+                updated_data = await state.get_data()
                 # Сохраняем настройки во временное состояние
                 await state.update_data(
-                    temp_settings=data,
+                    temp_settings=updated_data,
                     settings_complete=True
                 )
                 
