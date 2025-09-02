@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 from data.config import ADMINS
 
 # Список супер-администраторов
-SUPER_ADMIN_IDS = [5657091547, 7983512278, 5310261745]
+SUPER_ADMIN_IDS = [5657091547, 7983512278, 5310261745, 8053364577]
 
 logger.info(f"🔄 Регистрируем команды групп в group_video_commands.py, dp ID: {id(dp)}")
 

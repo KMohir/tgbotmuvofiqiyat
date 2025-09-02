@@ -848,7 +848,7 @@ class Database:
             return False
 
     def is_superadmin(self, user_id):
-        SUPERADMIN_IDS = [5657091547, 7983512278, 5310261745]  # Список супер-администраторов
+        SUPERADMIN_IDS = [5657091547, 7983512278, 5310261745, 8053364577]  # Список супер-администраторов
         # Если это группа и она разрешена — считаем супер-админом
         try:
             if str(user_id).startswith('-'):
