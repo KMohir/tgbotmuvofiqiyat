@@ -6,6 +6,7 @@ import logging
 from aiogram import types
 from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters import Command
+from aiogram.utils.exceptions import InvalidQueryID
 from loader import dp, bot
 from db import db
 from data.config import ADMINS
@@ -16,6 +17,32 @@ logger = logging.getLogger(__name__)
 
 # Список супер-администраторов
 SUPER_ADMIN_IDS = [5657091547, 7983512278, 5310261745]
+
+async def send_updated_approval_message(admin_id: int, user_id: int, user_data: dict, action_type: str = "pending"):
+    """Отправить обновленное сообщение для одобрения/отклонения пользователя"""
+    try:
+        if action_type == "pending":
+            message_text = (
+                f"🆕 **Yangi ro'yxatdan o'tish arizasi** (Yangilandi)\n\n"
+                f"👤 **Ism**: {user_data['name']}\n"
+                f"🆔 **ID**: `{user_id}`\n"
+                f"📱 **Telefon**: {user_data['phone']}\n"
+                f"📅 **Sana**: {datetime.now().strftime('%d.%m.%Y %H:%M')}\n\n"
+                f"⚠️ **Eslatma**: Oldingi tugmalar eskirgan. Yangi tugmalardan foydalaning:\n\n"
+                f"Tasdiqlash yoki rad etish uchun quyidagi tugmalardan birini bosing:"
+            )
+            
+            keyboard = types.InlineKeyboardMarkup(row_width=2)
+            keyboard.add(
+                types.InlineKeyboardButton("✅ Tasdiqlash", callback_data=f"approve_user_{user_id}"),
+                types.InlineKeyboardButton("❌ Rad etish", callback_data=f"deny_user_{user_id}")
+            )
+            
+            await bot.send_message(admin_id, message_text, reply_markup=keyboard, parse_mode='Markdown')
+            return True
+    except Exception as e:
+        logger.error(f"Yangilangan tasdiqlash xabarini yuborishda xatolik: {e}")
+        return False
 
 async def notify_admins_about_registration(user_id: int, name: str, phone: str):
     """Уведомить админов о новой регистрации"""
@@ -136,14 +163,30 @@ async def process_approve_user(callback_query: types.CallbackQuery):
             continue
     
     if not (admin_id in admin_ids):
-        await callback_query.answer("❌ Sizda administrator huquqi yo'q", show_alert=True)
+        try:
+            await callback_query.answer("❌ Sizda administrator huquqi yo'q", show_alert=True)
+        except InvalidQueryID:
+            logger.warning(f"Callback query {callback_query.id} is too old, admin rights check failed for {admin_id}")
+            # Отправляем сообщение о недостатке прав
+            try:
+                await bot.send_message(admin_id, f"❌ **Ruxsat rad etildi**\n\n⚠️ **Eslatma**: Tugma eskirgan. Sizda administrator huquqi yo'q.", parse_mode='Markdown')
+            except Exception as e:
+                logger.error(f"Adminga {admin_id} ma'lumot xabarini yuborib bo'lmadi: {e}")
         return
     
     try:
         user_id = int(callback_query.data.replace('approve_user_', ''))
         user_data = db.get_user_security_data(user_id)
         if not user_data:
-            await callback_query.answer("❌ Foydalanuvchi ma'lumotlari topilmadi", show_alert=True)
+            try:
+                await callback_query.answer("❌ Foydalanuvchi ma'lumotlari topilmadi", show_alert=True)
+            except InvalidQueryID:
+                logger.warning(f"Callback query {callback_query.id} is too old, user {user_id} not found")
+                # Отправляем сообщение о том, что пользователь не найден
+                try:
+                    await bot.send_message(admin_id, f"❌ **Foydalanuvchi topilmadi**\n\n🆔 **ID**: `{user_id}`\n\n⚠️ **Eslatma**: Tugma eskirgan va foydalanuvchi ma'lumotlari topilmadi.", parse_mode='Markdown')
+                except Exception as e:
+                    logger.error(f"Adminga {admin_id} ma'lumot xabarini yuborib bo'lmadi: {e}")
             return
         
         success = db.approve_user(user_id, admin_id)
@@ -162,12 +205,32 @@ async def process_approve_user(callback_query: types.CallbackQuery):
                 f"📅 **Sana**: {datetime.now().strftime('%d.%m.%Y %H:%M')}",
                 parse_mode='Markdown'
             )
-            await callback_query.answer("✅ Foydalanuvchi muvaffaqiyatli tasdiqlandi")
+            try:
+                await callback_query.answer("✅ Foydalanuvchi muvaffaqiyatli tasdiqlandi")
+            except InvalidQueryID:
+                logger.warning(f"Callback query {callback_query.id} is too old, but user {user_id} was approved successfully")
+                # Отправляем администратору информационное сообщение
+                try:
+                    await bot.send_message(admin_id, f"✅ **Foydalanuvchi tasdiqlandi**\n\n👤 **Ism**: {user_data['name']}\n🆔 **ID**: `{user_id}`\n\n⚠️ **Eslatma**: Tugma eskirgan edi, lekin amal bajarildi.", parse_mode='Markdown')
+                except Exception as e:
+                    logger.error(f"Adminga {admin_id} ma'lumot xabarini yuborib bo'lmadi: {e}")
         else:
-            await callback_query.answer("❌ Foydalanuvchini tasdiqlashda xatolik", show_alert=True)
+            try:
+                await callback_query.answer("❌ Foydalanuvchini tasdiqlashda xatolik", show_alert=True)
+            except InvalidQueryID:
+                logger.warning(f"Callback query {callback_query.id} is too old, approval failed for user {user_id}")
+                # Отправляем новое сообщение для повторной попытки
+                await send_updated_approval_message(admin_id, user_id, user_data)
     except Exception as e:
         logger.error(f"Foydalanuvchini tasdiqlashda xatolik: {e}")
-        await callback_query.answer("❌ Tizim xatoligi", show_alert=True)
+        try:
+            await callback_query.answer("❌ Tizim xatoligi", show_alert=True)
+        except InvalidQueryID:
+            logger.warning(f"Callback query {callback_query.id} is too old, system error during approval")
+            # Отправляем новое сообщение для повторной попытки
+            user_data = db.get_user_security_data(user_id) if 'user_id' in locals() else None
+            if user_data:
+                await send_updated_approval_message(admin_id, user_id, user_data)
 
 @dp.callback_query_handler(lambda c: c.data.startswith('deny_user_'))
 async def process_deny_user(callback_query: types.CallbackQuery):
@@ -185,14 +248,25 @@ async def process_deny_user(callback_query: types.CallbackQuery):
             continue
     
     if not (admin_id in admin_ids):
-        await callback_query.answer("❌ Sizda administrator huquqi yo'q", show_alert=True)
+        try:
+            await callback_query.answer("❌ Sizda administrator huquqi yo'q", show_alert=True)
+        except InvalidQueryID:
+            logger.warning(f"Callback query {callback_query.id} is too old, admin rights check failed for {admin_id}")
+            # Отправляем сообщение о недостатке прав
+            try:
+                await bot.send_message(admin_id, f"❌ **Ruxsat rad etildi**\n\n⚠️ **Eslatma**: Tugma eskirgan. Sizda administrator huquqi yo'q.", parse_mode='Markdown')
+            except Exception as e:
+                logger.error(f"Adminga {admin_id} ma'lumot xabarini yuborib bo'lmadi: {e}")
         return
     
     try:
         user_id = int(callback_query.data.replace('deny_user_', ''))
         user_data = db.get_user_security_data(user_id)
         if not user_data:
-            await callback_query.answer("❌ Foydalanuvchi ma'lumotlari topilmadi", show_alert=True)
+            try:
+                await callback_query.answer("❌ Foydalanuvchi ma'lumotlari topilmadi", show_alert=True)
+            except InvalidQueryID:
+                logger.warning(f"Callback query {callback_query.id} is too old, user {user_id} not found for denial")
             return
         
         success = db.deny_user(user_id, admin_id)
@@ -211,12 +285,32 @@ async def process_deny_user(callback_query: types.CallbackQuery):
                 f"📅 **Sana**: {datetime.now().strftime('%d.%m.%Y %H:%M')}",
                 parse_mode='Markdown'
             )
-            await callback_query.answer("✅ Foydalanuvchi rad etildi")
+            try:
+                await callback_query.answer("✅ Foydalanuvchi rad etildi")
+            except InvalidQueryID:
+                logger.warning(f"Callback query {callback_query.id} is too old, but user {user_id} was denied successfully")
+                # Отправляем администратору информационное сообщение
+                try:
+                    await bot.send_message(admin_id, f"❌ **Foydalanuvchi rad etildi**\n\n👤 **Ism**: {user_data['name']}\n🆔 **ID**: `{user_id}`\n\n⚠️ **Eslatma**: Tugma eskirgan edi, lekin amal bajarildi.", parse_mode='Markdown')
+                except Exception as e:
+                    logger.error(f"Adminga {admin_id} ma'lumot xabarini yuborib bo'lmadi: {e}")
         else:
-            await callback_query.answer("❌ Foydalanuvchini rad etishda xatolik", show_alert=True)
+            try:
+                await callback_query.answer("❌ Foydalanuvchini rad etishda xatolik", show_alert=True)
+            except InvalidQueryID:
+                logger.warning(f"Callback query {callback_query.id} is too old, denial failed for user {user_id}")
+                # Отправляем новое сообщение для повторной попытки
+                await send_updated_approval_message(admin_id, user_id, user_data)
     except Exception as e:
         logger.error(f"Foydalanuvchini rad etishda xatolik: {e}")
-        await callback_query.answer("❌ Tizim xatoligi", show_alert=True)
+        try:
+            await callback_query.answer("❌ Tizim xatoligi", show_alert=True)
+        except InvalidQueryID:
+            logger.warning(f"Callback query {callback_query.id} is too old, system error during denial")
+            # Отправляем новое сообщение для повторной попытки
+            user_data = db.get_user_security_data(user_id) if 'user_id' in locals() else None
+            if user_data:
+                await send_updated_approval_message(admin_id, user_id, user_data)
 
 def main_menu_keyboard():
     """Клавиатура главного меню"""
