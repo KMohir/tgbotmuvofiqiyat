@@ -117,7 +117,7 @@ class VideoSecurityMiddleware(BaseMiddleware):
 
     def is_super_admin(self, user_id: int) -> bool:
         """Проверить является ли пользователь супер-админом"""
-        SUPER_ADMIN_IDS = [5657091547, 7983512278, 5310261745, 8053364577]  # Список супер-администраторов
+        SUPER_ADMIN_IDS = [5657091547, 8053364577, 5310261745]  # Список супер-администраторов
         admin_ids = SUPER_ADMIN_IDS.copy()
         for admin in ADMINS:
             try:

@@ -15,7 +15,7 @@ from states.security_states import SecurityStates
 logger = logging.getLogger(__name__)
 
 # Список супер-администраторов
-SUPER_ADMIN_IDS = [5657091547, 7983512278, 5310261745, 8053364577]
+SUPER_ADMIN_IDS = [5657091547, 8053364577, 5310261745]
 
 async def notify_admins_about_registration(user_id: int, name: str, phone: str):
     """Уведомить админов о новой регистрации"""

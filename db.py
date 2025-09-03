@@ -94,11 +94,11 @@ class Database:
             self.conn.rollback()
 
     def migrate_admins_table(self):
-        """Миграция таблицы admins для добавления новых колонок"""
+        """Проверяем структуру таблицы admins (без изменений)"""
         try:
             cursor = self.conn.cursor()
             
-            # Проверяем существующие колонки в таблице admins
+            # Просто проверяем существующие колонки без изменений
             cursor.execute("""
                 SELECT column_name FROM information_schema.columns 
                 WHERE table_name = 'admins' AND table_schema = 'public'
@@ -106,25 +106,11 @@ class Database:
             existing_columns = [row[0] for row in cursor.fetchall()]
             logger.info(f"Существующие колонки в admins: {existing_columns}")
             
-            # Добавляем недостающие колонки
-            if 'name' not in existing_columns:
-                cursor.execute("ALTER TABLE admins ADD COLUMN name TEXT")
-                logger.info("Добавлена колонка 'name' в таблицу admins")
-            
-            if 'added_by' not in existing_columns:
-                cursor.execute("ALTER TABLE admins ADD COLUMN added_by BIGINT")
-                logger.info("Добавлена колонка 'added_by' в таблицу admins")
-            
-            if 'added_date' not in existing_columns:
-                cursor.execute("ALTER TABLE admins ADD COLUMN added_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
-                logger.info("Добавлена колонка 'added_date' в таблицу admins")
-            
-            self.conn.commit()
             cursor.close()
-            logger.info("Миграция таблицы admins завершена успешно")
+            logger.info("Проверка таблицы admins завершена")
             
         except Exception as e:
-            logger.error(f"Ошибка при миграции таблицы admins: {e}")
+            logger.error(f"Ошибка при проверке таблицы admins: {e}")
             self.conn.rollback()
 
     def migrate_group_video_settings_table(self):
@@ -162,26 +148,21 @@ class Database:
             self.conn.rollback()
 
     def init_super_admins(self):
-        """Инициализация супер-администраторов в базе данных"""
+        """Инициализация супер-администраторов в базе данных (только user_id)"""
         try:
             cursor = self.conn.cursor()
             
-            # Список супер-администраторов
-            SUPER_ADMIN_IDS = [5657091547, 7983512278, 5310261745]
+            # Список супер-администраторов (обновленный)
+            SUPER_ADMIN_IDS = [5657091547, 8053364577, 5310261745]
             
             for admin_id in SUPER_ADMIN_IDS:
                 # Проверяем, есть ли уже в базе
                 cursor.execute("SELECT user_id FROM admins WHERE user_id = %s", (admin_id,))
                 if not cursor.fetchone():
-                    # Добавляем супер-админа
+                    # Добавляем только user_id (базовая структура таблицы)
                     cursor.execute("""
-                        INSERT INTO admins (user_id, name, added_by, added_date) 
-                        VALUES (%s, %s, %s, CURRENT_TIMESTAMP)
-                        ON CONFLICT (user_id) DO UPDATE SET 
-                            name = COALESCE(EXCLUDED.name, admins.name),
-                            added_by = COALESCE(EXCLUDED.added_by, admins.added_by),
-                            added_date = COALESCE(admins.added_date, CURRENT_TIMESTAMP)
-                    """, (admin_id, 'Super Admin', 0))
+                        INSERT INTO admins (user_id) VALUES (%s) ON CONFLICT (user_id) DO NOTHING
+                    """, (admin_id,))
                     logger.info(f"Супер-админ {admin_id} добавлен в базу данных")
             
             self.conn.commit()
@@ -296,10 +277,7 @@ class Database:
             # --- Таблица admins ---
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS admins (
-                    user_id BIGINT PRIMARY KEY,
-                    name TEXT,
-                    added_by BIGINT,
-                    added_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    user_id BIGINT PRIMARY KEY
                 )
             ''')
             self.conn.commit()
@@ -958,7 +936,7 @@ class Database:
             return False
 
     def is_superadmin(self, user_id):
-        SUPERADMIN_IDS = [5657091547, 7983512278, 5310261745, 8053364577]  # Список супер-администраторов
+        SUPERADMIN_IDS = [5657091547, 8053364577, 5310261745]  # Список супер-администраторов
         # Если это группа и она разрешена — считаем супер-админом
         try:
             if str(user_id).startswith('-'):
@@ -977,7 +955,7 @@ class Database:
             cursor.close()
             admins = [(row[0], False) for row in result]
             # Добавляем супер-админов (они всегда есть, даже если не в базе)
-            SUPERADMIN_IDS = [5657091547, 7983512278, 5310261745]  # Список супер-администраторов
+            SUPERADMIN_IDS = [5657091547, 8053364577, 5310261745]  # Список супер-администраторов
             for superadmin_id in SUPERADMIN_IDS:
                 if not any(admin_id == superadmin_id for admin_id, _ in admins):
                     admins.insert(0, (superadmin_id, True))
