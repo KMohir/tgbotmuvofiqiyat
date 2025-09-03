@@ -68,32 +68,47 @@ class Database:
             """
             )
             default = cursor.fetchone()
-            if not default or not default[0] or 'nextval' not in str(default[0]):
-                logger.error("Поле id в seasons не автоинкрементируется. Запускаю миграцию...")
-                cursor.execute("ALTER TABLE seasons RENAME TO seasons_old;")
-                cursor.execute("""
-                    CREATE TABLE seasons (
-                        id SERIAL PRIMARY KEY,
-                        project TEXT NOT NULL,
-                        name TEXT NOT NULL
-                    )
-                """)
-                cursor.execute("INSERT INTO seasons (project, name) SELECT project, name FROM seasons_old;")
-                # Обновляем все season_id в videos на новые id
-                cursor.execute("""
-                    UPDATE videos v
-                    SET season_id = s.id
-                    FROM seasons s
-                    WHERE s.name = (SELECT name FROM seasons_old so WHERE so.id = v.season_id)
-                """)
-                # --- Удаляем внешний ключ, если есть ---
-                cursor.execute("ALTER TABLE videos DROP CONSTRAINT IF EXISTS videos_season_id_fkey;")
-                # --- Удаляем старую таблицу ---
-                cursor.execute("DROP TABLE IF EXISTS seasons_old;")
-                # --- Восстанавливаем внешний ключ ---
-                cursor.execute("ALTER TABLE videos ADD CONSTRAINT videos_season_id_fkey FOREIGN KEY (season_id) REFERENCES seasons(id) ON DELETE CASCADE;")
+            default_str = str(default[0]) if default and default[0] else ""
+            
+            # Проверяем, нужна ли миграция
+            needs_migration = not default or not default[0] or 'nextval' not in default_str
+            
+            if needs_migration:
+                logger.error(f"Поле id в seasons не автоинкрементируется. Текущее значение: {default_str}. Запускаю миграцию...")
+            else:
+                logger.info(f"Таблица seasons уже имеет правильную структуру с автоинкрементом: {default_str}")
+                # Пропускаем миграцию, но выполняем обновление project
+                cursor.execute("UPDATE seasons SET project = 'centris' WHERE project = 'centr';")
                 self.conn.commit()
-                logger.info("Миграция таблицы seasons завершена!")
+                cursor.close()
+                return
+            
+            # Если нужна миграция, выполняем её
+            cursor.execute("ALTER TABLE seasons RENAME TO seasons_old;")
+            cursor.execute("""
+                CREATE TABLE seasons (
+                    id SERIAL PRIMARY KEY,
+                    project TEXT NOT NULL,
+                    name TEXT NOT NULL
+                )
+            """)
+            cursor.execute("INSERT INTO seasons (project, name) SELECT project, name FROM seasons_old;")
+            # Обновляем все season_id в videos на новые id
+            cursor.execute("""
+                UPDATE videos v
+                SET season_id = s.id
+                FROM seasons s
+                WHERE s.name = (SELECT name FROM seasons_old so WHERE so.id = v.season_id)
+            """)
+            # --- Удаляем внешний ключ, если есть ---
+            cursor.execute("ALTER TABLE videos DROP CONSTRAINT IF EXISTS videos_season_id_fkey;")
+            # --- Удаляем старую таблицу ---
+            cursor.execute("DROP TABLE IF EXISTS seasons_old;")
+            # --- Восстанавливаем внешний ключ ---
+            cursor.execute("ALTER TABLE videos ADD CONSTRAINT videos_season_id_fkey FOREIGN KEY (season_id) REFERENCES seasons(id) ON DELETE CASCADE;")
+            self.conn.commit()
+            logger.info("Миграция таблицы seasons завершена!")
+            
             # --- Миграция project: centr -> centris ---
             cursor.execute("UPDATE seasons SET project = 'centris' WHERE project = 'centr';")
             self.conn.commit()
