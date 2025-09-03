@@ -94,11 +94,11 @@ class Database:
             self.conn.rollback()
 
     def migrate_admins_table(self):
-        """Проверяем структуру таблицы admins (без изменений)"""
+        """Миграция таблицы admins для добавления новых колонок"""
         try:
             cursor = self.conn.cursor()
             
-            # Просто проверяем существующие колонки без изменений
+            # Проверяем существующие колонки в таблице admins
             cursor.execute("""
                 SELECT column_name FROM information_schema.columns 
                 WHERE table_name = 'admins' AND table_schema = 'public'
@@ -106,11 +106,25 @@ class Database:
             existing_columns = [row[0] for row in cursor.fetchall()]
             logger.info(f"Существующие колонки в admins: {existing_columns}")
             
+            # Добавляем недостающие колонки
+            if 'name' not in existing_columns:
+                cursor.execute("ALTER TABLE admins ADD COLUMN name TEXT")
+                logger.info("Добавлена колонка 'name' в таблицу admins")
+            
+            if 'added_by' not in existing_columns:
+                cursor.execute("ALTER TABLE admins ADD COLUMN added_by BIGINT")
+                logger.info("Добавлена колонка 'added_by' в таблицу admins")
+            
+            if 'added_date' not in existing_columns:
+                cursor.execute("ALTER TABLE admins ADD COLUMN added_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
+                logger.info("Добавлена колонка 'added_date' в таблицу admins")
+            
+            self.conn.commit()
             cursor.close()
-            logger.info("Проверка таблицы admins завершена")
+            logger.info("Миграция таблицы admins завершена успешно")
             
         except Exception as e:
-            logger.error(f"Ошибка при проверке таблицы admins: {e}")
+            logger.error(f"Ошибка при миграции таблицы admins: {e}")
             self.conn.rollback()
 
     def migrate_group_video_settings_table(self):
@@ -148,7 +162,7 @@ class Database:
             self.conn.rollback()
 
     def init_super_admins(self):
-        """Инициализация супер-администраторов в базе данных (только user_id)"""
+        """Инициализация супер-администраторов в базе данных"""
         try:
             cursor = self.conn.cursor()
             
@@ -159,10 +173,14 @@ class Database:
                 # Проверяем, есть ли уже в базе
                 cursor.execute("SELECT user_id FROM admins WHERE user_id = %s", (admin_id,))
                 if not cursor.fetchone():
-                    # Добавляем только user_id (базовая структура таблицы)
+                    # Добавляем супер-админа со всеми колонками
                     cursor.execute("""
-                        INSERT INTO admins (user_id) VALUES (%s) ON CONFLICT (user_id) DO NOTHING
-                    """, (admin_id,))
+                        INSERT INTO admins (user_id, name, added_by, added_date) 
+                        VALUES (%s, %s, %s, CURRENT_TIMESTAMP)
+                        ON CONFLICT (user_id) DO UPDATE SET 
+                            name = COALESCE(EXCLUDED.name, admins.name),
+                            added_by = COALESCE(EXCLUDED.added_by, admins.added_by)
+                    """, (admin_id, 'Super Admin', 0))
                     logger.info(f"Супер-админ {admin_id} добавлен в базу данных")
             
             self.conn.commit()
@@ -277,7 +295,10 @@ class Database:
             # --- Таблица admins ---
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS admins (
-                    user_id BIGINT PRIMARY KEY
+                    user_id BIGINT PRIMARY KEY,
+                    name TEXT,
+                    added_by BIGINT,
+                    added_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             ''')
             self.conn.commit()
