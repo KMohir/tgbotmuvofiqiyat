@@ -7,6 +7,7 @@ from aiogram.dispatcher.middlewares import BaseMiddleware
 from aiogram.utils.exceptions import Throttled
 
 from db import db
+from translation import _
 
 
 class ThrottlingMiddleware(BaseMiddleware):
@@ -38,6 +39,6 @@ class ThrottlingMiddleware(BaseMiddleware):
         if throttled.exceeded_count <= 2:
             try:
                 lang = db.get_lang(message.from_user.id)
-                await message.reply("Juda ko'p so'rovlar!")
+                await message.reply(_("Juda ko'p so'rovlar!",lang))
             except Exception as ex:
                 await message.reply("Juda ko'p so'rovlar!")

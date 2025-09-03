@@ -1,8 +1,11 @@
 .idea
 databaseprotestim.db
-venv
-__pycache__
+venv310/
+__pycache__/
 *.pyc
+*.db
+credentials.json
 .env
-bot.log
-bot*.log
+*.log
+venv/
+env/

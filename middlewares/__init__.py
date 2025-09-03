@@ -1,9 +1,10 @@
 from aiogram import Dispatcher
 
+from loader import dp
 from .throttling import ThrottlingMiddleware
-from .security import VideoSecurityMiddleware
+from .support_middleware import SupportMiddleware
 
 
-def setup(dp: Dispatcher):
+if __name__ == "middlewares":
     dp.middleware.setup(ThrottlingMiddleware())
-    dp.middleware.setup(VideoSecurityMiddleware())
+    dp.middleware.setup(SupportMiddleware())
