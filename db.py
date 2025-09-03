@@ -9,7 +9,7 @@ log_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname
 logger = logging.getLogger()
 logger.setLevel(logging.ERROR)
 logger.addHandler(log_handler)
-from dotenv import load_dotenv
+from environs import Env
 import os
 
 # Пример .env:
@@ -19,8 +19,8 @@ import os
 # DB_PASSWORD=ваш_пароль
 # DB_NAME=centris
 #
-# Для работы требуется python-dotenv
-# pip install python-dotenv
+# Для работы требуется environs
+# pip install environs
 
 # Настройка ротации логов
 # log_handler = RotatingFileHandler('bot.log', maxBytes=5*1024*1024, backupCount=3, encoding='utf-8')
@@ -29,18 +29,27 @@ import os
 # logger.setLevel(logging.ERROR)
 # logger.addHandler(log_handler)
 
-load_dotenv()
+env = Env()
+try:
+    env.read_env()
+except UnicodeDecodeError as e:
+    logger.error(f"Ошибка кодировки в файле .env: {e}")
+    logger.error("Убедитесь, что файл .env сохранен в кодировке UTF-8")
+    raise
+except Exception as e:
+    logger.warning(f"Не удалось загрузить файл .env: {e}")
+    logger.warning("Продолжаем работу с переменными окружения системы")
 
 class Database:
     def __init__(self):
         try:
             # Подключение к PostgreSQL
             self.conn = psycopg2.connect(
-                host=os.getenv('DB_HOST'),
-                dbname=os.getenv('DB_NAME'),
-                user=os.getenv('DB_USER'),
-                password=os.getenv('DB_PASS'),
-                port=os.getenv('DB_PORT', '5432')
+                host=env.str('DB_HOST'),
+                dbname=env.str('DB_NAME'),
+                user=env.str('DB_USER'),
+                password=env.str('DB_PASSWORD'),
+                port=env.str('DB_PORT', '5432')
             )
             self.conn.autocommit = True
             self.create_tables()
@@ -93,108 +102,8 @@ class Database:
             logger.error(f"Ошибка при миграции таблицы seasons: {e}")
             self.conn.rollback()
 
-    def migrate_admins_table(self):
-        """Миграция таблицы admins для добавления новых колонок"""
-        try:
-            cursor = self.conn.cursor()
-            
-            # Проверяем существующие колонки в таблице admins
-            cursor.execute("""
-                SELECT column_name FROM information_schema.columns 
-                WHERE table_name = 'admins' AND table_schema = 'public'
-            """)
-            existing_columns = [row[0] for row in cursor.fetchall()]
-            logger.info(f"Существующие колонки в admins: {existing_columns}")
-            
-            # Добавляем недостающие колонки
-            if 'name' not in existing_columns:
-                cursor.execute("ALTER TABLE admins ADD COLUMN name TEXT")
-                logger.info("Добавлена колонка 'name' в таблицу admins")
-            
-            if 'added_by' not in existing_columns:
-                cursor.execute("ALTER TABLE admins ADD COLUMN added_by BIGINT")
-                logger.info("Добавлена колонка 'added_by' в таблицу admins")
-            
-            if 'added_date' not in existing_columns:
-                cursor.execute("ALTER TABLE admins ADD COLUMN added_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
-                logger.info("Добавлена колонка 'added_date' в таблицу admins")
-            
-            self.conn.commit()
-            cursor.close()
-            logger.info("Миграция таблицы admins завершена успешно")
-            
-        except Exception as e:
-            logger.error(f"Ошибка при миграции таблицы admins: {e}")
-            self.conn.rollback()
-
-    def migrate_group_video_settings_table(self):
-        """Миграция таблицы group_video_settings для добавления новых колонок"""
-        try:
-            cursor = self.conn.cursor()
-            
-            # Проверяем существующие колонки
-            cursor.execute("""
-                SELECT column_name FROM information_schema.columns 
-                WHERE table_name = 'group_video_settings' AND table_schema = 'public'
-            """)
-            existing_columns = [row[0] for row in cursor.fetchall()]
-            logger.info(f"Существующие колонки в group_video_settings: {existing_columns}")
-            
-            # Добавляем новые колонки для отдельного отслеживания видео
-            if 'centris_viewed_videos' not in existing_columns:
-                cursor.execute("ALTER TABLE group_video_settings ADD COLUMN centris_viewed_videos TEXT DEFAULT '[]'")
-                logger.info("Добавлена колонка 'centris_viewed_videos'")
-            
-            if 'golden_viewed_videos' not in existing_columns:
-                cursor.execute("ALTER TABLE group_video_settings ADD COLUMN golden_viewed_videos TEXT DEFAULT '[]'")
-                logger.info("Добавлена колонка 'golden_viewed_videos'")
-            
-            if 'group_name' not in existing_columns:
-                cursor.execute("ALTER TABLE group_video_settings ADD COLUMN group_name TEXT")
-                logger.info("Добавлена колонка 'group_name'")
-            
-            self.conn.commit()
-            cursor.close()
-            logger.info("Миграция таблицы group_video_settings завершена успешно")
-            
-        except Exception as e:
-            logger.error(f"Ошибка при миграции таблицы group_video_settings: {e}")
-            self.conn.rollback()
-
-    def init_super_admins(self):
-        """Инициализация супер-администраторов в базе данных"""
-        try:
-            cursor = self.conn.cursor()
-            
-            # Список супер-администраторов (обновленный)
-            SUPER_ADMIN_IDS = [5657091547, 8053364577, 5310261745]
-            
-            for admin_id in SUPER_ADMIN_IDS:
-                # Проверяем, есть ли уже в базе
-                cursor.execute("SELECT user_id FROM admins WHERE user_id = %s", (admin_id,))
-                if not cursor.fetchone():
-                    # Добавляем супер-админа со всеми колонками
-                    cursor.execute("""
-                        INSERT INTO admins (user_id, name, added_by, added_date) 
-                        VALUES (%s, %s, %s, CURRENT_TIMESTAMP)
-                        ON CONFLICT (user_id) DO UPDATE SET 
-                            name = COALESCE(EXCLUDED.name, admins.name),
-                            added_by = COALESCE(EXCLUDED.added_by, admins.added_by)
-                    """, (admin_id, 'Super Admin', 0))
-                    logger.info(f"Супер-админ {admin_id} добавлен в базу данных")
-            
-            self.conn.commit()
-            cursor.close()
-            logger.info("Инициализация супер-администраторов завершена")
-            
-        except Exception as e:
-            logger.error(f"Ошибка при инициализации супер-администраторов: {e}")
-            self.conn.rollback()
-
     def create_tables(self):
         self.migrate_seasons_table()
-        self.migrate_admins_table()
-        self.migrate_group_video_settings_table()
         try:
             cursor = self.conn.cursor()
             # --- Таблица users ---
@@ -295,10 +204,7 @@ class Database:
             # --- Таблица admins ---
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS admins (
-                    user_id BIGINT PRIMARY KEY,
-                    name TEXT,
-                    added_by BIGINT,
-                    added_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    user_id BIGINT PRIMARY KEY
                 )
             ''')
             self.conn.commit()
@@ -309,12 +215,6 @@ class Database:
                 self.sync_group_names_from_users()
             except Exception as e:
                 logger.error(f"Ошибка при синхронизации названий групп: {e}")
-            
-            # Инициализация супер-админов
-            try:
-                self.init_super_admins()
-            except Exception as e:
-                logger.error(f"Ошибка при инициализации супер-админов: {e}")
                 
         except Exception as e:
             logger.error(f"Ошибка при создании/обновлении таблиц: {e}")
@@ -957,7 +857,7 @@ class Database:
             return False
 
     def is_superadmin(self, user_id):
-        SUPERADMIN_IDS = [5657091547, 8053364577, 5310261745]  # Список супер-администраторов
+        SUPERADMIN_IDS = [5657091547, 7983512278, 5310261745, 8053364577]  # Список супер-администраторов
         # Если это группа и она разрешена — считаем супер-админом
         try:
             if str(user_id).startswith('-'):
@@ -976,7 +876,7 @@ class Database:
             cursor.close()
             admins = [(row[0], False) for row in result]
             # Добавляем супер-админов (они всегда есть, даже если не в базе)
-            SUPERADMIN_IDS = [5657091547, 8053364577, 5310261745]  # Список супер-администраторов
+            SUPERADMIN_IDS = [5657091547, 7983512278, 5310261745, 8053364577]  # Список супер-администраторов
             for superadmin_id in SUPERADMIN_IDS:
                 if not any(admin_id == superadmin_id for admin_id, _ in admins):
                     admins.insert(0, (superadmin_id, True))

@@ -7,7 +7,15 @@ logger = logging.getLogger(__name__)
 
 # Теперь используем вместо библиотеки python-dotenv библиотеку environs
 env = Env()
-env.read_env()
+try:
+    env.read_env()
+except UnicodeDecodeError as e:
+    logger.critical(f"Ошибка кодировки в файле .env: {e}")
+    logger.critical("Убедитесь, что файл .env сохранен в кодировке UTF-8")
+    raise
+except Exception as e:
+    logger.warning(f"Не удалось загрузить файл .env: {e}")
+    logger.warning("Продолжаем работу с переменными окружения системы")
 
 try:
     BOT_TOKEN = env.str("BOT_TOKEN")  # Забираем значение типа str
@@ -43,13 +51,13 @@ support_ids = [
     env.str("operator")
 ]
 
-SUPER_ADMIN_IDS = [5657091547, 8053364577, 5310261745]  # Список супер-администраторов
+SUPER_ADMIN_IDS = [5657091547, 7983512278, 5310261745, 8053364577]  # Список супер-администраторов
 
 # Обратная совместимость - оставляем старую переменную
 SUPER_ADMIN_ID = 5657091547
 
 # Пример строки для .env:
-# ADMINS=5657091547,8053364577,5310261745
+# ADMINS=5657091547,7983512278,5310261745
 # Если переменная ADMINS уже есть, просто добавьте 5310261745 через запятую
 
 # === НАСТРОЙКИ БЕЗОПАСНОСТИ ===
