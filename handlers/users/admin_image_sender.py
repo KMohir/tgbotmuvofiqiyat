@@ -73,7 +73,7 @@ try:
             kb.add(InlineKeyboardButton("❌ Нет сезонов", callback_data="no_seasons"))
             return kb
         
-            for season_id, season_name in seasons:
+        for season_id, season_name in seasons:
                 kb.add(InlineKeyboardButton(f"📺 {season_name}", callback_data=f"season_{season_id}"))
         return kb
 

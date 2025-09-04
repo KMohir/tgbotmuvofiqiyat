@@ -5481,3 +5481,147 @@ async def update_schedule_command(message: types.Message):
     except Exception as e:
         logger.error(f"Ошибка при обновлении планировщика: {e}")
         await message.answer(f"❌ Xatolik yuz berdi: {e}")
+
+
+# Команда для удаления группы из системы
+@dp.message_handler(commands=['remove_group'])
+async def remove_group_command(message: types.Message, state: FSMContext):
+    """
+    Команда для удаления группы из системы
+    """
+    logger.info(f"🚀 remove_group вызвана в чате {message.chat.id} ({message.chat.type})")
+    logger.info(f"👤 Пользователь: {message.from_user.id} ({message.from_user.username})")
+    
+    try:
+        user_id = message.from_user.id
+        
+        # Проверяем права пользователя (только супер-админы)
+        if user_id not in SUPER_ADMIN_IDS and not db.is_superadmin(user_id):
+            logger.warning(f"❌ Пользователь {user_id} не имеет прав")
+            await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat super-adminlar foydalana oladi.", parse_mode="Markdown")
+            return
+        
+        # Получаем список всех групп
+        try:
+            groups = db.get_all_groups()
+            logger.info(f"Получено групп из базы: {len(groups)}")
+            logger.info(f"Группы: {groups}")
+        except Exception as e:
+            logger.error(f"Ошибка при получении групп: {e}")
+            await message.answer(f"❌ **Xatolik yuz berdi:** {e}", parse_mode="Markdown")
+            return
+        
+        if not groups:
+            logger.warning("Список групп пуст!")
+            await message.answer("❌ **Guruhlar topilmadi!**\n\nMa'lumotlar bazasida guruhlar yo'q.", parse_mode="Markdown")
+            return
+        
+        # Создаем клавиатуру с группами
+        from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+        
+        response = "🗑️ **O'chirish uchun guruhni tanlang:**\n\n"
+        response += "⚠️ **Diqqat!** Guruh to'liq o'chiriladi va bot guruhdan chiqadi.\n\n"
+        
+        for group_id, group_name in groups:
+            response += f"🏢 **{group_name}**\n🆔 `{group_id}`\n\n"
+        
+        kb = InlineKeyboardMarkup(row_width=1)
+        for group_id, group_name in groups:
+            kb.add(InlineKeyboardButton(
+                f"🗑️ {group_name}",
+                callback_data=f"remove_group_{group_id}"
+            ))
+        kb.add(InlineKeyboardButton("❌ Bekor qilish", callback_data="remove_group_cancel"))
+        
+        await message.answer(response, reply_markup=kb, parse_mode="Markdown")
+        
+    except Exception as e:
+        logger.error(f"Ошибка при показе списка групп для удаления: {e}")
+        await message.answer(f"❌ Xatolik yuz berdi: {e}")
+
+
+# Обработчик выбора группы для удаления
+@dp.callback_query_handler(lambda c: c.data.startswith('remove_group_'))
+async def remove_group_callback(callback_query: types.CallbackQuery):
+    """Обработчик удаления группы"""
+    logger.info(f"🗑️ remove_group_callback вызван с данными: {callback_query.data}")
+    
+    try:
+        user_id = callback_query.from_user.id
+        
+        # Проверяем права пользователя (только супер-админы)
+        if user_id not in SUPER_ADMIN_IDS and not db.is_superadmin(user_id):
+            await callback_query.answer("❌ Sizda ruxsat yo'q!", show_alert=True)
+            return
+        
+        if callback_query.data == "remove_group_cancel":
+            await safe_edit_text(callback_query,
+                "❌ **O'chirish bekor qilindi!**\n\nHech qanday guruh o'chirilmadi.",
+                parse_mode="Markdown"
+            )
+            await callback_query.answer()
+            return
+        
+        # Получаем ID группы
+        group_id = int(callback_query.data.replace("remove_group_", ""))
+        logger.info(f"Удаляем группу с ID: {group_id}")
+        
+        # Получаем информацию о группе
+        group_info = db.get_group_by_id(group_id)
+        group_name = group_info[1] if group_info else f"ID: {group_id}"
+        
+        # Удаляем группу из базы данных
+        success = db.remove_group_completely(group_id)
+        
+        if success:
+            # Пытаемся покинуть группу
+            try:
+                from loader import bot
+                await bot.leave_chat(group_id)
+                logger.info(f"Бот успешно покинул группу {group_id}")
+                leave_status = "✅ Bot guruhdan chiqdi"
+            except Exception as e:
+                logger.warning(f"Не удалось покинуть группу {group_id}: {e}")
+                leave_status = "⚠️ Bot guruhdan chiqa olmadi (guruh mavjud emas yoki botni oldin olib tashlangan)"
+            
+            # Удаляем задачи планировщика для этой группы
+            try:
+                from handlers.users.video_scheduler import scheduler
+                jobs_to_remove = []
+                for job in scheduler.get_jobs():
+                    if job.id.endswith(f"_{group_id}"):
+                        jobs_to_remove.append(job.id)
+                
+                for job_id in jobs_to_remove:
+                    scheduler.remove_job(job_id)
+                    logger.info(f"Удалена задача планировщика: {job_id}")
+                
+                schedule_status = f"✅ {len(jobs_to_remove)} ta vazifa o'chirildi"
+            except Exception as e:
+                logger.warning(f"Ошибка при удалении задач планировщика: {e}")
+                schedule_status = "⚠️ Vazifalarni o'chirishda muammo"
+            
+            await safe_edit_text(callback_query,
+                f"✅ **Guruh muvaffaqiyatli o'chirildi!**\n\n"
+                f"🏢 **Guruh:** {group_name}\n"
+                f"🆔 **ID:** `{group_id}`\n\n"
+                f"📊 **Natijalar:**\n"
+                f"• Ma'lumotlar bazasidan o'chirildi: ✅\n"
+                f"• {leave_status}\n"
+                f"• {schedule_status}",
+                parse_mode="Markdown"
+            )
+        else:
+            await safe_edit_text(callback_query,
+                f"❌ **Guruhni o'chirishda xatolik!**\n\n"
+                f"🏢 **Guruh:** {group_name}\n"
+                f"🆔 **ID:** `{group_id}`\n\n"
+                f"Ma'lumotlar bazasidan o'chirib bo'lmadi.",
+                parse_mode="Markdown"
+            )
+        
+        await callback_query.answer()
+        
+    except Exception as e:
+        logger.error(f"Ошибка при удалении группы: {e}")
+        await callback_query.answer(f"❌ Xatolik: {e}", show_alert=True)

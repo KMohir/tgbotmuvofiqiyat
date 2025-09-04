@@ -44,6 +44,7 @@ class Database:
     def __init__(self):
         try:
             # Подключение к PostgreSQL
+            print('1111',env.str('DB_HOST'))
             self.conn = psycopg2.connect(
                 host=env.str('DB_HOST'),
                 dbname=env.str('DB_NAME'),
@@ -1295,6 +1296,54 @@ class Database:
         except Exception as e:
             logger.error(f"Guruh {chat_id} ni whitelist dan o'chirishda xatolik: {e}")
             return False
+
+    def remove_group_completely(self, chat_id: int) -> bool:
+        """Полностью удалить группу из всех таблиц базы данных"""
+        try:
+            cursor = self.conn.cursor()
+            
+            # Удаляем из всех связанных таблиц
+            # В group_video_settings chat_id имеет тип TEXT, поэтому приводим к строке
+            cursor.execute("DELETE FROM group_video_settings WHERE chat_id = %s", (str(chat_id),))
+            cursor.execute("DELETE FROM group_whitelist WHERE chat_id = %s", (str(chat_id),))
+            cursor.execute("DELETE FROM users WHERE user_id = %s AND is_group = 1", (chat_id,))
+            
+            self.conn.commit()
+            logger.info(f"Guruh {chat_id} barcha jadvallardan to'liq o'chirildi")
+            return True
+        except Exception as e:
+            logger.error(f"Guruh {chat_id} ni to'liq o'chirishda xatolik: {e}")
+            self.conn.rollback()
+            return False
+
+    def get_all_groups(self):
+        """Получить список всех групп из базы данных"""
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute("""
+                SELECT DISTINCT user_id, name 
+                FROM users 
+                WHERE is_group = 1 
+                ORDER BY name
+            """)
+            return cursor.fetchall()
+        except Exception as e:
+            logger.error(f"Ошибка при получении списка групп: {e}")
+            return []
+
+    def get_group_by_id(self, chat_id: int):
+        """Получить информацию о группе по ID"""
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute("""
+                SELECT user_id, name 
+                FROM users 
+                WHERE user_id = %s AND is_group = 1
+            """, (chat_id,))
+            return cursor.fetchone()
+        except Exception as e:
+            logger.error(f"Ошибка при получении информации о группе {chat_id}: {e}")
+            return None
 
     def is_group_whitelisted(self, chat_id: int) -> bool:
         """Проверить находится ли группа в whitelist"""
