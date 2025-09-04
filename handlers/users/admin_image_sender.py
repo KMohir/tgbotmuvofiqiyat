@@ -59,7 +59,7 @@ try:
     # --- Клавиатуры для set_group_video ---
     def get_project_keyboard():
         """Клавиатура для выбора проекта"""
-            return InlineKeyboardMarkup(row_width=1).add(
+        return InlineKeyboardMarkup(row_width=1).add(
             InlineKeyboardButton("🏢 Centris Towers", callback_data="project_centris"),
             InlineKeyboardButton("🏢 Golden Lake", callback_data="project_golden"),
             InlineKeyboardButton("🏢 Centris + Golden", callback_data="project_both")
@@ -74,7 +74,7 @@ try:
             return kb
         
             for season_id, season_name in seasons:
-            kb.add(InlineKeyboardButton(f"📺 {season_name}", callback_data=f"season_{season_id}"))
+                kb.add(InlineKeyboardButton(f"📺 {season_name}", callback_data=f"season_{season_id}"))
         return kb
 
     def get_video_keyboard_from_db(videos, viewed):
@@ -82,10 +82,10 @@ try:
         kb = InlineKeyboardMarkup(row_width=3)
         has_unwatched = False
         
-            for url, title, position in videos:
-                if position not in viewed:
-                    kb.add(InlineKeyboardButton(f"{position+1}. {title}", callback_data=f"video_{position}"))
-                    has_unwatched = True
+        for url, title, position in videos:
+            if position not in viewed:
+                kb.add(InlineKeyboardButton(f"{position+1}. {title}", callback_data=f"video_{position}"))
+                has_unwatched = True
         
         if not has_unwatched:
             kb.add(InlineKeyboardButton("❌ Все видео уже отправлены", callback_data="all_videos_sent"))
@@ -103,49 +103,6 @@ try:
 
     # Команда /set_group_video и связанные обработчики перенесены в handlers/users/group_video_commands.py
     # для устранения дублирования и циклических импортов
-        """Сохранение настроек группы"""
-        try:
-        chat_id = data.get("chat_id")
-        project = data.get("project")
-            
-            # Определяем какие проекты включены
-            centris_enabled = project in ["centris", "both"]
-            golden_enabled = project in ["golden", "both"]
-            
-            # Получаем данные
-        centris_season_id = data.get("centris_season_id") if centris_enabled else None
-        centris_start_video = data.get("centris_start_video", 0)
-        golden_season_id = data.get("golden_season_id") if golden_enabled else None
-        golden_start_video = data.get("golden_start_video", 0)
-        
-            # Сохраняем в базу
-        db.set_group_video_settings(
-            chat_id,
-            int(centris_enabled),
-            centris_season_id,
-            centris_start_video,
-            int(golden_enabled),
-            golden_start_video
-        )
-        
-            # Сохраняем стартовые позиции
-        if centris_enabled and centris_season_id is not None:
-            db.set_group_video_start(chat_id, 'centris', centris_season_id, centris_start_video)
-            db.reset_group_viewed_videos(chat_id)
-        
-        if golden_enabled and golden_season_id is not None:
-            db.set_group_video_start(chat_id, 'golden', golden_season_id, golden_start_video)
-            db.reset_group_viewed_videos(chat_id)
-        
-            # Планируем задачи
-        from handlers.users.video_scheduler import schedule_group_jobs
-        schedule_group_jobs()
-            
-            logger.info(f"Группа {chat_id}: настройки сохранены - Centris: {centris_enabled}, Golden: {golden_enabled}")
-            
-        except Exception as e:
-            logger.error(f"Ошибка при сохранении настроек группы: {e}")
-            raise
 
     # --- Тестовый обработчик ---
     @dp.message_handler(commands=['test_command'], chat_type=[types.ChatType.GROUP, types.ChatType.SUPERGROUP])
