@@ -280,7 +280,7 @@ def schedule_group_jobs():
         logger.info(f"Найдено {len(groups)} групп с настройками")
         for chat_id, centris_enabled, centris_season_id, centris_start_video, golden_enabled, golden_season_id, golden_start_video, viewed_videos, is_subscribed, group_name in groups:
             if centris_enabled and not golden_enabled:
-                # Только Centris Towers - 2 раза в день: 07:00, 20:00
+                # Только Centris Towers - 3 раза в день: 07:00, 11:00, 20:00
                     scheduler.add_job(
                     send_group_video_new,
                         trigger='cron',
@@ -288,6 +288,16 @@ def schedule_group_jobs():
                         minute=0,
                     args=[chat_id, 'centris', centris_season_id],
                         id=f"group_centrismorning_{chat_id}",
+                        replace_existing=True,
+                        timezone="Asia/Tashkent"
+                    )
+                    scheduler.add_job(
+                    send_group_video_new,
+                        trigger='cron',
+                        hour=11,
+                        minute=0,
+                    args=[chat_id, 'centris', centris_season_id],
+                        id=f"group_centrismid_{chat_id}",
                         replace_existing=True,
                         timezone="Asia/Tashkent"
                     )
@@ -302,14 +312,24 @@ def schedule_group_jobs():
                         timezone="Asia/Tashkent"
                     )
             elif golden_enabled and not centris_enabled:
-                # Только Golden Lake
+                # Только Golden Lake - 3 раза в день: 07:00, 11:00, 20:00
                 scheduler.add_job(
                     send_group_video_new,
                     trigger='cron',
-                    hour=8,
+                    hour=7,
                     minute=0,
                     args=[chat_id, 'golden_lake', golden_season_id],
                     id=f"group_goldenmorning_{chat_id}",
+                    replace_existing=True,
+                    timezone="Asia/Tashkent"
+                )
+                scheduler.add_job(
+                    send_group_video_new,
+                    trigger='cron',
+                    hour=11,
+                    minute=0,
+                    args=[chat_id, 'golden_lake', golden_season_id],
+                    id=f"group_goldenmid_{chat_id}",
                     replace_existing=True,
                     timezone="Asia/Tashkent"
                 )
@@ -324,7 +344,7 @@ def schedule_group_jobs():
                     timezone="Asia/Tashkent"
                 )
             elif centris_enabled and golden_enabled:
-                # Оба: Centris 07:00 и 20:00, Golden 11:00
+                # Оба: Centris 07:00, 11:00, 20:00, Golden 11:00
                     scheduler.add_job(
                     send_group_video_new,
                         trigger='cron',
@@ -332,6 +352,16 @@ def schedule_group_jobs():
                         minute=0,
                     args=[chat_id, 'centris', centris_season_id],
                         id=f"group_centrismorning_{chat_id}",
+                        replace_existing=True,
+                        timezone="Asia/Tashkent"
+                    )
+                    scheduler.add_job(
+                    send_group_video_new,
+                        trigger='cron',
+                        hour=11,
+                        minute=0,
+                    args=[chat_id, 'centris', centris_season_id],
+                        id=f"group_centrismid_{chat_id}",
                         replace_existing=True,
                         timezone="Asia/Tashkent"
                     )
@@ -694,9 +724,9 @@ def schedule_group_jobs_v2():
             if send_times_json:
                 send_times = json.loads(send_times_json)
             else:
-                send_times = ["07:00", "20:00"]  # По умолчанию
+                send_times = ["07:00", "11:00", "20:00"]  # По умолчанию
         except:
-            send_times = ["07:00", "20:00"]  # Fallback
+            send_times = ["07:00", "11:00", "20:00"]  # Fallback
         
         logger.info(f"Группа {chat_id}: время отправки {send_times}")
         
@@ -836,9 +866,9 @@ def schedule_single_group_jobs(chat_id: int):
             if send_times_json:
                 send_times = json.loads(send_times_json)
             else:
-                send_times = ["07:00", "20:00"]  # По умолчанию
+                send_times = ["07:00", "11:00", "20:00"]  # По умолчанию
         except:
-            send_times = ["07:00", "20:00"]  # Fallback
+            send_times = ["07:00", "11:00", "20:00"]  # Fallback
         
         logger.info(f"Группа {chat_id}: время отправки {send_times}")
         

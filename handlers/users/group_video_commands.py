@@ -194,7 +194,7 @@ async def process_time_selection(callback_query: types.CallbackQuery, state: FSM
             return
         
         # Получаем текущие времена отправки
-        current_times = temp_settings.get("send_times", ["07:00", "20:00"])
+        current_times = temp_settings.get("send_times", ["07:00", "11:00", "20:00"])
         
         if action == "time_preset_default":
             temp_settings["send_times"] = ["07:00", "20:00"]
@@ -213,8 +213,8 @@ async def process_time_selection(callback_query: types.CallbackQuery, state: FSM
             await callback_query.answer("🌅 O'rta vaqt tanlandi: 10:00, 18:00")
             
         elif action == "time_three_times":
-            temp_settings["send_times"] = ["07:00", "20:00"]
-            await callback_query.answer("📅 Kuniga 2 marta: 07:00, 20:00")
+            temp_settings["send_times"] = ["07:00", "11:00", "20:00"]
+            await callback_query.answer("📅 Kuniga 3 marta: 07:00, 11:00, 20:00")
             
         elif action == "time_custom":
             await callback_query.message.edit_text(
@@ -255,7 +255,7 @@ async def process_time_selection(callback_query: types.CallbackQuery, state: FSM
             except:
                 pass
             
-            send_times = temp_settings.get("send_times", ["07:00", "20:00"])
+            send_times = temp_settings.get("send_times", ["07:00", "11:00", "20:00"])
             send_times_str = ", ".join(send_times)
             
             await callback_query.message.edit_text(
@@ -276,7 +276,7 @@ async def process_time_selection(callback_query: types.CallbackQuery, state: FSM
             return
         
         # Обновляем клавиатуру с новыми временами
-        current_times_str = ", ".join(temp_settings.get("send_times", ["07:00", "20:00"]))
+        current_times_str = ", ".join(temp_settings.get("send_times", ["07:00", "11:00", "20:00"]))
         await callback_query.message.edit_text(
             f"⏰ **Yuborish vaqtini tanlang:**\n\n"
             f"Video qachon yuborilishini tanlang. Bir nechta vaqt tanlashingiz mumkin.\n\n"
@@ -3922,7 +3922,7 @@ def get_time_selection_keyboard():
     )
     keyboard.add(
         InlineKeyboardButton("⏰ Boshqa vaqt", callback_data="time_custom"),
-        InlineKeyboardButton("📅 2 marta kuniga", callback_data="time_three_times"),
+        InlineKeyboardButton("📅 3 marta kuniga", callback_data="time_three_times"),
     )
     keyboard.add(
         InlineKeyboardButton("✅ Tayyor", callback_data="time_confirm"),
@@ -4911,7 +4911,7 @@ async def save_group_settings(data):
         centris_start_video = data.get("centris_start_video", 0)
         golden_season_id = data.get("golden_season_id") if golden_enabled else None
         golden_start_video = data.get("golden_start_video", 0)
-        send_times = data.get("send_times", ["07:00", "20:00"])
+        send_times = data.get("send_times", ["07:00", "11:00", "20:00"])
         
         # Убеждаемся что у нас есть все необходимые данные
         if centris_enabled and centris_season_id is None:
