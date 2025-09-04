@@ -122,8 +122,17 @@ async def send_group_video_new(chat_id: int, project: str, season_id: int = None
         season_db, video_db = db.get_group_video_start(chat_id, project)
         season_id = season_id if season_id is not None else season_db
         start_video = start_video if start_video is not None else video_db
+        
+        # Проверяем валидность season_id
         if not season_id:
             logger.info(f"Не найден стартовый сезон для группы {chat_id}, проект {project}")
+            return False
+        
+        # ДОПОЛНИТЕЛЬНАЯ ПРОВЕРКА: убеждаемся что season_id - это число
+        try:
+            season_id = int(season_id)
+        except (ValueError, TypeError):
+            logger.error(f"Неправильный season_id '{season_id}' для группы {chat_id}, проект {project}. Требуется исправление настроек группы.")
             return False
 
         # Получаем все сезоны проекта
@@ -769,61 +778,43 @@ def schedule_group_jobs_v2():
                     continue
             logger.info(f"Группа {chat_id}: Только Golden Lake - {send_times}")
         
-        # Режим 3: Оба проекта - Centris по расписанию, Golden Lake между ними
+        # Режим 3: Оба проекта - ЧЕРЕДОВАНИЕ ПО ВРЕМЕНИ
         elif both_enabled and centris_season_id and golden_season_id:
-            # Centris: пользовательское время
+            logger.info(f"Группа {chat_id}: Режим чередования проектов по времени")
+            
+            # Чередуем проекты по времени: Centris -> Golden -> Centris -> Golden...
             for i, send_time in enumerate(send_times):
                 try:
                     hour, minute = map(int, send_time.split(':'))
+                    
+                    # Определяем какой проект отправлять в это время
+                    if i % 2 == 0:  # Четные индексы (0, 2, 4...) - Centris
+                        project = 'centris'
+                        season_id = centris_season_id
+                        start_video = centris_start_video
+                        project_name = "Centris"
+                    else:  # Нечетные индексы (1, 3, 5...) - Golden Lake
+                        project = 'golden_lake'
+                        season_id = golden_season_id
+                        start_video = golden_start_video
+                        project_name = "Golden Lake"
+                    
                     schedule_job_with_immediate_check(
                         scheduler,
                         send_group_video_new,
                         hour, minute,
-                        [chat_id, 'centris', centris_season_id, centris_start_video],
-                        f'group_{chat_id}_centris_{i}',
+                        [chat_id, project, season_id, start_video],
+                        f'group_{chat_id}_{project}_{i}',
                         "Asia/Tashkent"
                     )
+                    
+                    logger.info(f"Группа {chat_id}: {send_time} -> {project_name}")
+                    
                 except ValueError:
                     logger.error(f"Неверный формат времени {send_time} для группы {chat_id}")
                     continue
             
-            # Golden Lake: в промежуточное время (например, между первыми двумя временами Centris)
-            if len(send_times) >= 2:
-                try:
-                    first_hour = int(send_times[0].split(':')[0])
-                    second_hour = int(send_times[1].split(':')[0])
-                    golden_hour = (first_hour + second_hour) // 2
-                    if golden_hour == first_hour:
-                        golden_hour = first_hour + 3  # Добавляем 3 часа
-                    schedule_job_with_immediate_check(
-                        scheduler,
-                        send_group_video_new,
-                        golden_hour, 0,
-                        [chat_id, 'golden_lake', golden_season_id, golden_start_video],
-                        f'group_{chat_id}_golden_mid',
-                        "Asia/Tashkent"
-                    )
-                except:
-                    # Fallback: 11:00
-                    schedule_job_with_immediate_check(
-                        scheduler,
-                        send_group_video_new,
-                        11, 0,
-                        [chat_id, 'golden_lake', golden_season_id, golden_start_video],
-                        f'group_{chat_id}_golden_mid',
-                        "Asia/Tashkent"
-                    )
-            else:
-                # Если только одно время для Centris, Golden Lake в 11:00
-                schedule_job_with_immediate_check(
-                    scheduler,
-                    send_group_video_new,
-                    11, 0,
-                    [chat_id, 'golden_lake', golden_season_id, golden_start_video],
-                    f'group_{chat_id}_golden_mid',
-                    "Asia/Tashkent"
-                )
-            logger.info(f"Группа {chat_id}: Оба проекта - Centris {send_times}, Golden промежуточное время")
+            logger.info(f"Группа {chat_id}: Чередование настроено - времена: {send_times}")
     
     logger.info(f"Всего запланировано задач: {len(scheduler.get_jobs())}")
 
@@ -910,61 +901,43 @@ def schedule_single_group_jobs(chat_id: int):
                     continue
             logger.info(f"Группа {chat_id}: Только Golden Lake - {send_times}")
         
-        # Режим 3: Оба проекта - Centris по расписанию, Golden Lake между ними
+        # Режим 3: Оба проекта - ЧЕРЕДОВАНИЕ ПО ВРЕМЕНИ
         elif both_enabled and centris_season_id and golden_season_id:
-            # Centris: пользовательское время
+            logger.info(f"Группа {chat_id}: Режим чередования проектов по времени")
+            
+            # Чередуем проекты по времени: Centris -> Golden -> Centris -> Golden...
             for i, send_time in enumerate(send_times):
                 try:
                     hour, minute = map(int, send_time.split(':'))
+                    
+                    # Определяем какой проект отправлять в это время
+                    if i % 2 == 0:  # Четные индексы (0, 2, 4...) - Centris
+                        project = 'centris'
+                        season_id = centris_season_id
+                        start_video = centris_start_video
+                        project_name = "Centris"
+                    else:  # Нечетные индексы (1, 3, 5...) - Golden Lake
+                        project = 'golden_lake'
+                        season_id = golden_season_id
+                        start_video = golden_start_video
+                        project_name = "Golden Lake"
+                    
                     schedule_job_with_immediate_check(
                         scheduler,
                         send_group_video_new,
                         hour, minute,
-                        [chat_id, 'centris', centris_season_id, centris_start_video],
-                        f'group_{chat_id}_centris_{i}',
+                        [chat_id, project, season_id, start_video],
+                        f'group_{chat_id}_{project}_{i}',
                         "Asia/Tashkent"
                     )
+                    
+                    logger.info(f"Группа {chat_id}: {send_time} -> {project_name}")
+                    
                 except ValueError:
                     logger.error(f"Неверный формат времени {send_time} для группы {chat_id}")
                     continue
             
-            # Golden Lake: в промежуточное время
-            if len(send_times) >= 2:
-                try:
-                    first_hour = int(send_times[0].split(':')[0])
-                    second_hour = int(send_times[1].split(':')[0])
-                    golden_hour = (first_hour + second_hour) // 2
-                    if golden_hour == first_hour:
-                        golden_hour = first_hour + 3  # Добавляем 3 часа
-                    schedule_job_with_immediate_check(
-                        scheduler,
-                        send_group_video_new,
-                        golden_hour, 0,
-                        [chat_id, 'golden_lake', golden_season_id, golden_start_video],
-                        f'group_{chat_id}_golden_mid',
-                        "Asia/Tashkent"
-                    )
-                except:
-                    # Fallback: 11:00
-                    schedule_job_with_immediate_check(
-                        scheduler,
-                        send_group_video_new,
-                        11, 0,
-                        [chat_id, 'golden_lake', golden_season_id, golden_start_video],
-                        f'group_{chat_id}_golden_mid',
-                        "Asia/Tashkent"
-                    )
-            else:
-                # Если только одно время для Centris, Golden Lake в 11:00
-                schedule_job_with_immediate_check(
-                    scheduler,
-                    send_group_video_new,
-                    11, 0,
-                    [chat_id, 'golden_lake', golden_season_id, golden_start_video],
-                    f'group_{chat_id}_golden_mid',
-                    "Asia/Tashkent"
-                )
-            logger.info(f"Группа {chat_id}: Оба проекта - Centris {send_times}, Golden промежуточное время")
+            logger.info(f"Группа {chat_id}: Чередование настроено - времена: {send_times}")
         
         logger.info(f"Группа {chat_id}: задачи запланированы успешно")
         return True

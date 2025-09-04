@@ -1,4 +1,5 @@
 import asyncio
+import json
 import os
 from aiogram import types
 from aiogram.dispatcher import FSMContext
@@ -5270,3 +5271,213 @@ async def send_video_now(message: types.Message):
     except Exception as e:
         logger.error(f"Ошибка в send_video_now: {e}")
         await message.reply(f'❌ Ошибка: {e}')
+
+# Команда для исправления неправильных значений сезонов в базе данных
+@dp.message_handler(commands=['fix_group_seasons'])
+async def fix_group_seasons_command(message: types.Message):
+    """
+    Команда для исправления неправильных значений сезонов в базе данных
+    """
+    logger.info(f"🚀 fix_group_seasons вызвана в чате {message.chat.id} ({message.chat.type})")
+    logger.info(f"👤 Пользователь: {message.from_user.id} ({message.from_user.username})")
+    
+    try:
+        user_id = message.from_user.id
+        chat_id = message.chat.id
+        
+        # Проверяем права пользователя
+        if user_id not in ADMINS + SUPER_ADMIN_IDS and not db.is_admin(user_id):
+            logger.warning(f"❌ Пользователь {user_id} не имеет прав")
+            await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat adminlar foydalana oladi.", parse_mode="Markdown")
+            return
+        
+        # Проверяем, что команда используется в группе
+        if message.chat.type not in [types.ChatType.GROUP, types.ChatType.SUPERGROUP]:
+            logger.warning("⚠️ Команда вызвана не в группе")
+            await message.answer("⚠️ Bu buyruq faqat guruhlarda ishlaydi.")
+            return
+        
+        # Получаем текущие настройки группы
+        settings = db.get_group_video_settings(chat_id)
+        if not settings:
+            await message.answer("❌ **Guruh uchun sozlamalar topilmadi!**", parse_mode="Markdown")
+            return
+        
+        centris_enabled, centris_season_id, centris_start_video, golden_enabled, golden_season_id, golden_start_video = settings[:6]
+        
+        # Проверяем и исправляем неправильные значения сезонов
+        fixed_centris = False
+        fixed_golden = False
+        
+        # Исправляем Centris сезон
+        if centris_enabled and centris_season_id:
+            try:
+                # Пытаемся преобразовать в число
+                int(centris_season_id)
+                logger.info(f"Centris season_id {centris_season_id} корректен")
+            except (ValueError, TypeError):
+                # Неправильное значение - заменяем на первый доступный сезон Centris
+                logger.warning(f"Найдено неправильное значение Centris season_id: {centris_season_id}")
+                centris_seasons = db.get_seasons_by_project("centris")
+                if centris_seasons:
+                    new_season_id = centris_seasons[0][0]  # Берем первый сезон
+                    logger.info(f"Заменяем на первый доступный сезон: {new_season_id}")
+                    db.set_group_video_start(chat_id, 'centris', new_season_id, 0)
+                    fixed_centris = True
+                else:
+                    # Если нет сезонов Centris, отключаем проект
+                    logger.warning("Нет доступных сезонов Centris, отключаем проект")
+                    centris_enabled = False
+                    fixed_centris = True
+        
+        # Исправляем Golden сезон
+        if golden_enabled and golden_season_id:
+            try:
+                # Пытаемся преобразовать в число
+                int(golden_season_id)
+                logger.info(f"Golden season_id {golden_season_id} корректен")
+            except (ValueError, TypeError):
+                # Неправильное значение - заменяем на первый доступный сезон Golden
+                logger.warning(f"Найдено неправильное значение Golden season_id: {golden_season_id}")
+                golden_seasons = db.get_seasons_by_project("golden")
+                if golden_seasons:
+                    new_season_id = golden_seasons[0][0]  # Берем первый сезон
+                    logger.info(f"Заменяем на первый доступный сезон: {new_season_id}")
+                    db.set_group_video_start(chat_id, 'golden', new_season_id, 0)
+                    fixed_golden = True
+                else:
+                    # Если нет сезонов Golden, отключаем проект
+                    logger.warning("Нет доступных сезонов Golden, отключаем проект")
+                    golden_enabled = False
+                    fixed_golden = True
+        
+        # Обновляем настройки если что-то было исправлено
+        if fixed_centris or fixed_golden:
+            # Получаем обновленные значения
+            if fixed_centris:
+                if centris_enabled:
+                    centris_season_id, centris_start_video = db.get_group_video_start(chat_id, 'centris')
+                else:
+                    centris_season_id = None
+                    centris_start_video = 0
+            
+            if fixed_golden:
+                if golden_enabled:
+                    golden_season_id, golden_start_video = db.get_group_video_start(chat_id, 'golden')
+                else:
+                    golden_season_id = None
+                    golden_start_video = 0
+            
+            # Сохраняем исправленные настройки
+            db.set_group_video_settings(
+                chat_id,
+                int(centris_enabled),
+                centris_season_id,
+                centris_start_video,
+                int(golden_enabled),
+                golden_season_id,
+                golden_start_video
+            )
+            
+            # Очищаем просмотренные видео для корректного начала
+            db.reset_group_viewed_videos(chat_id)
+            
+            # Перепланируем задачи
+            from handlers.users.video_scheduler import schedule_single_group_jobs
+            schedule_single_group_jobs(chat_id)
+            
+            response = "✅ **Guruh sozlamalari tuzatildi!**\n\n"
+            if fixed_centris:
+                if centris_enabled:
+                    season_name = db.get_season_name(centris_season_id)
+                    response += f"🏢 **Centris Towers:** {season_name} (ID: {centris_season_id})\n"
+                else:
+                    response += f"🏢 **Centris Towers:** O'chirildi (sezонlar topilmadi)\n"
+            
+            if fixed_golden:
+                if golden_enabled:
+                    season_name = db.get_season_name(golden_season_id)
+                    response += f"🏊 **Golden Lake:** {season_name} (ID: {golden_season_id})\n"
+                else:
+                    response += f"🏊 **Golden Lake:** O'chirildi (sezonlar topilmadi)\n"
+            
+            response += f"\n🔄 Video tarqatish qaytadan boshlandi!"
+            
+            await message.answer(response, parse_mode="Markdown")
+            logger.info(f"Исправлены настройки для группы {chat_id}")
+        else:
+            await message.answer("✅ **Guruh sozlamalari to'g'ri!**\n\nHech qanday tuzatish talab qilinmadi.", parse_mode="Markdown")
+        
+    except Exception as e:
+        logger.error(f"Ошибка при исправлении настроек группы: {e}")
+        await message.answer(f"❌ Xatolik yuz berdi: {e}")
+
+# Команда для применения новой логики чередования проектов
+@dp.message_handler(commands=['update_schedule'])
+async def update_schedule_command(message: types.Message):
+    """
+    Команда для обновления планировщика с новой логикой чередования проектов
+    """
+    logger.info(f"🚀 update_schedule вызвана в чате {message.chat.id} ({message.chat.type})")
+    logger.info(f"👤 Пользователь: {message.from_user.id} ({message.from_user.username})")
+    
+    try:
+        user_id = message.from_user.id
+        chat_id = message.chat.id
+        
+        # Проверяем права пользователя
+        if user_id not in ADMINS + SUPER_ADMIN_IDS and not db.is_admin(user_id):
+            logger.warning(f"❌ Пользователь {user_id} не имеет прав")
+            await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat adminlar foydalana oladi.", parse_mode="Markdown")
+            return
+        
+        # Проверяем, что команда используется в группе
+        if message.chat.type not in [types.ChatType.GROUP, types.ChatType.SUPERGROUP]:
+            logger.warning("⚠️ Команда вызвана не в группе")
+            await message.answer("⚠️ Bu buyruq faqat guruhlarda ishlaydi.")
+            return
+        
+        # Получаем текущие настройки группы
+        settings = db.get_group_video_settings(chat_id)
+        if not settings:
+            await message.answer("❌ **Guruh uchun sozlamalar topilmadi!**", parse_mode="Markdown")
+            return
+        
+        # Перепланируем задачи с новой логикой
+        from handlers.users.video_scheduler import schedule_single_group_jobs
+        schedule_single_group_jobs(chat_id)
+        
+        # Получаем время отправки для отображения
+        send_times_json = settings[6] if len(settings) > 6 else None
+        try:
+            if send_times_json:
+                send_times = json.loads(send_times_json)
+            else:
+                send_times = ["07:00", "11:00", "20:00"]
+        except:
+            send_times = ["07:00", "11:00", "20:00"]
+        
+        centris_enabled = bool(settings[0])
+        golden_enabled = bool(settings[3])
+        
+        response = "🔄 **Yangi jadval qo'llanildi!**\n\n"
+        
+        if centris_enabled and golden_enabled:
+            response += "📋 **Yangi tarqatish tartibi:**\n"
+            for i, send_time in enumerate(send_times):
+                if i % 2 == 0:
+                    response += f"• {send_time} - 🏢 **Centris Towers**\n"
+                else:
+                    response += f"• {send_time} - 🏊 **Golden Lake**\n"
+            response += "\n✨ Loyihalar navbat bilan yuboriladi!"
+        elif centris_enabled:
+            response += f"📋 **Centris Towers:** {', '.join(send_times)}"
+        elif golden_enabled:
+            response += f"📋 **Golden Lake:** {', '.join(send_times)}"
+        
+        await message.answer(response, parse_mode="Markdown")
+        logger.info(f"Планировщик обновлен для группы {chat_id}")
+        
+    except Exception as e:
+        logger.error(f"Ошибка при обновлении планировщика: {e}")
+        await message.answer(f"❌ Xatolik yuz berdi: {e}")
