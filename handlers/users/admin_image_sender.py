@@ -41,6 +41,21 @@ try:
         waiting_for_new_title = State()
         waiting_for_new_position = State()
 
+    # Вспомогательная функция для безопасного редактирования сообщений
+    async def safe_edit_text(callback_query: types.CallbackQuery, text: str, reply_markup=None, parse_mode=None):
+        """Безопасно редактирует сообщение, обрабатывая ошибку 'Message is not modified'"""
+        try:
+            await callback_query.message.edit_text(text, reply_markup=reply_markup, parse_mode=parse_mode)
+        except Exception as e:
+            if "Message is not modified" in str(e):
+                # Если сообщение не изменилось, просто отвечаем на callback
+                logger.debug(f"Сообщение не изменилось: {e}")
+                await callback_query.answer()
+            else:
+                # Для других ошибок логируем и отвечаем на callback
+                logger.warning(f"Ошибка при редактировании сообщения: {e}")
+                await callback_query.answer()
+
     # --- Клавиатуры для set_group_video ---
     def get_project_keyboard():
         """Клавиатура для выбора проекта"""
@@ -361,7 +376,7 @@ try:
         
         logger.info(f"Выбран проект: {project}")
         await state.update_data(project=project)
-        await callback_query.message.edit_text("Введите название сезона:")
+        await safe_edit_text(callback_query, "Введите название сезона:")
         await state.set_state(AddSeasonStates.waiting_for_season_name.state)
 
     @dp.message_handler(state=AddSeasonStates.waiting_for_season_name)
@@ -1061,15 +1076,15 @@ try:
         season_id = int(callback_query.data.replace("confirm_delete_season_", ""))
         
         if db.delete_season(season_id):
-            await callback_query.message.edit_text("✅ Сезон и все его видео успешно удалены.")
+            await safe_edit_text(callback_query, "✅ Сезон и все его видео успешно удалены.")
         else:
-            await callback_query.message.edit_text("❌ Ошибка при удалении сезона.")
+            await safe_edit_text(callback_query, "❌ Ошибка при удалении сезона.")
         
         await callback_query.answer()
 
     @dp.callback_query_handler(lambda c: c.data == "cancel_delete")
     async def cancel_delete_season(callback_query: types.CallbackQuery):
-        await callback_query.message.edit_text("❌ Удаление отменено.")
+        await safe_edit_text(callback_query, "❌ Удаление отменено.")
         await callback_query.answer()
 
     @dp.message_handler(Command('delete_season'), user_id=ADMINS + [SUPER_ADMIN_ID])
@@ -1695,15 +1710,15 @@ try:
         season_id = int(callback_query.data.replace("confirm_delete_season_", ""))
         
         if db.delete_season(season_id):
-            await callback_query.message.edit_text("✅ Сезон и все его видео успешно удалены.")
+            await safe_edit_text(callback_query, "✅ Сезон и все его видео успешно удалены.")
         else:
-            await callback_query.message.edit_text("❌ Ошибка при удалении сезона.")
+            await safe_edit_text(callback_query, "❌ Ошибка при удалении сезона.")
         
         await callback_query.answer()
 
     @dp.callback_query_handler(lambda c: c.data == "cancel_delete")
     async def cancel_delete_season(callback_query: types.CallbackQuery):
-        await callback_query.message.edit_text("❌ Удаление отменено.")
+        await safe_edit_text(callback_query, "❌ Удаление отменено.")
         await callback_query.answer()
 
     @dp.message_handler(Command('delete_season'), user_id=ADMINS + [SUPER_ADMIN_ID])
@@ -2329,15 +2344,15 @@ try:
         season_id = int(callback_query.data.replace("confirm_delete_season_", ""))
         
         if db.delete_season(season_id):
-            await callback_query.message.edit_text("✅ Сезон и все его видео успешно удалены.")
+            await safe_edit_text(callback_query, "✅ Сезон и все его видео успешно удалены.")
         else:
-            await callback_query.message.edit_text("❌ Ошибка при удалении сезона.")
+            await safe_edit_text(callback_query, "❌ Ошибка при удалении сезона.")
         
         await callback_query.answer()
 
     @dp.callback_query_handler(lambda c: c.data == "cancel_delete")
     async def cancel_delete_season(callback_query: types.CallbackQuery):
-        await callback_query.message.edit_text("❌ Удаление отменено.")
+        await safe_edit_text(callback_query, "❌ Удаление отменено.")
         await callback_query.answer()
 
     @dp.message_handler(Command('delete_season'), user_id=ADMINS + [SUPER_ADMIN_ID])
@@ -2963,15 +2978,15 @@ try:
         season_id = int(callback_query.data.replace("confirm_delete_season_", ""))
         
         if db.delete_season(season_id):
-            await callback_query.message.edit_text("✅ Сезон и все его видео успешно удалены.")
+            await safe_edit_text(callback_query, "✅ Сезон и все его видео успешно удалены.")
         else:
-            await callback_query.message.edit_text("❌ Ошибка при удалении сезона.")
+            await safe_edit_text(callback_query, "❌ Ошибка при удалении сезона.")
         
         await callback_query.answer()
 
     @dp.callback_query_handler(lambda c: c.data == "cancel_delete")
     async def cancel_delete_season(callback_query: types.CallbackQuery):
-        await callback_query.message.edit_text("❌ Удаление отменено.")
+        await safe_edit_text(callback_query, "❌ Удаление отменено.")
         await callback_query.answer()
 
     @dp.message_handler(Command('delete_season'), user_id=ADMINS + [SUPER_ADMIN_ID])
@@ -3597,15 +3612,15 @@ try:
         season_id = int(callback_query.data.replace("confirm_delete_season_", ""))
         
         if db.delete_season(season_id):
-            await callback_query.message.edit_text("✅ Сезон и все его видео успешно удалены.")
+            await safe_edit_text(callback_query, "✅ Сезон и все его видео успешно удалены.")
         else:
-            await callback_query.message.edit_text("❌ Ошибка при удалении сезона.")
+            await safe_edit_text(callback_query, "❌ Ошибка при удалении сезона.")
         
         await callback_query.answer()
 
     @dp.callback_query_handler(lambda c: c.data == "cancel_delete")
     async def cancel_delete_season(callback_query: types.CallbackQuery):
-        await callback_query.message.edit_text("❌ Удаление отменено.")
+        await safe_edit_text(callback_query, "❌ Удаление отменено.")
         await callback_query.answer()
 
     @dp.message_handler(Command('delete_season'), user_id=ADMINS + [SUPER_ADMIN_ID])
@@ -4231,15 +4246,15 @@ try:
         season_id = int(callback_query.data.replace("confirm_delete_season_", ""))
         
         if db.delete_season(season_id):
-            await callback_query.message.edit_text("✅ Сезон и все его видео успешно удалены.")
+            await safe_edit_text(callback_query, "✅ Сезон и все его видео успешно удалены.")
         else:
-            await callback_query.message.edit_text("❌ Ошибка при удалении сезона.")
+            await safe_edit_text(callback_query, "❌ Ошибка при удалении сезона.")
         
         await callback_query.answer()
 
     @dp.callback_query_handler(lambda c: c.data == "cancel_delete")
     async def cancel_delete_season(callback_query: types.CallbackQuery):
-        await callback_query.message.edit_text("❌ Удаление отменено.")
+        await safe_edit_text(callback_query, "❌ Удаление отменено.")
         await callback_query.answer()
 
     @dp.message_handler(Command('delete_season'), user_id=ADMINS + [SUPER_ADMIN_ID])
@@ -4865,15 +4880,15 @@ try:
         season_id = int(callback_query.data.replace("confirm_delete_season_", ""))
         
         if db.delete_season(season_id):
-            await callback_query.message.edit_text("✅ Сезон и все его видео успешно удалены.")
+            await safe_edit_text(callback_query, "✅ Сезон и все его видео успешно удалены.")
         else:
-            await callback_query.message.edit_text("❌ Ошибка при удалении сезона.")
+            await safe_edit_text(callback_query, "❌ Ошибка при удалении сезона.")
         
         await callback_query.answer()
 
     @dp.callback_query_handler(lambda c: c.data == "cancel_delete")
     async def cancel_delete_season(callback_query: types.CallbackQuery):
-        await callback_query.message.edit_text("❌ Удаление отменено.")
+        await safe_edit_text(callback_query, "❌ Удаление отменено.")
         await callback_query.answer()
 
     @dp.message_handler(Command('delete_season'), user_id=ADMINS + [SUPER_ADMIN_ID])
@@ -5499,15 +5514,15 @@ try:
         season_id = int(callback_query.data.replace("confirm_delete_season_", ""))
         
         if db.delete_season(season_id):
-            await callback_query.message.edit_text("✅ Сезон и все его видео успешно удалены.")
+            await safe_edit_text(callback_query, "✅ Сезон и все его видео успешно удалены.")
         else:
-            await callback_query.message.edit_text("❌ Ошибка при удалении сезона.")
+            await safe_edit_text(callback_query, "❌ Ошибка при удалении сезона.")
         
         await callback_query.answer()
 
     @dp.callback_query_handler(lambda c: c.data == "cancel_delete")
     async def cancel_delete_season(callback_query: types.CallbackQuery):
-        await callback_query.message.edit_text("❌ Удаление отменено.")
+        await safe_edit_text(callback_query, "❌ Удаление отменено.")
         await callback_query.answer()
 
     @dp.message_handler(Command('delete_season'), user_id=ADMINS + [SUPER_ADMIN_ID])

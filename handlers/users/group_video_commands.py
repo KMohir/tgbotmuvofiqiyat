@@ -16,6 +16,21 @@ from handlers.users.video_scheduler import schedule_single_group_jobs
 # Настройка логирования
 logger = logging.getLogger(__name__)
 
+# Вспомогательная функция для безопасного редактирования сообщений
+async def safe_edit_text(callback_query: types.CallbackQuery, text: str, reply_markup=None, parse_mode=None):
+    """Безопасно редактирует сообщение, обрабатывая ошибку 'Message is not modified'"""
+    try:
+        await callback_query.message.edit_text(text, reply_markup=reply_markup, parse_mode=parse_mode)
+    except Exception as e:
+        if "Message is not modified" in str(e):
+            # Если сообщение не изменилось, просто отвечаем на callback
+            logger.debug(f"Сообщение не изменилось: {e}")
+            await callback_query.answer()
+        else:
+            # Для других ошибок логируем и отвечаем на callback
+            logger.warning(f"Ошибка при редактировании сообщения: {e}")
+            await callback_query.answer()
+
 # Импортируем необходимые переменные
 from data.config import ADMINS
 
@@ -189,7 +204,7 @@ async def process_time_selection(callback_query: types.CallbackQuery, state: FSM
         temp_settings = data.get("temp_settings")
         
         if not temp_settings:
-            await callback_query.message.edit_text("❌ **Xatolik!**\n\nSozlamalar topilmadi. Qaytadan boshlang.", parse_mode="Markdown")
+            await safe_edit_text(callback_query,"❌ **Xatolik!**\n\nSozlamalar topilmadi. Qaytadan boshlang.", parse_mode="Markdown")
             await state.finish()
             return
         
@@ -217,7 +232,7 @@ async def process_time_selection(callback_query: types.CallbackQuery, state: FSM
             await callback_query.answer("📅 Kuniga 3 marta: 07:00, 11:00, 20:00")
             
         elif action == "time_custom":
-            await callback_query.message.edit_text(
+            await safe_edit_text(callback_query,
                 "⏰ **Maxsus vaqtlarni kiriting:**\n\n"
                 "Vaqtlarni HH:MM formatida kiriting, vergul bilan ajrating.\n"
                 "Masalan: 09:00, 15:00, 21:00\n\n"
@@ -258,7 +273,7 @@ async def process_time_selection(callback_query: types.CallbackQuery, state: FSM
             send_times = temp_settings.get("send_times", ["07:00", "11:00", "20:00"])
             send_times_str = ", ".join(send_times)
             
-            await callback_query.message.edit_text(
+            await safe_edit_text(callback_query,
                 f"✅ **Sozlamalar saqlandi!**\n\n"
                 f"🏢 **Guruh:** {group_name}\n"
                 f"🆔 **ID:** {chat_id}\n\n"
@@ -277,7 +292,7 @@ async def process_time_selection(callback_query: types.CallbackQuery, state: FSM
         
         # Обновляем клавиатуру с новыми временами
         current_times_str = ", ".join(temp_settings.get("send_times", ["07:00", "11:00", "20:00"]))
-        await callback_query.message.edit_text(
+        await safe_edit_text(callback_query,
             f"⏰ **Yuborish vaqtini tanlang:**\n\n"
             f"Video qachon yuborilishini tanlang. Bir nechta vaqt tanlashingiz mumkin.\n\n"
             f"📋 **Joriy sozlamalar:**\n"
@@ -3940,7 +3955,7 @@ async def process_project_selection(callback_query: types.CallbackQuery, state: 
         await state.update_data(project=project)
         
         if project == "centris":
-            await callback_query.message.edit_text(
+            await safe_edit_text(callback_query,
                 "🏢 **Centris Towers**\n\n"
                 "📺 **Sesonni tanlang:**",
                 reply_markup=get_season_keyboard("centris")
@@ -3950,14 +3965,14 @@ async def process_project_selection(callback_query: types.CallbackQuery, state: 
         elif project == "golden":
             seasons = db.get_seasons_by_project("golden")
             if not seasons:
-                await callback_query.message.edit_text(
+                await safe_edit_text(callback_query,
                     "❌ **Golden Lake uchun hech qanday seson topilmadi!**\n\n"
                     "Iltimos, avval seson qo'shing."
                 , parse_mode="Markdown")
                 await state.finish()
                 return
                 
-            await callback_query.message.edit_text(
+            await safe_edit_text(callback_query,
                 "🏢 **Golden Lake**\n\n"
                 "📺 **Sesonni tanlang:**",
                 reply_markup=get_season_keyboard("golden")
@@ -3965,7 +3980,7 @@ async def process_project_selection(callback_query: types.CallbackQuery, state: 
             await state.set_state(GroupVideoStates.waiting_for_golden_season.state)
             
         elif project == "both":
-            await callback_query.message.edit_text(
+            await safe_edit_text(callback_query,
                 "🏢 **Centris + Golden**\n\n"
                 "📺 **Centris Towers uchun sesonni tanlang:**",
                 reply_markup=get_season_keyboard("centris")
@@ -3984,7 +3999,7 @@ async def process_season_selection(callback_query: types.CallbackQuery, state: F
     """Обработчик выбора сезона"""
     try:
         if callback_query.data == "no_seasons":
-            await callback_query.message.edit_text(
+            await safe_edit_text(callback_query,
                 "❌ **Hech qanday seson topilmadi!**\n\n"
                 "Iltimos, avval seson qo'shing."
             , parse_mode="Markdown")
@@ -3997,7 +4012,7 @@ async def process_season_selection(callback_query: types.CallbackQuery, state: F
         
         if project == "centris" or (project == "both" and data.get("both_mode")):
             await state.update_data(centris_season_id=season_id)
-            await callback_query.message.edit_text(
+            await safe_edit_text(callback_query,
                 "🏢 **Centris Towers**\n"
                 f"📺 **Seson:** {db.get_season_name(season_id)}\n\n"
                 "🎬 **Boshlash uchun videoni tanlang:**",
@@ -4008,7 +4023,7 @@ async def process_season_selection(callback_query: types.CallbackQuery, state: F
             
         elif project == "golden" or (project == "both" and not data.get("both_mode")):
             await state.update_data(golden_season_id=season_id)
-            await callback_query.message.edit_text(
+            await safe_edit_text(callback_query,
                 "🏢 **Golden Lake**\n"
                 f"📺 **Seson:** {db.get_season_name(season_id)}\n\n"
                 "🎬 **Boshlash uchun videoni tanlang:**",
@@ -4028,7 +4043,7 @@ async def process_video_selection(callback_query: types.CallbackQuery, state: FS
     """Обработчик выбора видео"""
     try:
         if callback_query.data == "all_videos_sent":
-            await callback_query.message.edit_text(
+            await safe_edit_text(callback_query,
                 "❌ **Barcha video allaqachon yuborilgan!**\n\n"
                 "Boshqa seson tanlang yoki yangi video qo'shing."
             , parse_mode="Markdown")
@@ -4046,7 +4061,7 @@ async def process_video_selection(callback_query: types.CallbackQuery, state: FS
                 # Если выбран оба проекта, переходим к Golden
                 # Сбрасываем both_mode чтобы правильно обработать Golden
                 await state.update_data(both_mode=False)
-                await callback_query.message.edit_text(
+                await safe_edit_text(callback_query,
                     "🏢 **Centris Towers sozlandi!**\n\n"
                     "📺 **Golden Lake uchun sesonni tanlang:**",
                     reply_markup=get_season_keyboard("golden")
@@ -4063,7 +4078,7 @@ async def process_video_selection(callback_query: types.CallbackQuery, state: FS
                 )
                 
                 # Предлагаем выбрать группу для применения настроек
-                await callback_query.message.edit_text(
+                await safe_edit_text(callback_query,
                     "✅ **Sozlamalar tayyor!**\n\n"
                     "🏢 **Endi guruhni tanlang:**\n\n"
                     "Qaysi guruhga bu sozlamalarni qo'llash kerak?",
@@ -4087,7 +4102,7 @@ async def process_video_selection(callback_query: types.CallbackQuery, state: FS
                 )
                 
                 # Предлагаем выбрать группу для применения настроек
-                await callback_query.message.edit_text(
+                await safe_edit_text(callback_query,
                     "✅ **Sozlamalar tayyor!**\n\n"
                     "🏢 **Endi guruhni tanlang:**\n\n"
                     "Qaysi guruhga bu sozlamalarni qo'llash kerak?",
@@ -4107,7 +4122,7 @@ async def process_video_selection(callback_query: types.CallbackQuery, state: FS
                 )
                 
                 # Предлагаем выбрать группу для применения настроек
-                await callback_query.message.edit_text(
+                await safe_edit_text(callback_query,
                     "✅ **Sozlamalar tayyor!**\n\n"
                     "🏢 **Endi guruhni tanlang:**\n\n"
                     "Qaysi guruhga bu sozlamalarni qo'llash kerak?",
@@ -4136,7 +4151,7 @@ async def process_group_selection(callback_query: types.CallbackQuery, state: FS
         temp_settings = data.get("temp_settings")
         
         if not temp_settings:
-            await callback_query.message.edit_text("❌ **Xatolik!**\n\nSozlamalar topilmadi. Qaytadan boshlang.", parse_mode="Markdown")
+            await safe_edit_text(callback_query,"❌ **Xatolik!**\n\nSozlamalar topilmadi. Qaytadan boshlang.", parse_mode="Markdown")
             await state.finish()
             return
         
@@ -4148,7 +4163,7 @@ async def process_group_selection(callback_query: types.CallbackQuery, state: FS
                 temp_settings["chat_id"] = chat_id
                 
                 # Переходим к выбору времени отправки
-                await callback_query.message.edit_text(
+                await safe_edit_text(callback_query,
                     "⏰ **Yuborish vaqtini tanlang:**\n\n"
                     "Video qachon yuborilishini tanlang. Bir nechta vaqt tanlashingiz mumkin.\n\n"
                     "📋 **Joriy sozlamalar:**\n"
@@ -4162,14 +4177,14 @@ async def process_group_selection(callback_query: types.CallbackQuery, state: FS
                 await callback_query.answer()
                 return
             else:
-                await callback_query.message.edit_text(
+                await safe_edit_text(callback_query,
                     "❌ **Xatolik!**\n\nBu buyruq faqat guruhlarda ishlaydi."
                 , parse_mode="Markdown")
                 await state.finish()
         
         elif action == "group_manual":
             # Запрашиваем ввод ID группы вручную
-            await callback_query.message.edit_text(
+            await safe_edit_text(callback_query,
                 "📝 **Guruh ID sini kiriting:**\n\n"
                 "Guruh ID sini yuboring (masalan: -1001234567890)\n\n"
                 "⚠️ **Eslatma:** Guruh ID si manfiy son bo'lishi kerak.",
@@ -4201,9 +4216,9 @@ async def process_group_selection(callback_query: types.CallbackQuery, state: FS
                     ))
                 kb.add(InlineKeyboardButton("❌ Bekor qilish", callback_data="group_cancel"))
                 
-                await callback_query.message.edit_text(response, reply_markup=kb, parse_mode="Markdown")
+                await safe_edit_text(callback_query,response, reply_markup=kb, parse_mode="Markdown")
             else:
-                await callback_query.message.edit_text(
+                await safe_edit_text(callback_query,
                     "❌ **Guruhlar topilmadi!**\n\n"
                     "Ma'lumotlar bazasida guruhlar yo'q yoki hech biri whitelist da emas."
                 , parse_mode="Markdown")
@@ -4211,7 +4226,7 @@ async def process_group_selection(callback_query: types.CallbackQuery, state: FS
         
         elif action == "group_cancel":
             # Отменяем настройку
-            await callback_query.message.edit_text(
+            await safe_edit_text(callback_query,
                 "❌ **Sozlamalar bekor qilindi!**\n\n"
                 "Hech qanday o'zgarish saqlanmadi."
             , parse_mode="Markdown")
@@ -4223,7 +4238,7 @@ async def process_group_selection(callback_query: types.CallbackQuery, state: FS
             temp_settings["chat_id"] = int(group_id)
             
             # Переходим к выбору времени отправки
-            await callback_query.message.edit_text(
+            await safe_edit_text(callback_query,
                 "⏰ **Yuborish vaqtini tanlang:**\n\n"
                 "Video qachon yuborilishini tanlang. Bir nechta vaqt tanlashingiz mumkin.\n\n"
                 "📋 **Joriy sozlamalar:**\n"
@@ -4241,7 +4256,7 @@ async def process_group_selection(callback_query: types.CallbackQuery, state: FS
         
     except Exception as e:
         logger.error(f"Ошибка при выборе группы: {e}")
-        await callback_query.message.edit_text(f"❌ Xatolik yuz berdi: {e}")
+        await safe_edit_text(callback_query,f"❌ Xatolik yuz berdi: {e}")
         await state.finish()
 
 async def update_video_progress(chat_id: int, project: str, season_id: int, video_position: int):

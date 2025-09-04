@@ -196,15 +196,20 @@ async def process_approve_user(callback_query: types.CallbackQuery):
             except Exception as e:
                 logger.warning(f"Foydalanuvchiga {user_id} xabar yuborib bo'lmadi: {e}")
             
-            await callback_query.message.edit_text(
-                f"✅ **Foydalanuvchi tasdiqlandi**\n\n" +
-                f"👤 **Ism**: {user_data['name']}\n" +
-                f"🆔 **ID**: `{user_id}`\n" +
-                f"📱 **Telefon**: {user_data['phone']}\n" +
-                f"👨‍💼 **Tasdiqlagan**: {callback_query.from_user.full_name}\n" +
-                f"📅 **Sana**: {datetime.now().strftime('%d.%m.%Y %H:%M')}",
-                parse_mode='Markdown'
-            )
+            try:
+                await callback_query.message.edit_text(
+                    f"✅ **Foydalanuvchi tasdiqlandi**\n\n" +
+                    f"👤 **Ism**: {user_data['name']}\n" +
+                    f"🆔 **ID**: `{user_id}`\n" +
+                    f"📱 **Telefon**: {user_data['phone']}\n" +
+                    f"👨‍💼 **Tasdiqlagan**: {callback_query.from_user.full_name}\n" +
+                    f"📅 **Sana**: {datetime.now().strftime('%d.%m.%Y %H:%M')}",
+                    parse_mode='Markdown'
+                )
+            except Exception as edit_error:
+                logger.warning(f"Не удалось отредактировать сообщение: {edit_error}")
+                # Если не удалось отредактировать, просто отвечаем на callback
+                pass
             try:
                 await callback_query.answer("✅ Foydalanuvchi muvaffaqiyatli tasdiqlandi")
             except InvalidQueryID:
@@ -276,15 +281,20 @@ async def process_deny_user(callback_query: types.CallbackQuery):
             except Exception as e:
                 logger.warning(f"Foydalanuvchiga {user_id} xabar yuborib bo'lmadi: {e}")
             
-            await callback_query.message.edit_text(
-                f"❌ **Foydalanuvchi rad etildi**\n\n" +
-                f"👤 **Ism**: {user_data['name']}\n" +
-                f"🆔 **ID**: `{user_id}`\n" +
-                f"📱 **Telefon**: {user_data['phone']}\n" +
-                f"👨‍💼 **Rad etgan**: {callback_query.from_user.full_name}\n" +
-                f"📅 **Sana**: {datetime.now().strftime('%d.%m.%Y %H:%M')}",
-                parse_mode='Markdown'
-            )
+            try:
+                await callback_query.message.edit_text(
+                    f"❌ **Foydalanuvchi rad etildi**\n\n" +
+                    f"👤 **Ism**: {user_data['name']}\n" +
+                    f"🆔 **ID**: `{user_id}`\n" +
+                    f"📱 **Telefon**: {user_data['phone']}\n" +
+                    f"👨‍💼 **Rad etgan**: {callback_query.from_user.full_name}\n" +
+                    f"📅 **Sana**: {datetime.now().strftime('%d.%m.%Y %H:%M')}",
+                    parse_mode='Markdown'
+                )
+            except Exception as edit_error:
+                logger.warning(f"Не удалось отредактировать сообщение: {edit_error}")
+                # Если не удалось отредактировать, просто отвечаем на callback
+                pass
             try:
                 await callback_query.answer("✅ Foydalanuvchi rad etildi")
             except InvalidQueryID:
