@@ -152,7 +152,7 @@ class Database:
                     centris_viewed_videos TEXT DEFAULT '[]',  -- Отдельно для Centris
                     golden_viewed_videos TEXT DEFAULT '[]',   -- Отдельно для Golden Lake
                     is_subscribed INTEGER DEFAULT 1,
-                    send_times TEXT DEFAULT '["08:00", "20:00"]'  -- Время отправки в формате JSON
+                    send_times TEXT DEFAULT '["07:00", "20:00"]'  -- Время отправки в формате JSON
                 )
             ''')
             
@@ -160,7 +160,7 @@ class Database:
             try:
                 cursor.execute("ALTER TABLE group_video_settings ADD COLUMN IF NOT EXISTS centris_viewed_videos TEXT DEFAULT '[]'")
                 cursor.execute("ALTER TABLE group_video_settings ADD COLUMN IF NOT EXISTS golden_viewed_videos TEXT DEFAULT '[]'")
-                cursor.execute("ALTER TABLE group_video_settings ADD COLUMN IF NOT EXISTS send_times TEXT DEFAULT '[\"08:00\", \"20:00\"]'")
+                cursor.execute("ALTER TABLE group_video_settings ADD COLUMN IF NOT EXISTS send_times TEXT DEFAULT '[\"07:00\", \"20:00\"]'")
                 logger.info("Миграция: добавлены колонки для отдельного отслеживания просмотренных видео и времени отправки")
             except Exception as e:
                 logger.error(f"Ошибка при добавлении колонок для отслеживания видео и времени: {e}")
@@ -1499,7 +1499,7 @@ class Database:
             cursor.close()
             if result and result[0]:
                 return json.loads(result[0])
-            return ["08:00", "20:00"]  # Время по умолчанию
+            return ["07:00", "20:00"]  # Время по умолчанию
         except Exception as e:
             logger.error(f"Ошибка при получении времени отправки для группы {chat_id}: {e}")
             return ["08:00", "20:00"]

@@ -194,11 +194,11 @@ async def process_time_selection(callback_query: types.CallbackQuery, state: FSM
             return
         
         # Получаем текущие времена отправки
-        current_times = temp_settings.get("send_times", ["08:00", "20:00"])
+        current_times = temp_settings.get("send_times", ["07:00", "20:00"])
         
         if action == "time_preset_default":
-            temp_settings["send_times"] = ["08:00", "20:00"]
-            await callback_query.answer("🌅 Standart vaqt tanlandi: 08:00, 20:00")
+            temp_settings["send_times"] = ["07:00", "20:00"]
+            await callback_query.answer("🌅 Standart vaqt tanlandi: 07:00, 20:00")
             
         elif action == "time_preset_early":
             temp_settings["send_times"] = ["07:00", "19:00"]
@@ -213,8 +213,8 @@ async def process_time_selection(callback_query: types.CallbackQuery, state: FSM
             await callback_query.answer("🌅 O'rta vaqt tanlandi: 10:00, 18:00")
             
         elif action == "time_three_times":
-            temp_settings["send_times"] = ["08:00", "14:00", "20:00"]
-            await callback_query.answer("📅 Kuniga 3 marta: 08:00, 14:00, 20:00")
+            temp_settings["send_times"] = ["07:00", "20:00"]
+            await callback_query.answer("📅 Kuniga 2 marta: 07:00, 20:00")
             
         elif action == "time_custom":
             await callback_query.message.edit_text(
@@ -255,7 +255,7 @@ async def process_time_selection(callback_query: types.CallbackQuery, state: FSM
             except:
                 pass
             
-            send_times = temp_settings.get("send_times", ["08:00", "20:00"])
+            send_times = temp_settings.get("send_times", ["07:00", "20:00"])
             send_times_str = ", ".join(send_times)
             
             await callback_query.message.edit_text(
@@ -276,7 +276,7 @@ async def process_time_selection(callback_query: types.CallbackQuery, state: FSM
             return
         
         # Обновляем клавиатуру с новыми временами
-        current_times_str = ", ".join(temp_settings.get("send_times", ["08:00", "20:00"]))
+        current_times_str = ", ".join(temp_settings.get("send_times", ["07:00", "20:00"]))
         await callback_query.message.edit_text(
             f"⏰ **Yuborish vaqtini tanlang:**\n\n"
             f"Video qachon yuborilishini tanlang. Bir nechta vaqt tanlashingiz mumkin.\n\n"
@@ -649,7 +649,7 @@ async def help_group_video_command(message: types.Message):
 5. Video avtomatik ravishda yuboriladi
 
 ⏰ **Avtomatik yuborish vaqti:**
-• Centris Towers: 08:00 va 20:00
+• Centris Towers: 07:00 va 20:00
 • Golden Lake: 11:00
 • Vaqt: Toshkent (UTC+5)
 """
@@ -1224,7 +1224,7 @@ async def status_group_video_command(message: types.Message):
         if centris_enabled or golden_enabled:
             response += "\n🎬 **Keyingi video:**\n"
             if centris_enabled:
-                response += "   • Centris: Avtomatik 08:00 va 20:00\n"
+                response += "   • Centris: Avtomatik 07:00 va 20:00\n"
             if golden_enabled:
                 response += "   • Golden: Avtomatik 11:00\n"
         
@@ -1568,7 +1568,7 @@ async def all_group_commands_command(message: types.Message):
         
         # Время автоматической отправки
         response += "⏰ **AVTOMATIK YUBORISH VAQTI:**\n"
-        response += "• Centris Towers: 08:00 va 20:00\n"
+        response += "• Centris Towers: 07:00 va 20:00\n"
         response += "• Golden Lake: 11:00\n"
         response += "• Vaqt: Toshkent (UTC+5)\n\n"
         
@@ -1720,7 +1720,7 @@ async def version_group_video_command(message: types.Message):
         
         # Время работы
         response += "⏰ **ISH VAQTI:**\n"
-        response += "   • Centris: 08:00 va 20:00\n"
+        response += "   • Centris: 07:00 va 20:00\n"
         response += "   • Golden: 11:00\n"
         response += "   • Vaqt zona: Toshkent (UTC+5)\n\n"
         
@@ -2712,7 +2712,7 @@ async def info_group_video_command(message: types.Message):
             
             # Время работы
             response += "⏰ **ISH VAQTI:**\n"
-            response += "   • Centris Towers: 08:00 va 20:00\n"
+            response += "   • Centris Towers: 07:00 va 20:00\n"
             response += "   • Golden Lake: 11:00\n"
             response += "   • Vaqt zona: Toshkent (UTC+5)\n"
             response += "   • Avtomatik: Har kuni\n\n"
@@ -2983,7 +2983,7 @@ async def about_group_video_command(message: types.Message):
             
             # Время работы
             response += "⏰ **ISH VAQTI:**\n"
-            response += "   • Centris Towers: 08:00 va 20:00\n"
+            response += "   • Centris Towers: 07:00 va 20:00\n"
             response += "   • Golden Lake: 11:00\n"
             response += "   • Vaqt zona: Toshkent (UTC+5)\n"
             response += "   • Avtomatik: Har kuni\n"
@@ -3913,7 +3913,7 @@ def get_time_selection_keyboard():
     
     # Предустановленные варианты времени
     keyboard.add(
-        InlineKeyboardButton("🌅 08:00, 20:00", callback_data="time_preset_default"),
+        InlineKeyboardButton("🌅 07:00, 20:00", callback_data="time_preset_default"),
         InlineKeyboardButton("🌅 07:00, 19:00", callback_data="time_preset_early"),
     )
     keyboard.add(
@@ -3922,7 +3922,7 @@ def get_time_selection_keyboard():
     )
     keyboard.add(
         InlineKeyboardButton("⏰ Boshqa vaqt", callback_data="time_custom"),
-        InlineKeyboardButton("📅 3 marta kuniga", callback_data="time_three_times"),
+        InlineKeyboardButton("📅 2 marta kuniga", callback_data="time_three_times"),
     )
     keyboard.add(
         InlineKeyboardButton("✅ Tayyor", callback_data="time_confirm"),
@@ -4911,7 +4911,7 @@ async def save_group_settings(data):
         centris_start_video = data.get("centris_start_video", 0)
         golden_season_id = data.get("golden_season_id") if golden_enabled else None
         golden_start_video = data.get("golden_start_video", 0)
-        send_times = data.get("send_times", ["08:00", "20:00"])
+        send_times = data.get("send_times", ["07:00", "20:00"])
         
         # Убеждаемся что у нас есть все необходимые данные
         if centris_enabled and centris_season_id is None:
