@@ -1,14 +1,14 @@
 import logging
 
 from aiogram import Dispatcher
-
-from data.config import ADMINS
+from utils.safe_admin_notify import safe_send_to_admins
 
 
 async def on_startup_notify(dp: Dispatcher):
-    for admin in ADMINS:
-        try:
-            await dp.bot.send_message(admin, "Bot Ishga  Tushirildi")
-
-        except Exception as err:
-            logging.exception(err)
+    """Уведомляет администраторов о запуске бота"""
+    success_count = await safe_send_to_admins(dp.bot, "Bot Ishga  Tushirildi")
+    
+    if success_count > 0:
+        logging.info(f"Уведомление о запуске отправлено {success_count} администраторам")
+    else:
+        logging.warning("Не удалось отправить уведомление о запуске ни одному администратору")

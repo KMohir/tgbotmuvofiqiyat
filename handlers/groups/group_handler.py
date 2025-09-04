@@ -4,6 +4,7 @@ from aiogram.dispatcher.filters import Command
 from data.config import ADMINS, SUPER_ADMIN_ID
 from loader import dp
 from db import db
+from utils.safe_admin_notify import safe_send_to_admins
 import logging
 
 # --- Удалены все проверки и действия, связанные с разрешением/запретом групп ---
@@ -103,11 +104,9 @@ async def my_chat_member_handler(message: types.ChatMemberUpdated):
             logging.info(f"Бота удалили из группы '{group_title}' (ID: {group_id}). Группа отписана от рассылки.")
 
             # Оповещаем админов
-            for admin in ADMINS:
-                try:
-                    await dp.bot.send_message(admin, f"🚪 Бот был удален из группы: {group_title}")
-                except Exception as e:
-                    logging.error(f"Ошибка при уведомлении админа {admin}: {e}")
+            success_count = await safe_send_to_admins(dp.bot, f"🚪 Бот был удален из группы: {group_title}")
+            if success_count > 0:
+                logging.info(f"Уведомление об удалении из группы отправлено {success_count} администраторам")
 
 
 @dp.callback_query_handler(lambda c: c.data.startswith(('allow_group_', 'ban_group_')))
