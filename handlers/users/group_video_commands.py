@@ -40,6 +40,108 @@ SUPER_ADMIN_IDS = [5657091547, 7983512278, 5310261745]
 
 logger.info(f"🔄 Регистрируем команды групп в group_video_commands.py, dp ID: {id(dp)}")
 
+# Константы для пагинации
+GROUPS_PER_PAGE = 10  # Количество групп на странице
+
+def create_paginated_groups_keyboard(groups, page=0, prefix="group", cancel_callback="group_cancel"):
+    """
+    Создает клавиатуру с пагинацией для списка групп
+    
+    Args:
+        groups: список кортежей (group_id, group_name)
+        page: номер страницы (начиная с 0)
+        prefix: префикс для callback_data (например, "remove_group", "select_group")
+        cancel_callback: callback для кнопки отмены
+    
+    Returns:
+        tuple: (keyboard, total_pages, current_page)
+    """
+    from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+    
+    if not groups:
+        kb = InlineKeyboardMarkup()
+        kb.add(InlineKeyboardButton("❌ Guruhlar yo'q", callback_data="no_groups"))
+        return kb, 0, 0
+    
+    total_pages = (len(groups) + GROUPS_PER_PAGE - 1) // GROUPS_PER_PAGE
+    current_page = min(page, total_pages - 1) if total_pages > 0 else 0
+    
+    start_idx = current_page * GROUPS_PER_PAGE
+    end_idx = min(start_idx + GROUPS_PER_PAGE, len(groups))
+    page_groups = groups[start_idx:end_idx]
+    
+    kb = InlineKeyboardMarkup(row_width=1)
+    
+    # Добавляем кнопки групп
+    for group_id, group_name in page_groups:
+        kb.add(InlineKeyboardButton(
+            f"🏢 {group_name}",
+            callback_data=f"{prefix}_{group_id}"
+        ))
+    
+    # Добавляем кнопки навигации если страниц больше одной
+    if total_pages > 1:
+        nav_buttons = []
+        
+        # Кнопка "Назад"
+        if current_page > 0:
+            nav_buttons.append(InlineKeyboardButton(
+                "⬅️ Oldingi", 
+                callback_data=f"page_{prefix}_{current_page - 1}"
+            ))
+        
+        # Информация о странице
+        nav_buttons.append(InlineKeyboardButton(
+            f"📄 {current_page + 1}/{total_pages}",
+            callback_data="page_info"
+        ))
+        
+        # Кнопка "Вперед"
+        if current_page < total_pages - 1:
+            nav_buttons.append(InlineKeyboardButton(
+                "➡️ Keyingi", 
+                callback_data=f"page_{prefix}_{current_page + 1}"
+            ))
+        
+        kb.row(*nav_buttons)
+    
+    # Кнопка отмены
+    kb.add(InlineKeyboardButton("❌ Bekor qilish", callback_data=cancel_callback))
+    
+    return kb, total_pages, current_page
+
+def create_paginated_groups_text(groups, page=0, title="Guruhlar"):
+    """
+    Создает текст сообщения с пагинацией для списка групп
+    
+    Args:
+        groups: список кортежей (group_id, group_name)
+        page: номер страницы (начиная с 0)
+        title: заголовок сообщения
+    
+    Returns:
+        str: текст сообщения
+    """
+    if not groups:
+        return f"❌ **{title} topilmadi!**\n\nMa'lumotlar bazasida guruhlar yo'q."
+    
+    total_pages = (len(groups) + GROUPS_PER_PAGE - 1) // GROUPS_PER_PAGE
+    current_page = min(page, total_pages - 1) if total_pages > 0 else 0
+    
+    start_idx = current_page * GROUPS_PER_PAGE
+    end_idx = min(start_idx + GROUPS_PER_PAGE, len(groups))
+    page_groups = groups[start_idx:end_idx]
+    
+    response = f"📋 **{title}:**\n\n"
+    
+    for group_id, group_name in page_groups:
+        response += f"🏢 **{group_name}**\n🆔 `{group_id}`\n\n"
+    
+    if total_pages > 1:
+        response += f"📄 **Sahifa:** {current_page + 1}/{total_pages}\n\n"
+    
+    return response
+
 # Команда для настройки видео рассылки в группе
 @dp.message_handler(commands=['set_group_video'])
 async def set_group_video_command(message: types.Message, state: FSMContext):
@@ -4195,29 +4297,27 @@ async def process_group_selection(callback_query: types.CallbackQuery, state: FS
             await state.update_data(waiting_for_manual_id=True)
         
         elif action == "group_list":
-            # Показываем список доступных групп
+            # Показываем список доступных групп с пагинацией
             groups = db.get_all_whitelisted_groups()
             logger.info(f"Найдено {len(groups)} разрешенных групп")
             for group_id, group_name in groups:
                 logger.info(f"Группа: {group_name} (ID: {group_id})")
             if groups:
                 response = "📋 **Mavjud guruhlar:**\n\n"
-                for group_id, group_name in groups:
-                    response += f"🏢 **{group_name}**\n🆔 `{group_id}`\n\n"
+                response += "Guruh ID sini yuboring yoki ro'yxatdan tanlang:\n\n"
                 
-                response += "Guruh ID sini yuboring yoki ro'yxatdan tanlang:"
+                # Добавляем текст с группами первой страницы
+                response += create_paginated_groups_text(groups, page=0, title="Mavjud guruhlar")
                 
-                # Создаем клавиатуру с группами
-                from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-                kb = InlineKeyboardMarkup(row_width=1)
-                for group_id, group_name in groups:
-                    kb.add(InlineKeyboardButton(
-                        f"🏢 {group_name}",
-                        callback_data=f"select_group_{group_id}"
-                    ))
-                kb.add(InlineKeyboardButton("❌ Bekor qilish", callback_data="group_cancel"))
+                # Создаем пагинированную клавиатуру
+                kb, total_pages, current_page = create_paginated_groups_keyboard(
+                    groups, 
+                    page=0, 
+                    prefix="select_group", 
+                    cancel_callback="group_cancel"
+                )
                 
-                await safe_edit_text(callback_query,response, reply_markup=kb, parse_mode="Markdown")
+                await safe_edit_text(callback_query, response, reply_markup=kb, parse_mode="Markdown")
             else:
                 await safe_edit_text(callback_query,
                     "❌ **Guruhlar topilmadi!**\n\n"
@@ -5516,22 +5616,20 @@ async def remove_group_command(message: types.Message, state: FSMContext):
             await message.answer("❌ **Guruhlar topilmadi!**\n\nMa'lumotlar bazasida guruhlar yo'q.", parse_mode="Markdown")
             return
         
-        # Создаем клавиатуру с группами
-        from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-        
+        # Создаем пагинированную клавиатуру с группами
         response = "🗑️ **O'chirish uchun guruhni tanlang:**\n\n"
         response += "⚠️ **Diqqat!** Guruh to'liq o'chiriladi va bot guruhdan chiqadi.\n\n"
         
-        for group_id, group_name in groups:
-            response += f"🏢 **{group_name}**\n🆔 `{group_id}`\n\n"
+        # Добавляем текст с группами первой страницы
+        response += create_paginated_groups_text(groups, page=0, title="O'chirish uchun guruhni tanlang")
         
-        kb = InlineKeyboardMarkup(row_width=1)
-        for group_id, group_name in groups:
-            kb.add(InlineKeyboardButton(
-                f"🗑️ {group_name}",
-                callback_data=f"remove_group_{group_id}"
-            ))
-        kb.add(InlineKeyboardButton("❌ Bekor qilish", callback_data="remove_group_cancel"))
+        # Создаем пагинированную клавиатуру
+        kb, total_pages, current_page = create_paginated_groups_keyboard(
+            groups, 
+            page=0, 
+            prefix="remove_group", 
+            cancel_callback="remove_group_cancel"
+        )
         
         await message.answer(response, reply_markup=kb, parse_mode="Markdown")
         
@@ -5625,3 +5723,108 @@ async def remove_group_callback(callback_query: types.CallbackQuery):
     except Exception as e:
         logger.error(f"Ошибка при удалении группы: {e}")
         await callback_query.answer(f"❌ Xatolik: {e}", show_alert=True)
+
+
+# Обработчики пагинации для remove_group
+@dp.callback_query_handler(lambda c: c.data.startswith('page_remove_group_'))
+async def remove_group_pagination_callback(callback_query: types.CallbackQuery):
+    """Обработчик пагинации для списка групп в remove_group"""
+    logger.info(f"📄 remove_group_pagination_callback вызван с данными: {callback_query.data}")
+    
+    try:
+        user_id = callback_query.from_user.id
+        
+        # Проверяем права пользователя (только супер-админы)
+        if user_id not in SUPER_ADMIN_IDS and not db.is_superadmin(user_id):
+            await callback_query.answer("❌ Sizda ruxsat yo'q!", show_alert=True)
+            return
+        
+        # Получаем номер страницы
+        page = int(callback_query.data.replace("page_remove_group_", ""))
+        logger.info(f"Переходим на страницу {page} для remove_group")
+        
+        # Получаем список всех групп
+        groups = db.get_all_groups()
+        
+        if not groups:
+            await safe_edit_text(callback_query,
+                "❌ **Guruhlar topilmadi!**\n\nMa'lumotlar bazasida guruhlar yo'q.",
+                parse_mode="Markdown"
+            )
+            await callback_query.answer()
+            return
+        
+        # Создаем текст и клавиатуру для новой страницы
+        response = "🗑️ **O'chirish uchun guruhni tanlang:**\n\n"
+        response += "⚠️ **Diqqat!** Guruh to'liq o'chiriladi va bot guruhdan chiqadi.\n\n"
+        response += create_paginated_groups_text(groups, page=page, title="O'chirish uchun guruhni tanlang")
+        
+        kb, total_pages, current_page = create_paginated_groups_keyboard(
+            groups, 
+            page=page, 
+            prefix="remove_group", 
+            cancel_callback="remove_group_cancel"
+        )
+        
+        await safe_edit_text(callback_query, response, reply_markup=kb, parse_mode="Markdown")
+        await callback_query.answer()
+        
+    except Exception as e:
+        logger.error(f"Ошибка при пагинации remove_group: {e}")
+        await callback_query.answer(f"❌ Xatolik: {e}", show_alert=True)
+
+
+# Обработчики пагинации для select_group (set_group_video)
+@dp.callback_query_handler(lambda c: c.data.startswith('page_select_group_'))
+async def select_group_pagination_callback(callback_query: types.CallbackQuery, state: FSMContext):
+    """Обработчик пагинации для списка групп в set_group_video"""
+    logger.info(f"📄 select_group_pagination_callback вызван с данными: {callback_query.data}")
+    
+    try:
+        user_id = callback_query.from_user.id
+        
+        # Проверяем права пользователя
+        if user_id not in ADMINS + SUPER_ADMIN_IDS and not db.is_admin(user_id):
+            await callback_query.answer("❌ Sizda ruxsat yo'q!", show_alert=True)
+            return
+        
+        # Получаем номер страницы
+        page = int(callback_query.data.replace("page_select_group_", ""))
+        logger.info(f"Переходим на страницу {page} для select_group")
+        
+        # Получаем список всех разрешенных групп
+        groups = db.get_all_whitelisted_groups()
+        
+        if not groups:
+            await safe_edit_text(callback_query,
+                "❌ **Guruhlar topilmadi!**\n\nMa'lumotlar bazasida guruhlar yo'q yoki hech biri whitelist da emas.",
+                parse_mode="Markdown"
+            )
+            await callback_query.answer()
+            return
+        
+        # Создаем текст и клавиатуру для новой страницы
+        response = "📋 **Mavjud guruhlar:**\n\n"
+        response += "Guruh ID sini yuboring yoki ro'yxatdan tanlang:\n\n"
+        response += create_paginated_groups_text(groups, page=page, title="Mavjud guruhlar")
+        
+        kb, total_pages, current_page = create_paginated_groups_keyboard(
+            groups, 
+            page=page, 
+            prefix="select_group", 
+            cancel_callback="group_cancel"
+        )
+        
+        await safe_edit_text(callback_query, response, reply_markup=kb, parse_mode="Markdown")
+        await callback_query.answer()
+        
+    except Exception as e:
+        logger.error(f"Ошибка при пагинации select_group: {e}")
+        await callback_query.answer(f"❌ Xatolik: {e}", show_alert=True)
+
+
+# Обработчик для кнопки информации о странице
+@dp.callback_query_handler(lambda c: c.data == "page_info")
+async def page_info_callback(callback_query: types.CallbackQuery):
+    """Обработчик для кнопки информации о странице"""
+    await callback_query.answer("📄 Bu sahifa haqida ma'lumot", show_alert=False)
