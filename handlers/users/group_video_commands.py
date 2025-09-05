@@ -8,7 +8,7 @@ from handlers import groups
 from db import db
 from loader import dp
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 
 # Импортируем состояния
 from handlers.users.group_video_states import GroupVideoStates
@@ -37,6 +37,288 @@ from data.config import ADMINS
 
 # Список супер-администраторов
 SUPER_ADMIN_IDS = [5657091547, 7983512278, 5310261745]
+
+# Команда для предоставления доступа пользователю
+@dp.message_handler(commands=['grant_access'])
+async def grant_access_command(message: types.Message):
+    """Предоставить доступ пользователю на определенное время"""
+    user_id = message.from_user.id
+    
+    # Проверяем права доступа
+    if user_id not in SUPER_ADMIN_IDS:
+        await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat super-adminlar foydalana oladi.", parse_mode="Markdown")
+        return
+    
+    # Парсим аргументы: /grant_access <user_id> <hours>
+    args = message.text.split()
+    if len(args) < 3:
+        await message.answer(
+            "❌ **Noto'g'ri format!**\n\n"
+            "**Foydalanish:** `/grant_access <user_id> <soat>`\n"
+            "**Misollar:**\n"
+            "• `/grant_access 123456789 24` - 24 soat\n"
+            "• `/grant_access 123456789 168` - 7 kun\n"
+            "• `/grant_access 123456789 720` - 30 kun",
+            parse_mode="Markdown"
+        )
+        return
+    
+    try:
+        target_user_id = int(args[1])
+        hours = int(args[2])
+        
+        if hours <= 0:
+            await message.answer("❌ **Soat soni musbat bo'lishi kerak!**")
+            return
+            
+        # Предоставляем доступ
+        success = db.grant_access(target_user_id, hours)
+        
+        if success:
+            await message.answer(
+                f"✅ **Ruxsat berildi!**\n\n"
+                f"👤 **Foydalanuvchi:** `{target_user_id}`\n"
+                f"⏰ **Muddat:** {hours} soat\n"
+                f"📅 **Tugash vaqti:** {(datetime.now() + timedelta(hours=hours)).strftime('%d.%m.%Y %H:%M')}",
+                parse_mode="Markdown"
+            )
+        else:
+            await message.answer("❌ **Xatolik yuz berdi!** Ruxsat berishda muammo bo'ldi.")
+            
+    except ValueError:
+        await message.answer("❌ **Noto'g'ri format!** User ID va soat soni raqam bo'lishi kerak.")
+    except Exception as e:
+        logger.error(f"Ошибка в grant_access_command: {e}")
+        await message.answer("❌ **Xatolik yuz berdi!**")
+
+# Команда для отзыва доступа
+@dp.message_handler(commands=['revoke_access'])
+async def revoke_access_command(message: types.Message):
+    """Отозвать доступ у пользователя"""
+    user_id = message.from_user.id
+    
+    # Проверяем права доступа
+    if user_id not in SUPER_ADMIN_IDS:
+        await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat super-adminlar foydalana oladi.", parse_mode="Markdown")
+        return
+    
+    # Парсим аргументы: /revoke_access <user_id>
+    args = message.text.split()
+    if len(args) < 2:
+        await message.answer(
+            "❌ **Noto'g'ri format!**\n\n"
+            "**Foydalanish:** `/revoke_access <user_id>`\n"
+            "**Misollar:**\n"
+            "• `/revoke_access 123456789`",
+            parse_mode="Markdown"
+        )
+        return
+    
+    try:
+        target_user_id = int(args[1])
+        
+        # Отзываем доступ
+        success = db.revoke_access(target_user_id)
+        
+        if success:
+            await message.answer(
+                f"✅ **Ruxsat olib qo'yildi!**\n\n"
+                f"👤 **Foydalanuvchi:** `{target_user_id}`\n"
+                f"🚫 **Holat:** Ruxsat yo'q",
+                parse_mode="Markdown"
+            )
+        else:
+            await message.answer("❌ **Xatolik yuz berdi!** Ruxsat olib qo'yishda muammo bo'ldi.")
+            
+    except ValueError:
+        await message.answer("❌ **Noto'g'ri format!** User ID raqam bo'lishi kerak.")
+    except Exception as e:
+        logger.error(f"Ошибка в revoke_access_command: {e}")
+        await message.answer("❌ **Xatolik yuz berdi!**")
+
+# Команда для проверки доступа
+@dp.message_handler(commands=['check_access'])
+async def check_access_command(message: types.Message):
+    """Проверить доступ пользователя"""
+    user_id = message.from_user.id
+    
+    # Проверяем права доступа
+    if user_id not in SUPER_ADMIN_IDS:
+        await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat super-adminlar foydalana oladi.", parse_mode="Markdown")
+        return
+    
+    # Парсим аргументы: /check_access <user_id>
+    args = message.text.split()
+    if len(args) < 2:
+        await message.answer(
+            "❌ **Noto'g'ri format!**\n\n"
+            "**Foydalanish:** `/check_access <user_id>`\n"
+            "**Misollar:**\n"
+            "• `/check_access 123456789`",
+            parse_mode="Markdown"
+        )
+        return
+    
+    try:
+        target_user_id = int(args[1])
+        
+        # Проверяем доступ
+        is_valid = db.is_access_valid(target_user_id)
+        
+        if is_valid:
+            await message.answer(
+                f"✅ **Ruxsat mavjud!**\n\n"
+                f"👤 **Foydalanuvchi:** `{target_user_id}`\n"
+                f"🟢 **Holat:** Faol",
+                parse_mode="Markdown"
+            )
+        else:
+            await message.answer(
+                f"❌ **Ruxsat yo'q!**\n\n"
+                f"👤 **Foydalanuvchi:** `{target_user_id}`\n"
+                f"🔴 **Holat:** Ruxsat yo'q yoki muddati tugagan",
+                parse_mode="Markdown"
+            )
+            
+    except ValueError:
+        await message.answer("❌ **Noto'g'ri format!** User ID raqam bo'lishi kerak.")
+    except Exception as e:
+        logger.error(f"Ошибка в check_access_command: {e}")
+        await message.answer("❌ **Xatolik yuz berdi!**")
+
+# Команда для автоматического отзыва истекшего доступа
+@dp.message_handler(commands=['auto_revoke'])
+async def auto_revoke_command(message: types.Message):
+    """Автоматически отозвать доступ у пользователей с истекшим временем"""
+    user_id = message.from_user.id
+    
+    # Проверяем права доступа
+    if user_id not in SUPER_ADMIN_IDS:
+        await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat super-adminlar foydalana oladi.", parse_mode="Markdown")
+        return
+    
+    try:
+        # Автоматически отзываем доступ
+        revoked_count = db.auto_revoke_expired_access()
+        
+        await message.answer(
+            f"✅ **Avtomatik ruxsat olib qo'yildi!**\n\n"
+            f"🚫 **Olib qo'yilgan:** {revoked_count} ta foydalanuvchi\n"
+            f"⏰ **Vaqt:** {datetime.now().strftime('%d.%m.%Y %H:%M')}",
+            parse_mode="Markdown"
+        )
+        
+    except Exception as e:
+        logger.error(f"Ошибка в auto_revoke_command: {e}")
+        await message.answer("❌ **Xatolik yuz berdi!**")
+
+# Команда для просмотра статистики доступа
+@dp.message_handler(commands=['access_stats'])
+async def access_stats_command(message: types.Message):
+    """Показать статистику доступа пользователей"""
+    user_id = message.from_user.id
+    
+    # Проверяем права доступа
+    if user_id not in SUPER_ADMIN_IDS:
+        await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat super-adminlar foydalana oladi.", parse_mode="Markdown")
+        return
+    
+    try:
+        from datetime import datetime
+        cursor = db.conn.cursor()
+        
+        # Получаем статистику
+        cursor.execute("""
+            SELECT 
+                COUNT(*) as total_users,
+                COUNT(CASE WHEN is_banned = 0 THEN 1 END) as active_users,
+                COUNT(CASE WHEN is_banned = 1 THEN 1 END) as banned_users,
+                COUNT(CASE WHEN access_expires_at IS NOT NULL AND access_expires_at > %s THEN 1 END) as users_with_time_limit,
+                COUNT(CASE WHEN access_expires_at IS NOT NULL AND access_expires_at <= %s THEN 1 END) as expired_users
+            FROM users 
+            WHERE is_group = 0
+        """, (datetime.now(), datetime.now()))
+        
+        stats = cursor.fetchone()
+        
+        # Получаем пользователей с истекшим доступом
+        expired_users = db.get_expired_users()
+        
+        cursor.close()
+        
+        if stats:
+            total_users, active_users, banned_users, users_with_time_limit, expired_users_count = stats
+            
+            response = f"📊 **Статистика доступа:**\n\n"
+            response += f"👥 **Всего пользователей:** {total_users}\n"
+            response += f"🟢 **Активных:** {active_users}\n"
+            response += f"🔴 **Заблокированных:** {banned_users}\n"
+            response += f"⏰ **С ограничением времени:** {users_with_time_limit}\n"
+            response += f"⏳ **С истекшим доступом:** {expired_users_count}\n\n"
+            
+            if expired_users:
+                response += f"🚫 **Пользователи с истекшим доступом:**\n"
+                for user_id, name, expires_at in expired_users[:5]:  # Показываем только первых 5
+                    try:
+                        expires_str = expires_at.strftime("%d.%m.%Y %H:%M") if expires_at else "Noma'lum"
+                    except:
+                        expires_str = "Noma'lum"
+                    response += f"• `{user_id}` - {name} (до {expires_str})\n"
+                
+                if len(expired_users) > 5:
+                    response += f"... и еще {len(expired_users) - 5} пользователей\n"
+            else:
+                response += "✅ **Пользователей с истекшим доступом нет**\n"
+            
+            response += f"\n⏰ **Время проверки:** {datetime.now().strftime('%d.%m.%Y %H:%M')}"
+            
+            await message.answer(response, parse_mode="Markdown")
+        else:
+            await message.answer("❌ **Ma'lumotlar topilmadi!**")
+            
+    except Exception as e:
+        logger.error(f"Ошибка в access_stats_command: {e}")
+        await message.answer("❌ **Xatolik yuz berdi!**")
+
+# Команда для справки по управлению доступом
+@dp.message_handler(commands=['access_help'])
+async def access_help_command(message: types.Message):
+    """Показать справку по командам управления доступом"""
+    user_id = message.from_user.id
+    
+    # Проверяем права доступа
+    if user_id not in SUPER_ADMIN_IDS:
+        await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat super-adminlar foydalana oladi.", parse_mode="Markdown")
+        return
+    
+    help_text = """
+🔐 **Команды управления доступом:**
+
+**Предоставление доступа:**
+• `/grant_access <user_id> <часы>` - предоставить доступ на N часов
+• Пример: `/grant_access 123456789 24` - доступ на 24 часа
+• Пример: `/grant_access 123456789 168` - доступ на 7 дней
+
+**Отзыв доступа:**
+• `/revoke_access <user_id>` - отозвать доступ у пользователя
+• Пример: `/revoke_access 123456789`
+
+**Проверка доступа:**
+• `/check_access <user_id>` - проверить статус доступа
+• Пример: `/check_access 123456789`
+
+**Автоматические функции:**
+• `/auto_revoke` - отозвать доступ у всех с истекшим временем
+• `/access_stats` - показать статистику доступа
+
+**Особенности:**
+• Новые пользователи получают доступ на 24 часа автоматически
+• Доступ проверяется каждые 6 часов автоматически
+• Супер-админы имеют неограниченный доступ
+• Группы не имеют ограничений по времени
+    """
+    
+    await message.answer(help_text, parse_mode="Markdown")
 
 logger.info(f"🔄 Регистрируем команды групп в group_video_commands.py, dp ID: {id(dp)}")
 
@@ -73,9 +355,29 @@ def create_paginated_groups_keyboard(groups, page=0, prefix="group", cancel_call
     kb = InlineKeyboardMarkup(row_width=1)
     
     # Добавляем кнопки групп
-    for group_id, group_name in page_groups:
+    for group_data in page_groups:
+        if len(group_data) >= 3:
+            group_id, group_name, created_at = group_data
+            # Форматируем дату для отображения
+            try:
+                if created_at:
+                    date_str = created_at.strftime("%d.%m %H:%M")
+                else:
+                    date_str = ""
+            except:
+                date_str = ""
+            
+            # Добавляем дату к названию группы
+            display_name = f"🏢 {group_name}"
+            if date_str:
+                display_name += f" ({date_str})"
+        else:
+            # Обратная совместимость для старых данных
+            group_id, group_name = group_data
+            display_name = f"🏢 {group_name}"
+        
         kb.add(InlineKeyboardButton(
-            f"🏢 {group_name}",
+            display_name,
             callback_data=f"{prefix}_{group_id}"
         ))
     
@@ -117,7 +419,7 @@ def create_paginated_groups_text(groups, page=0, title="Guruhlar"):
     Создает текст сообщения с пагинацией для списка групп
     
     Args:
-        groups: список кортежей (group_id, group_name)
+        groups: список кортежей (group_id, group_name, created_at)
         page: номер страницы (начиная с 0)
         title: заголовок сообщения
     
@@ -136,8 +438,22 @@ def create_paginated_groups_text(groups, page=0, title="Guruhlar"):
     
     response = f"📋 **{title}:**\n\n"
     
-    for group_id, group_name in page_groups:
-        response += f"🏢 **{group_name}**\n🆔 `{group_id}`\n\n"
+    for group_data in page_groups:
+        if len(group_data) >= 3:
+            group_id, group_name, created_at = group_data
+            # Форматируем дату
+            try:
+                if created_at:
+                    date_str = created_at.strftime("%d.%m.%Y %H:%M")
+                else:
+                    date_str = "Noma'lum"
+            except:
+                date_str = "Noma'lum"
+            response += f"🏢 **{group_name}**\n🆔 `{group_id}`\n📅 {date_str}\n\n"
+        else:
+            # Обратная совместимость для старых данных
+            group_id, group_name = group_data
+            response += f"🏢 **{group_name}**\n🆔 `{group_id}`\n\n"
     
     if total_pages > 1:
         response += f"📄 **Sahifa:** {current_page + 1}/{total_pages}\n\n"
@@ -4302,7 +4618,11 @@ async def process_group_selection(callback_query: types.CallbackQuery, state: FS
             # Показываем список доступных групп с пагинацией
             groups = db.get_all_whitelisted_groups()
             logger.info(f"Найдено {len(groups)} разрешенных групп")
-            for group_id, group_name in groups:
+            for group_data in groups:
+                if len(group_data) >= 3:
+                    group_id, group_name, created_at = group_data
+                else:
+                    group_id, group_name = group_data
                 logger.info(f"Группа: {group_name} (ID: {group_id})")
             if groups:
                 response = "📋 **Mavjud guruhlar:**\n\n"

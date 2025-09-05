@@ -136,7 +136,10 @@ class Database:
                     viewed_videos TEXT DEFAULT '[]',
                     is_group INTEGER DEFAULT 0,
                     is_banned INTEGER DEFAULT 0,
-                    group_id TEXT
+                    group_id TEXT,
+                    access_granted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    access_expires_at TIMESTAMP,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             ''')
             # --- Таблица group_video_settings ---
@@ -165,6 +168,15 @@ class Database:
                 logger.info("Миграция: добавлены колонки для отдельного отслеживания просмотренных видео и времени отправки")
             except Exception as e:
                 logger.error(f"Ошибка при добавлении колонок для отслеживания видео и времени: {e}")
+            
+            # Миграция: добавляем колонки для отслеживания доступа
+            try:
+                cursor.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS access_granted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
+                cursor.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS access_expires_at TIMESTAMP")
+                cursor.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
+                logger.info("Миграция: добавлены колонки для отслеживания доступа")
+            except Exception as e:
+                logger.error(f"Ошибка при добавлении колонок для отслеживания доступа: {e}")
             
             # Проверяем и обновляем структуру существующей таблицы
             cursor.execute('''
@@ -239,12 +251,28 @@ class Database:
     # --- Методы для users ---
     def add_user(self, user_id, name, phone, preferred_time="07:00", is_group=False, group_id=None):
         try:
+            from datetime import datetime, timedelta
             cursor = self.conn.cursor()
-            cursor.execute('''
-                INSERT INTO users (user_id, name, phone, preferred_time, is_group, group_id)
-                VALUES (%s, %s, %s, %s, %s, %s)
-                ON CONFLICT (user_id) DO NOTHING
-            ''', (user_id, name, phone, preferred_time, int(is_group), group_id))
+            
+            # Для групп не устанавливаем время доступа
+            if is_group:
+                cursor.execute('''
+                    INSERT INTO users (user_id, name, phone, preferred_time, is_group, group_id, created_at)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                    ON CONFLICT (user_id) DO NOTHING
+                ''', (user_id, name, phone, preferred_time, int(is_group), group_id, datetime.now()))
+            else:
+                # Для обычных пользователей предоставляем доступ на 24 часа
+                now = datetime.now()
+                expires_at = now + timedelta(hours=24)
+                cursor.execute('''
+                    INSERT INTO users (user_id, name, phone, preferred_time, is_group, group_id, 
+                                     access_granted_at, access_expires_at, created_at)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    ON CONFLICT (user_id) DO NOTHING
+                ''', (user_id, name, phone, preferred_time, int(is_group), group_id, 
+                      now, expires_at, now))
+            
             self.conn.commit()
             cursor.close()
             logger.info(f"Пользователь {user_id} успешно добавлен/обновлен")
@@ -1080,9 +1108,10 @@ class Database:
             cursor.execute('''
                 SELECT gvs.chat_id, gvs.centris_enabled, gvs.centris_season_id, gvs.centris_start_video, 
                        gvs.golden_enabled, gvs.golden_season_id, gvs.golden_start_video, gvs.viewed_videos, gvs.is_subscribed, 
-                       COALESCE(gvs.group_name, u.name, 'Noma''lum guruh') as group_name, gvs.send_times
+                       COALESCE(gvs.group_name, u.name, 'Noma''lum guruh') as group_name, gvs.send_times, u.created_at
                 FROM group_video_settings gvs
                 LEFT JOIN users u ON gvs.chat_id::bigint = u.user_id AND u.is_group = 1
+                ORDER BY u.created_at DESC, gvs.chat_id
             ''')
             result = cursor.fetchall()
             cursor.close()
@@ -1092,22 +1121,33 @@ class Database:
             return []
     
     def get_all_whitelisted_groups(self):
-        """Получить все разрешенные группы с именами"""
+        """Получить все разрешенные группы с именами, отсортированные по дате добавления (новые первыми)"""
         try:
             cursor = self.conn.cursor()
             cursor.execute('''
-                SELECT u.user_id, u.name
+                SELECT u.user_id, u.name, u.created_at
                 FROM users u
                 WHERE u.is_group = 1 AND u.is_banned = 0
+                ORDER BY u.created_at DESC, u.name
             ''')
             all_groups = cursor.fetchall()
             cursor.close()
             
             # Фильтруем только разрешенные группы (в whitelist)
             whitelisted_groups = []
-            for group_id, name in all_groups:
+            for group_data in all_groups:
+                if len(group_data) >= 3:
+                    group_id, name, created_at = group_data
+                else:
+                    # Обратная совместимость
+                    group_id, name = group_data
+                    created_at = None
+                    
                 if self.is_group_whitelisted(group_id):
-                    whitelisted_groups.append((group_id, name))
+                    if created_at:
+                        whitelisted_groups.append((group_id, name, created_at))
+                    else:
+                        whitelisted_groups.append((group_id, name))
             
             return whitelisted_groups
         except Exception as e:
@@ -1317,14 +1357,14 @@ class Database:
             return False
 
     def get_all_groups(self):
-        """Получить список всех групп из базы данных"""
+        """Получить список всех групп из базы данных, отсортированных по дате добавления (новые первыми)"""
         try:
             cursor = self.conn.cursor()
             cursor.execute("""
-                SELECT DISTINCT user_id, name 
-                FROM users 
-                WHERE is_group = 1 
-                ORDER BY name
+                SELECT DISTINCT u.user_id, u.name, u.created_at
+                FROM users u
+                WHERE u.is_group = 1 
+                ORDER BY u.created_at DESC, u.name
             """)
             return cursor.fetchall()
         except Exception as e:
@@ -1552,6 +1592,139 @@ class Database:
         except Exception as e:
             logger.error(f"Ошибка при получении времени отправки для группы {chat_id}: {e}")
             return ["08:00", "20:00"]
+
+    def grant_access(self, user_id: int, hours: int = 24):
+        """Предоставить доступ пользователю на указанное количество часов"""
+        try:
+            from datetime import datetime, timedelta
+            cursor = self.conn.cursor()
+            
+            now = datetime.now()
+            expires_at = now + timedelta(hours=hours)
+            
+            cursor.execute("""
+                UPDATE users 
+                SET access_granted_at = %s, access_expires_at = %s, is_banned = 0
+                WHERE user_id = %s
+            """, (now, expires_at, user_id))
+            
+            self.conn.commit()
+            cursor.close()
+            logger.info(f"Доступ предоставлен пользователю {user_id} до {expires_at}")
+            return True
+        except Exception as e:
+            logger.error(f"Ошибка при предоставлении доступа пользователю {user_id}: {e}")
+            self.conn.rollback()
+            return False
+
+    def revoke_access(self, user_id: int):
+        """Отозвать доступ у пользователя"""
+        try:
+            cursor = self.conn.cursor()
+            from datetime import datetime
+            cursor.execute("""
+                UPDATE users 
+                SET access_expires_at = %s, is_banned = 1
+                WHERE user_id = %s
+            """, (datetime.now(), user_id))
+            
+            self.conn.commit()
+            cursor.close()
+            logger.info(f"Доступ отозван у пользователя {user_id}")
+            return True
+        except Exception as e:
+            logger.error(f"Ошибка при отзыве доступа у пользователя {user_id}: {e}")
+            self.conn.rollback()
+            return False
+
+    def is_access_valid(self, user_id: int) -> bool:
+        """Проверить, действителен ли доступ пользователя"""
+        try:
+            from datetime import datetime
+            cursor = self.conn.cursor()
+            cursor.execute("""
+                SELECT access_expires_at, is_banned 
+                FROM users 
+                WHERE user_id = %s
+            """, (user_id,))
+            
+            result = cursor.fetchone()
+            cursor.close()
+            
+            if not result:
+                return False
+                
+            access_expires_at, is_banned = result
+            
+            # Если пользователь забанен
+            if is_banned:
+                return False
+                
+            # Если время доступа не установлено, считаем доступ действительным
+            if not access_expires_at:
+                return True
+                
+            # Проверяем, не истек ли доступ
+            now = datetime.now()
+            return now < access_expires_at
+            
+        except Exception as e:
+            logger.error(f"Ошибка при проверке доступа пользователя {user_id}: {e}")
+            return False
+
+    def get_expired_users(self):
+        """Получить список пользователей с истекшим доступом"""
+        try:
+            from datetime import datetime
+            cursor = self.conn.cursor()
+            cursor.execute("""
+                SELECT user_id, name, access_expires_at
+                FROM users 
+                WHERE access_expires_at IS NOT NULL 
+                AND access_expires_at < %s 
+                AND is_banned = 0
+            """, (datetime.now(),))
+            
+            result = cursor.fetchall()
+            cursor.close()
+            return result
+        except Exception as e:
+            logger.error(f"Ошибка при получении пользователей с истекшим доступом: {e}")
+            return []
+
+    def auto_revoke_expired_access(self):
+        """Автоматически отозвать доступ у пользователей с истекшим временем"""
+        try:
+            from datetime import datetime
+            cursor = self.conn.cursor()
+            
+            # Получаем пользователей с истекшим доступом
+            expired_users = self.get_expired_users()
+            
+            if not expired_users:
+                cursor.close()
+                return 0
+                
+            # Отзываем доступ
+            cursor.execute("""
+                UPDATE users 
+                SET is_banned = 1
+                WHERE access_expires_at IS NOT NULL 
+                AND access_expires_at < %s 
+                AND is_banned = 0
+            """, (datetime.now(),))
+            
+            revoked_count = cursor.rowcount
+            self.conn.commit()
+            cursor.close()
+            
+            logger.info(f"Автоматически отозван доступ у {revoked_count} пользователей")
+            return revoked_count
+            
+        except Exception as e:
+            logger.error(f"Ошибка при автоматическом отзыве доступа: {e}")
+            self.conn.rollback()
+            return 0
 
 # create_security_tables метод уже определен в классе Database
 

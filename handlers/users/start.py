@@ -54,9 +54,16 @@ try:
     ], chat_type=types.ChatType.PRIVATE)
     async def private_protect_filter(message: types.Message):
         user_id = int(message.from_user.id)
+        
         # Супер-админ всегда может использовать любые сообщения
         if db.is_superadmin(user_id):
             return
+            
+        # Проверяем доступ для обычных пользователей
+        if not db.is_access_valid(user_id):
+            logger.warning(f"Доступ заблокирован для пользователя {user_id}")
+            raise CancelHandler()
+            
         # Для остальных — можно блокировать или просто pass
         pass
 
