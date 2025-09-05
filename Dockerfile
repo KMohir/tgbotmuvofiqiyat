@@ -13,18 +13,18 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /app
 
 # Copy requirements and entrypoint script first
-COPY ./requirements.txt /app/requirements.txt
-# COPY ./entrypoint.sh /app/entrypoint.sh
-COPY . /app
+COPY ./requirements.txt ./requirements.txt
+COPY ./entrypoint.sh /app/entrypoint.sh
+# COPY . /app
 
 # Ensure entrypoint.sh is executable
-RUN chmod +x /app/entrypoint.sh
+RUN chmod +x ./entrypoint.sh
 
 # Install Python dependencies
 RUN pip install --user --no-cache-dir -r requirements.txt
 
 # Copy the rest of the application
-COPY . /app
+# COPY . /app
 
 # Set the entrypoint
 ENTRYPOINT ["/app/entrypoint.sh"]
