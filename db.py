@@ -46,10 +46,10 @@ class Database:
             # Подключение к PostgreSQL
             print('1111',env.str('DB_HOST'))
             self.conn = psycopg2.connect(
-                host=env.str('DB_HOST'),
-                dbname=env.str('DB_NAME'),
-                user=env.str('DB_USER'),
-                password=env.str('DB_PASSWORD'),
+                host=env.str('DB_HOST', 'localhost'),
+                dbname=env.str('DB_NAME', 'tgbotmuvofiqiyat'),
+                user=env.str('DB_USER', 'postgres'),
+                password=env.str('DB_PASSWORD', '1111'),
                 port=env.str('DB_PORT', '5432')
             )
             self.conn.autocommit = True

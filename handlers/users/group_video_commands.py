@@ -41,7 +41,7 @@ SUPER_ADMIN_IDS = [5657091547, 7983512278, 5310261745]
 logger.info(f"🔄 Регистрируем команды групп в group_video_commands.py, dp ID: {id(dp)}")
 
 # Константы для пагинации
-GROUPS_PER_PAGE = 10  # Количество групп на странице
+GROUPS_PER_PAGE = 5  # Количество групп на странице (уменьшено для избежания "Message is too long")
 
 def create_paginated_groups_keyboard(groups, page=0, prefix="group", cancel_callback="group_cancel"):
     """
@@ -103,7 +103,9 @@ def create_paginated_groups_keyboard(groups, page=0, prefix="group", cancel_call
                 callback_data=f"page_{prefix}_{current_page + 1}"
             ))
         
-        kb.row(*nav_buttons)
+        # Добавляем кнопки навигации в отдельный ряд
+        if nav_buttons:
+            kb.row(*nav_buttons)
     
     # Кнопка отмены
     kb.add(InlineKeyboardButton("❌ Bekor qilish", callback_data=cancel_callback))
@@ -4353,8 +4355,6 @@ async def process_group_selection(callback_query: types.CallbackQuery, state: FS
             await callback_query.answer()
             return
         
-        await callback_query.answer()
-        
     except Exception as e:
         logger.error(f"Ошибка при выборе группы: {e}")
         await safe_edit_text(callback_query,f"❌ Xatolik yuz berdi: {e}")
@@ -5743,6 +5743,9 @@ async def remove_group_pagination_callback(callback_query: types.CallbackQuery):
         page = int(callback_query.data.replace("page_remove_group_", ""))
         logger.info(f"Переходим на страницу {page} для remove_group")
         
+        # Отвечаем на callback_query сразу
+        await callback_query.answer()
+        
         # Получаем список всех групп
         groups = db.get_all_groups()
         
@@ -5767,7 +5770,6 @@ async def remove_group_pagination_callback(callback_query: types.CallbackQuery):
         )
         
         await safe_edit_text(callback_query, response, reply_markup=kb, parse_mode="Markdown")
-        await callback_query.answer()
         
     except Exception as e:
         logger.error(f"Ошибка при пагинации remove_group: {e}")
@@ -5775,7 +5777,7 @@ async def remove_group_pagination_callback(callback_query: types.CallbackQuery):
 
 
 # Обработчики пагинации для select_group (set_group_video)
-@dp.callback_query_handler(lambda c: c.data.startswith('page_select_group_'))
+@dp.callback_query_handler(lambda c: c.data.startswith('page_select_group_'), state=GroupVideoStates.waiting_for_group_selection)
 async def select_group_pagination_callback(callback_query: types.CallbackQuery, state: FSMContext):
     """Обработчик пагинации для списка групп в set_group_video"""
     logger.info(f"📄 select_group_pagination_callback вызван с данными: {callback_query.data}")
@@ -5791,6 +5793,9 @@ async def select_group_pagination_callback(callback_query: types.CallbackQuery, 
         # Получаем номер страницы
         page = int(callback_query.data.replace("page_select_group_", ""))
         logger.info(f"Переходим на страницу {page} для select_group")
+        
+        # Отвечаем на callback_query сразу
+        await callback_query.answer()
         
         # Получаем список всех разрешенных групп
         groups = db.get_all_whitelisted_groups()
@@ -5816,7 +5821,6 @@ async def select_group_pagination_callback(callback_query: types.CallbackQuery, 
         )
         
         await safe_edit_text(callback_query, response, reply_markup=kb, parse_mode="Markdown")
-        await callback_query.answer()
         
     except Exception as e:
         logger.error(f"Ошибка при пагинации select_group: {e}")

@@ -18,12 +18,13 @@ except Exception as e:
     logger.warning("Продолжаем работу с переменными окружения системы")
 
 try:
-    BOT_TOKEN = env.str("BOT_TOKEN")  # Забираем значение типа str
-    if not BOT_TOKEN:
-        raise ValueError("BOT_TOKEN не найден в переменных окружения")
+    BOT_TOKEN = env.str("BOT_TOKEN", default="your_bot_token_here")  # Забираем значение типа str
+    if not BOT_TOKEN or BOT_TOKEN == "your_bot_token_here":
+        logger.warning("BOT_TOKEN не найден в переменных окружения, используем значение по умолчанию")
+        BOT_TOKEN = "your_bot_token_here"
 except Exception as e:
     logger.critical(f"Ошибка при загрузке BOT_TOKEN: {e}")
-    raise
+    BOT_TOKEN = "your_bot_token_here"
 
 try:
     admins_str = env.str("ADMINS", default="")
