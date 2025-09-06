@@ -94,7 +94,17 @@ try:
         chat_type=types.ChatType.PRIVATE
     )
     async def block_private_commands_for_non_superadmin(message: types.Message):
-        await message.reply("Вам недоступны команды. Только супер-админ может использовать команды в личке.")
+        command = message.text.split()[0]
+        await message.reply(
+            f"❌ **Noma'lum buyruq: {command}**\n\n"
+            "Sizda bu buyruqni bajarish uchun ruxsat yo'q!\n"
+            "Faqat super admin shaxsiy xabarlarda buyruqlardan foydalanishi mumkin.\n\n"
+            "Mavjud buyruqlar:\n"
+            "• /start - Botni ishga tushurish\n"
+            "• /help - Yordam\n\n"
+            "Boshqa funksiyalar uchun guruhlarda botdan foydalaning.",
+            parse_mode="Markdown"
+        )
         raise CancelHandler()
 
     # --- Удалены все проверки на запрет группы ---
@@ -109,6 +119,47 @@ try:
         #     raise CancelHandler()
         # В разрешённых группах — пропускаем всё без ограничений
         pass
+
+    # --- Обработчик неизвестных команд в группах ---
+    @dp.message_handler(
+        lambda m: (
+            m.text 
+            and m.text.startswith('/')
+            and m.text.split()[0] not in [
+                '/start', '/help', '/centris_towers', '/golden_lake', '/about', '/contact',
+                '/set_group_video', '/show_group_video_settings', '/help_group_video',
+                '/start_group_video', '/stop_group_video', '/next_group_video', '/skip_group_video',
+                '/test_group_video', '/reset_group_video', '/list_group_videos', '/status_group_video',
+                '/add_group_to_whitelist', '/remove_group_from_whitelist', '/force_group_video',
+                '/schedule_group_video', '/debug_group_video', '/all_group_commands',
+                '/ping_group_video', '/version_group_video', '/stats_group_video',
+                '/cleanup_group_video', '/backup_group_video', '/restore_group_video',
+                '/logs_group_video', '/monitor_group_video', '/emergency_group_video',
+                '/reboot_group_video', '/info_group_video', '/support_group_video',
+                '/about_group_video', '/credits_group_video', '/donate_group_video',
+                '/changelog_group_video', '/license_group_video', '/privacy_group_video',
+                '/terms_group_video', '/update_video_progress', '/auto_update_progress',
+                '/update_group_names', '/test_send_video_all_groups', '/send_all_planned_videos',
+                '/admin_show_all_groups_settings', '/send_specific_video', '/send_now',
+                '/fix_group_seasons', '/update_schedule', '/remove_group'
+            ]
+        ),
+        chat_type=[types.ChatType.GROUP, types.ChatType.SUPERGROUP]
+    )
+    async def handle_unknown_group_command(message: types.Message):
+        """Обработчик неизвестных команд в группах"""
+        command = message.text.split()[0]
+        await message.reply(
+            f"❌ **Noma'lum buyruq: {command}**\n\n"
+            "Bot faqat quyidagi buyruqlarni qo'llab-quvvatlaydi:\n"
+            "• /start - Botni ishga tushurish\n"
+            "• /centris_towers - Centris Towers videolar\n"
+            "• /golden_lake - Golden Lake videolar\n"
+            "• /about - Bino haqida ma'lumot\n"
+            "• /help_group_video - Batafsil yordam\n\n"
+            "To'liq ro'yxat uchun /help_group_video buyrug'ini ishlating.",
+            parse_mode="Markdown"
+        )
 
     # --- Фильтр для callback_query в группах ---
     # @dp.callback_query_handler(lambda c: c.message.chat.type in [types.ChatType.GROUP, types.ChatType.SUPERGROUP])

@@ -68,7 +68,6 @@
 - ❌ `group_auto_leave.py` (не используется)
 
 ### **Ненужные файлы в utils/misc:**
-- ❌ `throttling.py` (не используется)
 
 ### **Ненужные файлы в states:**
 - ❌ `state.py` (не используется)
@@ -122,7 +121,6 @@
 ### **Папка middlewares:**
 - ✅ `middlewares/security.py` - безопасность
 - ✅ `middlewares/support_middleware.py` - поддержка
-- ✅ `middlewares/throttling.py` - ограничение частоты
 
 ### **Папка filters:**
 - ✅ `filters/` - фильтры сообщений
