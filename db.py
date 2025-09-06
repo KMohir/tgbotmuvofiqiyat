@@ -547,6 +547,24 @@ class Database:
     def mark_group_video_as_viewed_by_project(self, chat_id, video_position, project):
         """Отметить видео как просмотренное для конкретного проекта"""
         try:
+            # Специальное значение -1 означает сброс всех просмотренных видео
+            if video_position == -1:
+                cursor = self.conn.cursor()
+                if project == "centris":
+                    cursor.execute(
+                        "UPDATE group_video_settings SET centris_viewed_videos = %s WHERE chat_id = %s",
+                        (json.dumps([]), str(chat_id))
+                    )
+                elif project == "golden_lake":
+                    cursor.execute(
+                        "UPDATE group_video_settings SET golden_viewed_videos = %s WHERE chat_id = %s",
+                        (json.dumps([]), str(chat_id))
+                    )
+                self.conn.commit()
+                cursor.close()
+                logger.info(f"Сброшены все просмотренные видео для группы {chat_id}, проект {project}")
+                return
+            
             viewed_videos = self.get_group_viewed_videos_by_project(chat_id, project)
             if video_position not in viewed_videos:
                 viewed_videos.append(video_position)

@@ -242,7 +242,44 @@ async def send_group_video_new(chat_id: int, project: str, season_id: int = None
                 
                 return True
         
-        logger.info(f"Нет новых видео для отправки во всех сезонах проекта {project}")
+        # --- ЦИКЛИЧЕСКОЕ ВОСПРОИЗВЕДЕНИЕ: ВОЗВРАТ К ПЕРВОМУ СЕЗОНУ ---
+        logger.info(f"Все сезоны проекта {project} просмотрены, начинаем с первого сезона заново")
+        
+        # Сбрасываем просмотренные видео для этого проекта
+        if project == "centris":
+            db.mark_group_video_as_viewed_by_project(chat_id, -1, "centris")  # Сброс через специальное значение
+            # Устанавливаем первый сезон и первое видео
+            first_season_id = all_seasons[0][0]
+            db.set_group_video_start(chat_id, 'centris', first_season_id, 0)
+        elif project == "golden_lake":
+            db.mark_group_video_as_viewed_by_project(chat_id, -1, "golden")  # Сброс через специальное значение
+            # Устанавливаем первый сезон и первое видео
+            first_season_id = all_seasons[0][0]
+            db.set_group_video_start(chat_id, 'golden', first_season_id, 0)
+        
+        # Отправляем первое видео первого сезона
+        first_season_id = all_seasons[0][0]
+        first_season_name = all_seasons[0][1]
+        first_videos = db.get_videos_by_season(first_season_id)
+        
+        if first_videos:
+            url, title, position = first_videos[0]  # Берем первое видео
+            message_id = int(url.split("/")[-1])
+            await bot.copy_message(
+                chat_id=chat_id,
+                from_chat_id=-1002550852551,
+                message_id=message_id,
+                protect_content=True
+            )
+            logger.info(f"🔄 ЦИКЛ: Первое видео {position} первого сезона {first_season_id} ({first_season_name}) отправлено в группу {chat_id} (проект {project})")
+            db.mark_group_video_as_viewed_by_project(chat_id, position, project)
+            
+            # Обновляем планировщик для группы
+            schedule_single_group_jobs(chat_id)
+            
+            return True
+        
+        logger.info(f"Нет видео для отправки в проекте {project}")
         return False
     except Exception as e:
         logger.error(f"Ошибка в send_group_video_new: {e}")
