@@ -1960,6 +1960,7 @@ async def all_group_commands_command(message: types.Message):
         # Супер-админ команды
         if user_id in SUPER_ADMIN_IDS:
             response += "💪 **SUPER ADMIN BUYRUQLARI:**\n"
+            response += "   • /remove_group - Guruhni o'chirish (ID bilan yoki tanlash)\n"
             response += "   • /force_group_video - Video majburiy yuborish\n"
             response += "   • /debug_group_video - Debug ma'lumotlari\n"
             response += "   • /cleanup_group_video - Sistema tozalash\n"
@@ -3822,6 +3823,7 @@ async def changelog_group_video_command(message: types.Message):
             response += "   • /list_group_videos - Video ro'yxati\n"
             response += "   • /status_group_video - Video holati va progress\n"
             response += "   • /reset_group_video - Sozlamalarni qayta o'rnatish\n"
+            response += "   • /remove_group - Guruhni o'chirish (ID bilan yoki tanlash)\n"
             response += "   • /schedule_group_video - Vazifalarni qayta rejalashtirish\n"
             response += "   • /add_group_to_whitelist - Whitelist ga qo'shish\n"
             response += "   • /remove_group_from_whitelist - Whitelist dan olib tashlash\n"
@@ -5908,6 +5910,9 @@ async def update_schedule_command(message: types.Message):
 async def remove_group_command(message: types.Message, state: FSMContext):
     """
     Команда для удаления группы из системы
+    Поддерживает два режима:
+    1. /remove_group - интерактивный выбор группы
+    2. /remove_group <group_id> - прямое удаление по ID
     """
     logger.info(f"🚀 remove_group вызвана в чате {message.chat.id} ({message.chat.type})")
     logger.info(f"👤 Пользователь: {message.from_user.id} ({message.from_user.username})")
@@ -5921,6 +5926,93 @@ async def remove_group_command(message: types.Message, state: FSMContext):
             await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat super-adminlar foydalana oladi.", parse_mode="Markdown")
             return
         
+        # Парсим аргументы команды
+        args = message.text.split()
+        
+        # Если передан ID группы напрямую
+        if len(args) > 1:
+            try:
+                group_id = int(args[1])
+                logger.info(f"Прямое удаление группы по ID: {group_id}")
+                
+                # Получаем информацию о группе
+                group_info = db.get_group_by_id(group_id)
+                if not group_info:
+                    await message.answer(f"❌ **Guruh topilmadi!**\n\nID `{group_id}` bo'yicha guruh ma'lumotlar bazasida yo'q.", parse_mode="Markdown")
+                    return
+                
+                group_name = group_info[1]
+                
+                # Удаляем группу из базы данных
+                success = db.remove_group_completely(group_id)
+                
+                if success:
+                    # Пытаемся покинуть группу
+                    try:
+                        from loader import bot
+                        await bot.leave_chat(group_id)
+                        logger.info(f"Бот успешно покинул группу {group_id}")
+                        leave_status = "✅ Bot guruhdan chiqdi"
+                    except Exception as e:
+                        logger.warning(f"Не удалось покинуть группу {group_id}: {e}")
+                        leave_status = "⚠️ Bot guruhdan chiqa olmadi (guruh mavjud emas yoki botni oldin olib tashlangan)"
+                    
+                    # Удаляем задачи планировщика для этой группы
+                    try:
+                        from handlers.users.video_scheduler import scheduler
+                        jobs_to_remove = []
+                        for job in scheduler.get_jobs():
+                            if job.id.endswith(f"_{group_id}"):
+                                jobs_to_remove.append(job.id)
+                        
+                        for job_id in jobs_to_remove:
+                            scheduler.remove_job(job_id)
+                            logger.info(f"Удалена задача планировщика: {job_id}")
+                        
+                        schedule_status = f"✅ {len(jobs_to_remove)} ta vazifa o'chirildi"
+                    except Exception as e:
+                        logger.warning(f"Ошибка при удалении задач планировщика: {e}")
+                        schedule_status = "⚠️ Vazifalarni o'chirishda muammo"
+                    
+                    await message.answer(
+                        f"✅ **Guruh muvaffaqiyatli o'chirildi!**\n\n"
+                        f"🏢 **Guruh:** {group_name}\n"
+                        f"🆔 **ID:** `{group_id}`\n\n"
+                        f"📊 **Natijalar:**\n"
+                        f"• Ma'lumotlar bazasidan o'chirildi: ✅\n"
+                        f"• {leave_status}\n"
+                        f"• {schedule_status}",
+                        parse_mode="Markdown"
+                    )
+                else:
+                    await message.answer(
+                        f"❌ **Guruhni o'chirishda xatolik!**\n\n"
+                        f"🏢 **Guruh:** {group_name}\n"
+                        f"🆔 **ID:** `{group_id}`\n\n"
+                        f"Ma'lumotlar bazasidan o'chirib bo'lmadi.",
+                        parse_mode="Markdown"
+                    )
+                
+                return
+                
+            except ValueError:
+                await message.answer(
+                    "❌ **Noto'g'ri format!**\n\n"
+                    "**Foydalanish:**\n"
+                    "• `/remove_group` - guruhni tanlash\n"
+                    "• `/remove_group <group_id>` - to'g'ridan-to'g'ri o'chirish\n\n"
+                    "**Misollar:**\n"
+                    "• `/remove_group`\n"
+                    "• `/remove_group -1001234567890`",
+                    parse_mode="Markdown"
+                )
+                return
+            except Exception as e:
+                logger.error(f"Ошибка при прямом удалении группы: {e}")
+                await message.answer(f"❌ **Xatolik yuz berdi:** {e}", parse_mode="Markdown")
+                return
+        
+        # Интерактивный режим - показываем список групп
         # Получаем список всех групп
         try:
             groups = db.get_all_groups()
@@ -5939,6 +6031,7 @@ async def remove_group_command(message: types.Message, state: FSMContext):
         # Создаем пагинированную клавиатуру с группами
         response = "🗑️ **O'chirish uchun guruhni tanlang:**\n\n"
         response += "⚠️ **Diqqat!** Guruh to'liq o'chiriladi va bot guruhdan chiqadi.\n\n"
+        response += "💡 **Yoki to'g'ridan-to'g'ri ID bilan:** `/remove_group <group_id>`\n\n"
         
         # Добавляем текст с группами первой страницы
         response += create_paginated_groups_text(groups, page=0, title="O'chirish uchun guruhni tanlang")
