@@ -16,4 +16,5 @@ async def set_default_commands(dp):
         types.BotCommand("test_send_video_all_groups", "Test video yuborish (admin)"),
         types.BotCommand("send_all_planned_videos", "Barcha rejalashtirilgan videolar (admin)"),
         types.BotCommand("send_specific_video", "Maxsus video yuborish (admin)"),
+        types.BotCommand("send_content", "Xabarni video guruhiga yuborish (admin)"),
     ])

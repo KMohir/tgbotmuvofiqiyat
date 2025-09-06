@@ -31,3 +31,7 @@ class EditVideoStates(StatesGroup):
     waiting_for_new_position = State()
 
 
+class SendContentStates(StatesGroup):
+    waiting_for_message_id = State()
+
+

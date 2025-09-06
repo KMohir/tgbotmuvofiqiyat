@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta
 from functools import wraps
+import asyncio
 
 try:
 
@@ -316,6 +317,153 @@ try:
         db.conn.commit()
         cursor.close()
         await message.reply(f"Время рассылки Golden Lake обновлено: {golden_time}")
+
+    @dp.message_handler(commands=['send_content'], state="*")
+    async def send_content_command(message: types.Message, state: FSMContext):
+        """
+        Команда для пересылки сообщения во все зарегистрированные группы
+        """
+        try:
+            user_id = message.from_user.id
+            
+            # Проверяем права пользователя
+            if not (db.is_superadmin(user_id) or db.is_admin(user_id)):
+                await message.reply("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat adminlar foydalana oladi.", parse_mode="Markdown")
+                return
+            
+            # Парсим аргументы команды
+            args = message.get_args().split()
+            show_details = True  # По умолчанию показываем детали
+            
+            if args and args[0] in ['--quiet', '--brief', '-q']:
+                show_details = False
+            
+            # Сохраняем настройку в состоянии
+            await state.update_data(show_details=show_details)
+            
+            # Переходим в состояние ожидания ID сообщения
+            from handlers.users.group_video_states import SendContentStates
+            await state.set_state(SendContentStates.waiting_for_message_id.state)
+            
+            if show_details:
+                await message.reply("📤 **Xabar ID yuboring**\n\nIltimos, yuborish kerak bo'lgan xabarning ID yoki havolasini yuboring.\n\nMasalan: `https://t.me/c/2550852551/802` yoki `802`\n\n💡 **Qisqa natija uchun:** `/send_content --quiet`")
+            else:
+                await message.reply("📤 **Xabar ID yuboring**\n\nIltimos, yuborish kerak bo'lgan xabarning ID yoki havolasini yuboring.\n\nMasalan: `https://t.me/c/2550852551/802` yoki `802`")
+                
+        except Exception as e:
+            await message.reply(f"❌ **Xatolik yuz berdi!**\n\n{str(e)}")
+
+    @dp.message_handler(state="SendContentStates:waiting_for_message_id")
+    async def process_message_id(message: types.Message, state: FSMContext):
+        """
+        Обработка ID сообщения и пересылка во все группы
+        """
+        try:
+            user_id = message.from_user.id
+            message_text = message.text.strip()
+            
+            # Получаем настройку детального вывода из состояния
+            data = await state.get_data()
+            show_details = data.get('show_details', True)
+            
+            # Парсим ID сообщения из ссылки или получаем напрямую
+            message_id = None
+            source_chat_id = None
+            
+            if message_text.startswith('https://t.me/c/'):
+                # Парсим ссылку типа https://t.me/c/2550852551/802
+                try:
+                    parts = message_text.split('/')
+                    if len(parts) >= 5:
+                        chat_id_part = parts[4]  # 2550852551
+                        message_id_part = parts[5]  # 802
+                        
+                        # Преобразуем в правильный формат ID группы
+                        source_chat_id = int(f"-100{chat_id_part}")
+                        message_id = int(message_id_part)
+                except (ValueError, IndexError):
+                    await message.reply("❌ **Noto'g'ri havola format!**\n\nIltimos, to'g'ri havola yuboring.\nMasalan: `https://t.me/c/2550852551/802`")
+                    return
+            elif message_text.isdigit():
+                # Если передан только ID сообщения, используем группу с видео как источник
+                source_chat_id = -1002550852551
+                message_id = int(message_text)
+            else:
+                await message.reply("❌ **Noto'g'ri format!**\n\nIltimos, havola yoki raqam yuboring.\nMasalan: `https://t.me/c/2550852551/802` yoki `802`")
+                return
+            
+            # Получаем все зарегистрированные группы
+            groups_settings = db.get_all_groups_with_settings()
+            if not groups_settings:
+                await message.reply("❌ **Hech qanday guruh topilmadi!**\n\nRo'yxatdan o'tgan guruhlar yo'q.")
+                await state.finish()
+                return
+            
+            # Получаем информацию о пользователе
+            user_name = message.from_user.first_name or "Noma'lum"
+            user_username = f"@{message.from_user.username}" if message.from_user.username else "Username yo'q"
+            
+            sent_count = 0
+            failed_count = 0
+            
+            # Инициализируем ответ в зависимости от режима
+            if show_details:
+                response = "📤 **Xabar yuborish natijalari:**\n\n"
+            else:
+                response = ""
+            
+            # Пересылаем сообщение во все группы
+            for group_data in groups_settings:
+                try:
+                    chat_id = int(group_data[0])  # chat_id
+                    group_name = group_data[9] if len(group_data) > 9 else "Noma'lum guruh"  # group_name
+                    
+                    # Пересылаем сообщение
+                    await message.bot.copy_message(
+                        chat_id=chat_id,
+                        from_chat_id=source_chat_id,
+                        message_id=message_id,
+                        caption=f"📤 **Admin tomonidan yuborilgan:**\n\n👤 **Admin:** {user_name}\n🔗 **Username:** {user_username}\n🆔 **ID:** `{user_id}`\n\n📝 **Xabar:**"
+                    )
+                    
+                    sent_count += 1
+                    if show_details:
+                        response += f"✅ **{group_name}**: Yuborildi\n"
+                    
+                    # Небольшая задержка между отправками
+                    await asyncio.sleep(0.5)
+                    
+                except Exception as e:
+                    failed_count += 1
+                    if show_details:
+                        response += f"❌ **{group_name}**: Xatolik - {str(e)[:50]}...\n"
+                    continue
+            
+            # Формируем итоговый ответ
+            if show_details:
+                # Детальный режим - показываем все
+                response += f"\n📊 **Jami natijalar:**\n"
+                response += f"✅ Yuborilgan: {sent_count} guruh\n"
+                response += f"❌ Xatolik: {failed_count} guruh\n"
+                response += f"📋 Jami: {len(groups_settings)} guruh"
+                
+                # Разбиваем на части, если сообщение слишком длинное
+                if len(response) > 4096:
+                    parts = [response[i:i+4096] for i in range(0, len(response), 4096)]
+                    for i, part in enumerate(parts):
+                        await message.answer(f"📤 **Qism {i+1}/{len(parts)}:**\n\n{part}")
+                else:
+                    await message.answer(response)
+            else:
+                # Краткий режим - показываем только итоги
+                brief_response = f"📤 **Xabar yuborildi!**\n\n✅ **Muvaffaqiyatli:** {sent_count} guruh\n❌ **Xatolik:** {failed_count} guruh\n📋 **Jami:** {len(groups_settings)} guruh"
+                await message.answer(brief_response)
+            
+            await state.finish()
+                
+        except Exception as e:
+            await message.reply(f"❌ **Xatolik yuz berdi!**\n\n{str(e)}")
+            await state.finish()
 
 
 except Exception as exx:
