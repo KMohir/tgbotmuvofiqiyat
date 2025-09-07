@@ -6,3 +6,4 @@ __pycache__
 .env
 bot.log
 bot*.log
+centris-actions*
