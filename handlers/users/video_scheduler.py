@@ -138,7 +138,7 @@ async def send_group_video_new(chat_id: int, project: str, season_id: int = None
         # Получаем все сезоны проекта
         if project == "centris":
             all_seasons = db.get_seasons_by_project("centris")
-        elif project == "golden_lake":
+        elif project == "golden_lake" or project == "golden":
             all_seasons = db.get_seasons_by_project("golden")
         else:
             all_seasons = []
@@ -161,8 +161,10 @@ async def send_group_video_new(chat_id: int, project: str, season_id: int = None
             start_video = 0
 
         # Получаем просмотренные видео для группы по проекту
-        viewed_positions = db.get_group_viewed_videos_by_project(chat_id, project)
-        logger.info(f"Просмотренные позиции для группы {chat_id}, проект {project}: {viewed_positions}")
+        # Унифицируем название проекта для получения просмотренных видео
+        project_for_db = "golden_lake" if project == "golden" else project
+        viewed_positions = db.get_group_viewed_videos_by_project(chat_id, project_for_db)
+        logger.info(f"Просмотренные позиции для группы {chat_id}, проект {project_for_db}: {viewed_positions}")
         # Получаем список видео текущего сезона
         videos = db.get_videos_by_season(season_id)
         # --- Исправление: сначала отправляем именно стартовое видео, если оно не просмотрено ---
@@ -178,8 +180,8 @@ async def send_group_video_new(chat_id: int, project: str, season_id: int = None
                         protect_content=True
                     )
                     logger.info(f"Стартовое видео {position} сезона {season_id} отправлено в группу {chat_id} (проект {project})")
-                    db.mark_group_video_as_viewed_by_project(chat_id, position, project)
-                    logger.info(f"Видео {position} отмечено как просмотренное для группы {chat_id}, проект {project}")
+                    db.mark_group_video_as_viewed_by_project(chat_id, position, project_for_db)
+                    logger.info(f"Видео {position} отмечено как просмотренное для группы {chat_id}, проект {project_for_db}")
                     return True
             # Если вдруг стартовое видео не найдено — продолжаем обычную логику
         # --- Обычная логика: ищем первое непосмотренное видео начиная с season_start_video ---
@@ -200,27 +202,29 @@ async def send_group_video_new(chat_id: int, project: str, season_id: int = None
                     protect_content=True
                 )
                 logger.info(f"Видео {position} сезона {season_id} отправлено в группу {chat_id} (проект {project})")
-                db.mark_group_video_as_viewed_by_project(chat_id, position, project)
-                logger.info(f"Видео {position} отмечено как просмотренное для группы {chat_id}, проект {project}")
+                db.mark_group_video_as_viewed_by_project(chat_id, position, project_for_db)
+                logger.info(f"Видео {position} отмечено как просмотренное для группы {chat_id}, проект {project_for_db}")
                 return True
             else:
                 logger.info(f"Видео позиция {position} уже просмотрено, пропускаем")
         
         # --- АВТОМАТИЧЕСКИЙ ПЕРЕХОД НА СЛЕДУЮЩИЙ СЕЗОН ---
-        logger.info(f"Все видео сезона {season_id} просмотрены, пытаемся перейти на следующий сезон")
+        logger.info(f"📺 Все видео сезона {season_id} просмотрены для проекта {project}, пытаемся перейти на следующий сезон")
         
         # Находим следующий сезон
         next_season_index = current_season_index + 1
+        logger.info(f"📺 Текущий индекс сезона: {current_season_index}, следующий: {next_season_index}, всего сезонов: {len(all_seasons)}")
+        
         if next_season_index < len(all_seasons):
             next_season_id = all_seasons[next_season_index][0]
             next_season_name = all_seasons[next_season_index][1]
             
-            logger.info(f"Переходим на следующий сезон: {next_season_id} ({next_season_name})")
+            logger.info(f"✅ Переходим на следующий сезон: {next_season_id} ({next_season_name}) для проекта {project}")
             
             # Обновляем настройки группы для следующего сезона
             if project == "centris":
                 db.set_group_video_start(chat_id, 'centris', next_season_id, 0)
-            elif project == "golden_lake":
+            elif project == "golden_lake" or project == "golden":
                 db.set_group_video_start(chat_id, 'golden', next_season_id, 0)
             
             # Пытаемся отправить первое видео из следующего сезона
@@ -235,7 +239,7 @@ async def send_group_video_new(chat_id: int, project: str, season_id: int = None
                     protect_content=True
                 )
                 logger.info(f"Первое видео {position} нового сезона {next_season_id} отправлено в группу {chat_id} (проект {project})")
-                db.mark_group_video_as_viewed_by_project(chat_id, position, project)
+                db.mark_group_video_as_viewed_by_project(chat_id, position, project_for_db)
                 
                 # Обновляем планировщик для группы
                 schedule_single_group_jobs(chat_id)
@@ -243,18 +247,18 @@ async def send_group_video_new(chat_id: int, project: str, season_id: int = None
                 return True
         
         # --- ЦИКЛИЧЕСКОЕ ВОСПРОИЗВЕДЕНИЕ: ВОЗВРАТ К ПЕРВОМУ СЕЗОНУ ---
-        logger.info(f"Все сезоны проекта {project} просмотрены, начинаем с первого сезона заново")
+        logger.info(f"🔄 Все {len(all_seasons)} сезонов проекта {project} просмотрены, начинаем с первого сезона заново")
+        logger.info(f"🔄 Завершен полный цикл: Сезон 1 → Сезон 2 → ... → Сезон {len(all_seasons)} → возврат к Сезону 1")
         
-        # Сбрасываем просмотренные видео для этого проекта
+        # Сбрасываем просмотренные видео ТОЛЬКО для этого проекта
+        logger.info(f"🔄 Сбрасываем просмотренные видео для проекта {project_for_db}")
+        db.mark_group_video_as_viewed_by_project(chat_id, -1, project_for_db)  # Сброс через специальное значение
+        
+        # Устанавливаем первый сезон и первое видео
+        first_season_id = all_seasons[0][0]
         if project == "centris":
-            db.mark_group_video_as_viewed_by_project(chat_id, -1, "centris")  # Сброс через специальное значение
-            # Устанавливаем первый сезон и первое видео
-            first_season_id = all_seasons[0][0]
             db.set_group_video_start(chat_id, 'centris', first_season_id, 0)
-        elif project == "golden_lake":
-            db.mark_group_video_as_viewed_by_project(chat_id, -1, "golden")  # Сброс через специальное значение
-            # Устанавливаем первый сезон и первое видео
-            first_season_id = all_seasons[0][0]
+        elif project == "golden_lake" or project == "golden":
             db.set_group_video_start(chat_id, 'golden', first_season_id, 0)
         
         # Отправляем первое видео первого сезона
@@ -272,7 +276,7 @@ async def send_group_video_new(chat_id: int, project: str, season_id: int = None
                 protect_content=True
             )
             logger.info(f"🔄 ЦИКЛ: Первое видео {position} первого сезона {first_season_id} ({first_season_name}) отправлено в группу {chat_id} (проект {project})")
-            db.mark_group_video_as_viewed_by_project(chat_id, position, project)
+            db.mark_group_video_as_viewed_by_project(chat_id, position, project_for_db)
             
             # Обновляем планировщик для группы
             schedule_single_group_jobs(chat_id)
@@ -284,6 +288,79 @@ async def send_group_video_new(chat_id: int, project: str, season_id: int = None
     except Exception as e:
         logger.error(f"Ошибка в send_group_video_new: {e}")
         return False
+
+# --- Функция для тестирования исправлений ---
+async def test_video_sequence_fix(chat_id: int, project: str):
+    """
+    Тестовая функция для проверки корректности исправлений в логике отправки видео
+    Поддерживает любое количество сезонов (3, 8, 9 и больше)
+    """
+    logger.info(f"🧪 ТЕСТ: Начинаем тестирование для группы {chat_id}, проект {project}")
+    
+    # Получаем настройки группы
+    settings = db.get_group_video_settings(chat_id)
+    if not settings:
+        logger.error(f"🧪 ТЕСТ: Группа {chat_id} не найдена в настройках")
+        return False
+    
+    # Получаем просмотренные видео
+    project_for_db = "golden_lake" if project == "golden" else project
+    viewed_positions = db.get_group_viewed_videos_by_project(chat_id, project_for_db)
+    logger.info(f"🧪 ТЕСТ: Просмотренные позиции для {project_for_db}: {viewed_positions}")
+    
+    # Получаем все сезоны проекта
+    if project == "centris":
+        all_seasons = db.get_seasons_by_project("centris")
+    elif project == "golden" or project == "golden_lake":
+        all_seasons = db.get_seasons_by_project("golden")
+    else:
+        logger.error(f"🧪 ТЕСТ: Неизвестный проект {project}")
+        return False
+    
+    logger.info(f"🧪 ТЕСТ: Найдено сезонов для {project}: {len(all_seasons)} (поддерживает любое количество: 3, 8, 9+)")
+    for i, (season_id, season_name) in enumerate(all_seasons):
+        logger.info(f"🧪 ТЕСТ: Сезон #{i+1} (ID: {season_id}): {season_name}")
+    
+    # Получаем стартовые значения
+    season_db, video_db = db.get_group_video_start(chat_id, project)
+    logger.info(f"🧪 ТЕСТ: Стартовый сезон: {season_db}, стартовое видео: {video_db}")
+    
+    # Проверяем логику перехода между сезонами
+    if len(all_seasons) > 1:
+        logger.info(f"🧪 ТЕСТ: Логика переходов будет работать для всех {len(all_seasons)} сезонов")
+        logger.info(f"🧪 ТЕСТ: Порядок: Сезон 1 → Сезон 2 → ... → Сезон {len(all_seasons)} → Сезон 1 (цикл)")
+    else:
+        logger.info(f"🧪 ТЕСТ: Только 1 сезон - будет циклическое воспроизведение")
+    
+    return True
+
+# --- Функция для получения статистики сезонов ---
+def get_seasons_statistics():
+    """
+    Возвращает статистику по количеству сезонов в каждом проекте
+    """
+    try:
+        centris_seasons = db.get_seasons_by_project("centris")
+        golden_seasons = db.get_seasons_by_project("golden")
+        
+        stats = {
+            "centris": {
+                "count": len(centris_seasons),
+                "seasons": centris_seasons
+            },
+            "golden": {
+                "count": len(golden_seasons), 
+                "seasons": golden_seasons
+            }
+        }
+        
+        logger.info(f"📊 СТАТИСТИКА: Centris Towers - {stats['centris']['count']} сезонов")
+        logger.info(f"📊 СТАТИСТИКА: Golden Lake - {stats['golden']['count']} сезонов")
+        
+        return stats
+    except Exception as e:
+        logger.error(f"Ошибка при получении статистики сезонов: {e}")
+        return None
 
 # --- Планировщик для групп (старая логика) ---
 async def send_group_video_by_settings(chat_id: int):

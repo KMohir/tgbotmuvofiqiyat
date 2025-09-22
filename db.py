@@ -530,7 +530,7 @@ class Database:
             # Используем отдельные колонки для каждого проекта
             if project == "centris":
                 cursor.execute("SELECT centris_viewed_videos FROM group_video_settings WHERE chat_id = %s", (str(chat_id),))
-            elif project == "golden_lake":
+            elif project == "golden_lake" or project == "golden":
                 cursor.execute("SELECT golden_viewed_videos FROM group_video_settings WHERE chat_id = %s", (str(chat_id),))
             else:
                 return []
@@ -555,7 +555,7 @@ class Database:
                         "UPDATE group_video_settings SET centris_viewed_videos = %s WHERE chat_id = %s",
                         (json.dumps([]), str(chat_id))
                     )
-                elif project == "golden_lake":
+                elif project == "golden_lake" or project == "golden":
                     cursor.execute(
                         "UPDATE group_video_settings SET golden_viewed_videos = %s WHERE chat_id = %s",
                         (json.dumps([]), str(chat_id))
@@ -575,7 +575,7 @@ class Database:
                         "UPDATE group_video_settings SET centris_viewed_videos = %s WHERE chat_id = %s",
                         (json.dumps(viewed_videos), str(chat_id))
                     )
-                elif project == "golden_lake":
+                elif project == "golden_lake" or project == "golden":
                     cursor.execute(
                         "UPDATE group_video_settings SET golden_viewed_videos = %s WHERE chat_id = %s",
                         (json.dumps(viewed_videos), str(chat_id))
@@ -1610,6 +1610,26 @@ class Database:
         except Exception as e:
             logger.error(f"Ошибка при получении времени отправки для группы {chat_id}: {e}")
             return ["08:00", "20:00"]
+
+    def set_send_times_for_all_groups(self, send_times: list) -> bool:
+        """Массово установить время отправки для всех групп"""
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute(
+                """
+                UPDATE group_video_settings
+                SET send_times = %s
+                """,
+                (json.dumps(send_times),)
+            )
+            self.conn.commit()
+            cursor.close()
+            logger.info(f"Глобально обновлены send_times для всех групп: {send_times}")
+            return True
+        except Exception as e:
+            logger.error(f"Ошибка при глобальном обновлении send_times для всех групп: {e}")
+            self.conn.rollback()
+            return False
 
     def grant_access(self, user_id: int, hours: int = 24):
         """Предоставить доступ пользователю на указанное количество часов"""

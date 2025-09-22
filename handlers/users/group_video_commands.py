@@ -12,7 +12,7 @@ from datetime import datetime, timedelta
 
 # Импортируем состояния
 from handlers.users.group_video_states import GroupVideoStates
-from handlers.users.video_scheduler import schedule_single_group_jobs
+from handlers.users.video_scheduler import schedule_single_group_jobs, schedule_group_jobs_v2
 
 # Настройка логирования
 logger = logging.getLogger(__name__)
@@ -5406,6 +5406,54 @@ async def is_admin_or_super_admin(user_id: int) -> bool:
     Проверяет, является ли пользователь админом или супер-админом
     """
     return user_id in ADMINS or user_id in SUPER_ADMIN_IDS or db.is_admin(user_id)
+
+# --- Массовая установка времени отправки всем группам ---
+@dp.message_handler(commands=["set_all_groups_time"])  # Пример: /set_all_groups_time 07:30 12:00 20:15
+async def set_all_groups_time_command(message: types.Message):
+    """
+    Админ-команда: установить общее время отправки для всех групп.
+    Пример: /set_all_groups_time 07:30 12:00 20:15
+    """
+    try:
+        # Проверяем права
+        if not await is_admin_or_super_admin(message.from_user.id):
+            await message.answer("❌ Ruxsat yo'q! Bu buyruq faqat administratorlar uchun.")
+            return
+
+        args = message.text.split()[1:]
+        if not args:
+            await message.answer(
+                "🕒 Foydalanish: /set_all_groups_time HH:MM [HH:MM ...]\nMasalan: /set_all_groups_time 07:00 11:00 20:00"
+            )
+            return
+
+        # Валидация формата времени
+        validated_times = []
+        for t in args:
+            try:
+                h, m = t.split(":")
+                h = int(h); m = int(m)
+                if not (0 <= h < 24 and 0 <= m < 60):
+                    raise ValueError
+                validated_times.append(f"{h:02d}:{m:02d}")
+            except Exception:
+                await message.answer(f"❌ Noto'g'ri vaqt formati: {t}. To'g'ri format: HH:MM")
+                return
+
+        # Обновляем в БД всем группам
+        ok = db.set_send_times_for_all_groups(validated_times)
+        if not ok:
+            await message.answer("❌ Xatolik: bazaga yozishda muammo yuz berdi")
+            return
+
+        # Перепланируем все задачи
+        schedule_group_jobs_v2()
+
+        await message.answer(
+            "✅ Barcha guruhlar uchun yuborish vaqti yangilandi: " + ", ".join(validated_times)
+        )
+    except Exception as e:
+        await message.answer(f"❌ Xatolik: {e}")
 
 # Команда для показа настроек всех групп (только для админов)
 @dp.message_handler(commands=["admin_show_all_groups_settings"])
