@@ -52,7 +52,7 @@ async def on_startup(dispatcher):
     # Инициализировать планировщик видео
     try:
         await init_scheduler()
-        logger.info("Планировщик видео успешно инициализирован")
+        logger.info("Планировщик видео успешно начался")
     except Exception as e:
         logger.error(f"Ошибка при инициализации планировщика видео: {e}")
 
