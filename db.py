@@ -55,6 +55,7 @@ class Database:
             self.conn.autocommit = True
             self.create_tables()
             self.create_security_tables()  # Создать таблицы безопасности
+            self.migrate_to_alternating_system()  # Автоматический переход на новую систему
         except Exception as e:
             logger.error(f"Ошибка при инициализации базы данных: {e}")
             raise
@@ -1630,6 +1631,153 @@ class Database:
             logger.error(f"Ошибка при глобальном обновлении send_times для всех групп: {e}")
             self.conn.rollback()
             return False
+
+    # === МЕТОДЫ ДЛЯ ДЕТАЛЬНОГО ОТСЛЕЖИВАНИЯ ВИДЕО (season_id:position) ===
+    
+    def get_group_viewed_videos_detailed_by_project(self, chat_id: int, project: str) -> list:
+        """Получить детальный список просмотренных видео в формате ['season_id:position', ...]"""
+        try:
+            cursor = self.conn.cursor()
+            if project == "centris":
+                cursor.execute("SELECT centris_viewed_videos_detailed FROM group_video_settings WHERE chat_id = %s", (str(chat_id),))
+            elif project == "golden_lake" or project == "golden":
+                cursor.execute("SELECT golden_viewed_videos_detailed FROM group_video_settings WHERE chat_id = %s", (str(chat_id),))
+            else:
+                return []
+            
+            result = cursor.fetchone()
+            cursor.close()
+            if result and result[0]:
+                return json.loads(result[0])
+            return []
+        except Exception as e:
+            logger.error(f"Ошибка при получении детальных просмотренных видео группой {chat_id} для проекта {project}: {e}")
+            # Если новая колонка не существует, возвращаем пустой список
+            return []
+
+    def mark_group_video_as_viewed_detailed_by_project(self, chat_id: int, season_id: int, position: int, project: str):
+        """Отметить видео как просмотренное в детальном формате (season_id:position)"""
+        try:
+            # Добавляем колонки, если их нет
+            cursor = self.conn.cursor()
+            try:
+                cursor.execute("ALTER TABLE group_video_settings ADD COLUMN IF NOT EXISTS centris_viewed_videos_detailed TEXT DEFAULT '[]'")
+                cursor.execute("ALTER TABLE group_video_settings ADD COLUMN IF NOT EXISTS golden_viewed_videos_detailed TEXT DEFAULT '[]'")
+                self.conn.commit()
+            except Exception:
+                pass  # Колонки уже существуют
+            
+            viewed_videos_detailed = self.get_group_viewed_videos_detailed_by_project(chat_id, project)
+            video_key = f"{season_id}:{position}"
+            
+            if video_key not in viewed_videos_detailed:
+                viewed_videos_detailed.append(video_key)
+                
+                if project == "centris":
+                    cursor.execute(
+                        "UPDATE group_video_settings SET centris_viewed_videos_detailed = %s WHERE chat_id = %s",
+                        (json.dumps(viewed_videos_detailed), str(chat_id))
+                    )
+                elif project == "golden_lake" or project == "golden":
+                    cursor.execute(
+                        "UPDATE group_video_settings SET golden_viewed_videos_detailed = %s WHERE chat_id = %s",
+                        (json.dumps(viewed_videos_detailed), str(chat_id))
+                    )
+                
+                self.conn.commit()
+                cursor.close()
+                logger.info(f"Детальное видео {video_key} отмечено как просмотренное для группы {chat_id}, проект {project}")
+        except Exception as e:
+            logger.error(f"Ошибка при детальной отметке видео как просмотренного группой {chat_id} для проекта {project}: {e}")
+            self.conn.rollback()
+
+    def reset_group_viewed_videos_detailed_by_project(self, chat_id: int, project: str):
+        """Сбросить детальный список просмотренных видео для проекта"""
+        try:
+            cursor = self.conn.cursor()
+            if project == "centris":
+                cursor.execute(
+                    "UPDATE group_video_settings SET centris_viewed_videos_detailed = %s WHERE chat_id = %s",
+                    (json.dumps([]), str(chat_id))
+                )
+            elif project == "golden_lake" or project == "golden":
+                cursor.execute(
+                    "UPDATE group_video_settings SET golden_viewed_videos_detailed = %s WHERE chat_id = %s",
+                    (json.dumps([]), str(chat_id))
+                )
+            self.conn.commit()
+            cursor.close()
+            logger.info(f"Детальные просмотренные видео сброшены для группы {chat_id}, проект {project}")
+        except Exception as e:
+            logger.error(f"Ошибка при сбросе детальных просмотренных видео для группы {chat_id}, проект {project}: {e}")
+            self.conn.rollback()
+
+    def migrate_to_alternating_system(self):
+        """Автоматическая миграция всех групп на новую систему чередования сезонов"""
+        try:
+            logger.info("🔄 Запуск автоматической миграции на новую систему чередования сезонов...")
+            
+            # Добавляем новые колонки, если их нет
+            cursor = self.conn.cursor()
+            try:
+                cursor.execute("ALTER TABLE group_video_settings ADD COLUMN IF NOT EXISTS centris_viewed_videos_detailed TEXT DEFAULT '[]'")
+                cursor.execute("ALTER TABLE group_video_settings ADD COLUMN IF NOT EXISTS golden_viewed_videos_detailed TEXT DEFAULT '[]'")
+                cursor.execute("ALTER TABLE group_video_settings ADD COLUMN IF NOT EXISTS migration_completed BOOLEAN DEFAULT FALSE")
+                self.conn.commit()
+                logger.info("✅ Новые колонки добавлены в таблицу group_video_settings")
+            except Exception as e:
+                logger.warning(f"Колонки уже существуют или ошибка при добавлении: {e}")
+            
+            # Проверяем, нужна ли миграция
+            cursor.execute("SELECT chat_id FROM group_video_settings WHERE migration_completed = FALSE OR migration_completed IS NULL")
+            groups_to_migrate = cursor.fetchall()
+            
+            if not groups_to_migrate:
+                logger.info("✅ Все группы уже мигрированы на новую систему")
+                cursor.close()
+                return
+            
+            logger.info(f"🔄 Найдено групп для миграции: {len(groups_to_migrate)}")
+            
+            migrated_count = 0
+            for (chat_id,) in groups_to_migrate:
+                try:
+                    # Сбрасываем старые просмотренные видео
+                    cursor.execute("UPDATE group_video_settings SET viewed_videos = %s WHERE chat_id = %s", 
+                                 (json.dumps([]), str(chat_id)))
+                    
+                    # Инициализируем новые детальные списки как пустые
+                    cursor.execute("""
+                        UPDATE group_video_settings 
+                        SET centris_viewed_videos_detailed = %s, 
+                            golden_viewed_videos_detailed = %s,
+                            migration_completed = TRUE
+                        WHERE chat_id = %s
+                    """, (json.dumps([]), json.dumps([]), str(chat_id)))
+                    
+                    migrated_count += 1
+                    
+                except Exception as e:
+                    logger.error(f"Ошибка при миграции группы {chat_id}: {e}")
+                    continue
+            
+            self.conn.commit()
+            cursor.close()
+            
+            logger.info(f"✅ Автоматическая миграция завершена! Мигрировано групп: {migrated_count}")
+            logger.info("🎯 Новая система: сезоны будут чередоваться (1/14 → 2/14 → 3/14 → 1/15...)")
+            
+            # Пытаемся перепланировать задачи (если планировщик доступен)
+            try:
+                from handlers.users.video_scheduler import schedule_group_jobs_v2
+                schedule_group_jobs_v2()
+                logger.info("✅ Задачи перепланированы для новой системы")
+            except Exception as scheduler_error:
+                logger.info(f"⚠️ Планировщик будет обновлен позже: {scheduler_error}")
+            
+        except Exception as e:
+            logger.error(f"❌ Ошибка при автоматической миграции: {e}")
+            self.conn.rollback()
 
     def grant_access(self, user_id: int, hours: int = 24):
         """Предоставить доступ пользователю на указанное количество часов"""

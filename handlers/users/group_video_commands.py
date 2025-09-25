@@ -5455,6 +5455,51 @@ async def set_all_groups_time_command(message: types.Message):
     except Exception as e:
         await message.answer(f"❌ Xatolik: {e}")
 
+# --- Команда для сброса прогресса групп и перехода на новую систему чередования ---
+@dp.message_handler(commands=["reset_groups_to_alternating"])
+async def reset_groups_to_alternating_command(message: types.Message):
+    """
+    Админ-команда: сбросить прогресс всех групп и перейти на новую систему чередования сезонов
+    """
+    try:
+        # Проверяем права
+        if not await is_admin_or_super_admin(message.from_user.id):
+            await message.answer("❌ Ruxsat yo'q! Bu buyruq faqat administratorlar uchun.")
+            return
+
+        # Получаем все группы
+        groups_settings = db.get_all_groups_with_settings()
+        
+        reset_count = 0
+        for group in groups_settings:
+            chat_id = group[0]
+            
+            # Сбрасываем старые просмотренные видео
+            db.reset_group_viewed_videos(chat_id)
+            
+            # Сбрасываем детальные просмотренные видео для обоих проектов
+            db.reset_group_viewed_videos_detailed_by_project(chat_id, "centris")
+            db.reset_group_viewed_videos_detailed_by_project(chat_id, "golden_lake")
+            
+            reset_count += 1
+
+        # Перепланируем все задачи
+        schedule_group_jobs_v2()
+
+        await message.answer(
+            f"✅ Yangi tizimga o'tish yakunlandi!\n\n"
+            f"📊 Guruhlar soni: {reset_count}\n"
+            f"🔄 Barcha guruhlar uchun progress reset qilindi\n"
+            f"🎯 Yangi tizim: sezonlar navbatma-navbat yuboriladi\n\n"
+            f"📋 Misol:\n"
+            f"1-kun: 1/14 (1-sezon, 14-qism)\n"
+            f"2-kun: 2/14 (2-sezon, 14-qism)\n"
+            f"3-kun: 3/14 (3-sezon, 14-qism)\n"
+            f"va hokazo..."
+        )
+    except Exception as e:
+        await message.answer(f"❌ Xatolik: {e}")
+
 # Команда для показа настроек всех групп (только для админов)
 @dp.message_handler(commands=["admin_show_all_groups_settings"])
 async def admin_show_all_groups_settings(message: types.Message):

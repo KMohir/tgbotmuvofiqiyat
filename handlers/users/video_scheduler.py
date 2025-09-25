@@ -184,16 +184,40 @@ async def send_group_video_new(chat_id: int, project: str, season_id: int = None
                     logger.info(f"Видео {position} отмечено как просмотренное для группы {chat_id}, проект {project_for_db}")
                     return True
             # Если вдруг стартовое видео не найдено — продолжаем обычную логику
-        # --- Обычная логика: ищем первое непосмотренное видео начиная с season_start_video ---
-        season_start_video = start_video if start_video > 0 else 0
-        logger.info(f"Стартовая позиция для сезона {season_id}: {season_start_video}")
-        for url, title, position in videos:
-            logger.info(f"Проверяем видео позиция {position}, просмотрено: {position in viewed_positions}")
-            if position < season_start_video:
-                logger.info(f"Пропускаем позицию {position} (меньше стартовой {season_start_video})")
-                continue
-            if position not in viewed_positions:
-                logger.info(f"Отправляем видео позиция {position}, title: {title}")
+        # --- НОВАЯ ЛОГИКА: чередование сезонов с одинаковой серией ---
+        
+        # Получаем просмотренные видео в формате "season_id:position"
+        viewed_videos_detailed = db.get_group_viewed_videos_detailed_by_project(chat_id, project_for_db)
+        
+        # Находим текущую серию и текущий сезон для отправки
+        total_sent = len(viewed_videos_detailed)
+        num_seasons = len(all_seasons)
+        
+        if num_seasons == 0:
+            logger.error(f"Нет сезонов для проекта {project}")
+            return False
+        
+        # Определяем текущий номер серии и индекс сезона
+        current_episode_number = (total_sent // num_seasons)  # Номер серии (0-based)
+        current_season_index = total_sent % num_seasons       # Индекс сезона в цикле
+        
+        logger.info(f"🎯 ЧЕРЕДОВАНИЕ: серия {current_episode_number + 1}, сезон {current_season_index + 1}/{num_seasons}")
+        logger.info(f"🎯 Всего отправлено видео: {total_sent}")
+        
+        # Берем текущий сезон из цикла
+        target_season_id, target_season_name = all_seasons[current_season_index]
+        
+        # Получаем видео этого сезона
+        season_videos = db.get_videos_by_season(target_season_id)
+        
+        if current_episode_number < len(season_videos):
+            url, title, position = season_videos[current_episode_number]
+            
+            # Проверяем, не отправляли ли мы уже это видео
+            video_key = f"{target_season_id}:{position}"
+            
+            if video_key not in viewed_videos_detailed:
+                logger.info(f"🎯 Отправляем серию {current_episode_number + 1} из сезона {target_season_id} ({target_season_name})")
                 message_id = int(url.split("/")[-1])
                 await bot.copy_message(
                     chat_id=chat_id,
@@ -201,12 +225,24 @@ async def send_group_video_new(chat_id: int, project: str, season_id: int = None
                     message_id=message_id,
                     protect_content=True
                 )
-                logger.info(f"Видео {position} сезона {season_id} отправлено в группу {chat_id} (проект {project})")
-                db.mark_group_video_as_viewed_by_project(chat_id, position, project_for_db)
-                logger.info(f"Видео {position} отмечено как просмотренное для группы {chat_id}, проект {project_for_db}")
+                logger.info(f"✅ Видео {position} сезона {target_season_id} отправлено в группу {chat_id} (проект {project})")
+                
+                # Отмечаем как просмотренное в детальном формате
+                db.mark_group_video_as_viewed_detailed_by_project(chat_id, target_season_id, position, project_for_db)
+                logger.info(f"✅ Видео {target_season_id}:{position} отмечено как просмотренное для группы {chat_id}, проект {project_for_db}")
                 return True
             else:
-                logger.info(f"Видео позиция {position} уже просмотрено, пропускаем")
+                logger.info(f"🎯 Видео {video_key} уже было отправлено")
+        else:
+            logger.info(f"🎯 В сезоне {target_season_id} нет серии {current_episode_number + 1}")
+        
+        # Если достигли конца всех серий во всех сезонах - начинаем заново
+        max_episodes_in_any_season = max([len(db.get_videos_by_season(s_id)) for s_id, _ in all_seasons]) if all_seasons else 0
+        if current_episode_number >= max_episodes_in_any_season:
+            logger.info(f"🔄 Все серии всех сезонов просмотрены, начинаем заново")
+            # Сбрасываем просмотренные видео
+            db.reset_group_viewed_videos_detailed_by_project(chat_id, project_for_db)
+            return await send_group_video_new(chat_id, project, season_id, start_video)
         
         # --- АВТОМАТИЧЕСКИЙ ПЕРЕХОД НА СЛЕДУЮЩИЙ СЕЗОН ---
         logger.info(f"📺 Все видео сезона {season_id} просмотрены для проекта {project}, пытаемся перейти на следующий сезон")
