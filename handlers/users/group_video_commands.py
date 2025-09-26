@@ -5609,6 +5609,190 @@ async def reset_groups_to_alternating_command(message: types.Message):
     except Exception as e:
         await message.answer(f"❌ Xatolik: {e}")
 
+# --- Команда для просмотра прогресса групп ---
+@dp.message_handler(commands=["show_groups_progress"])
+async def show_groups_progress_command(message: types.Message):
+    """
+    Админ-команда: показать прогресс всех групп - последний индекс и список просмотренных видео
+    """
+    try:
+        # Проверяем права
+        if not await is_admin_or_super_admin(message.from_user.id):
+            await message.answer("❌ Ruxsat yo'q! Bu buyruq faqat administratorlar uchun.")
+            return
+
+        # Получаем все группы с настройками
+        groups_settings = db.get_all_groups_with_settings()
+        
+        if not groups_settings:
+            await message.answer("📋 **Guruhlar progressi:**\n\n❌ Hech qanday guruh sozlamalari topilmadi.", parse_mode="Markdown")
+            return
+
+        response = "📊 **Guruhlar progressi:**\n\n"
+        
+        for group in groups_settings:
+            chat_id, centris_enabled, centris_season_id, centris_start_video, golden_enabled, golden_season_id, golden_start_video, viewed_videos, is_subscribed, group_name, send_times = group
+            
+            # Получаем название группы
+            if not group_name or group_name == "Noma'lum guruh":
+                try:
+                    group_info = await message.bot.get_chat(chat_id)
+                    group_name = group_info.title or group_info.first_name or f"Guruh {chat_id}"
+                except:
+                    group_name = f"Guruh {chat_id}"
+            
+            response += f"🏢 **{group_name}** (ID: `{chat_id}`)\n"
+            
+            # Centris Towers прогресс
+            if centris_enabled and centris_season_id:
+                centris_detailed = db.get_group_viewed_videos_detailed_by_project(chat_id, "centris")
+                centris_old = db.get_group_viewed_videos_by_project(chat_id, "centris")
+                
+                response += f"  🎬 **Centris Towers:**\n"
+                response += f"    📺 Sezon: {centris_season_id}\n"
+                response += f"    📊 Yangi tizim: {len(centris_detailed)} video ko'rilgan\n"
+                response += f"    📋 Eski tizim: {len(centris_old)} video ko'rilgan\n"
+                
+                if centris_detailed:
+                    # Показываем последние 5 просмотренных видео
+                    last_5 = centris_detailed[-5:] if len(centris_detailed) > 5 else centris_detailed
+                    response += f"    🎥 So'nggi ko'rilgan: {', '.join(last_5)}\n"
+                else:
+                    response += f"    🎥 Hech qanday video ko'rilmagan\n"
+                
+                # Показываем текущую позицию в чередовании
+                if centris_detailed:
+                    total_sent = len(centris_detailed)
+                    all_seasons = db.get_seasons_by_project("centris")
+                    num_seasons = len(all_seasons)
+                    if num_seasons > 0:
+                        current_episode = (total_sent // num_seasons) + 1
+                        current_season_index = total_sent % num_seasons
+                        response += f"    🎯 Joriy pozitsiya: {current_episode}-qism, {current_season_index + 1}-sezon\n"
+            else:
+                response += f"  🎬 **Centris Towers:** ❌ O'chirilgan\n"
+            
+            # Golden Lake прогресс
+            if golden_enabled and golden_season_id:
+                golden_detailed = db.get_group_viewed_videos_detailed_by_project(chat_id, "golden_lake")
+                golden_old = db.get_group_viewed_videos_by_project(chat_id, "golden_lake")
+                
+                response += f"  🏊 **Golden Lake:**\n"
+                response += f"    📺 Sezon: {golden_season_id}\n"
+                response += f"    📊 Yangi tizim: {len(golden_detailed)} video ko'rilgan\n"
+                response += f"    📋 Eski tizim: {len(golden_old)} video ko'rilgan\n"
+                
+                if golden_detailed:
+                    # Показываем последние 5 просмотренных видео
+                    last_5 = golden_detailed[-5:] if len(golden_detailed) > 5 else golden_detailed
+                    response += f"    🎥 So'nggi ko'rilgan: {', '.join(last_5)}\n"
+                else:
+                    response += f"    🎥 Hech qanday video ko'rilmagan\n"
+                
+                # Показываем текущую позицию в чередовании
+                if golden_detailed:
+                    total_sent = len(golden_detailed)
+                    all_seasons = db.get_seasons_by_project("golden")
+                    num_seasons = len(all_seasons)
+                    if num_seasons > 0:
+                        current_episode = (total_sent // num_seasons) + 1
+                        current_season_index = total_sent % num_seasons
+                        response += f"    🎯 Joriy pozitsiya: {current_episode}-qism, {current_season_index + 1}-sezon\n"
+            else:
+                response += f"  🏊 **Golden Lake:** ❌ O'chirilgan\n"
+            
+            response += "\n" + "─" * 50 + "\n\n"
+        
+        # Разбиваем на части, если сообщение слишком длинное
+        if len(response) > 4096:
+            parts = [response[i:i+4096] for i in range(0, len(response), 4096)]
+            for i, part in enumerate(parts):
+                await message.answer(f"📊 **Qism {i+1}/{len(parts)}:**\n\n{part}", parse_mode="Markdown")
+        else:
+            await message.answer(response, parse_mode="Markdown")
+            
+    except Exception as e:
+        logger.error(f"Ошибка при показе прогресса групп: {e}")
+        await message.answer("❌ **Xatolik yuz berdi!**\n\nIltimos, qaytadan urinib ko'ring.", parse_mode="Markdown")
+
+# --- Команда для детального просмотра прогресса конкретной группы ---
+@dp.message_handler(commands=["show_group_detailed_progress"])
+async def show_group_detailed_progress_command(message: types.Message):
+    """
+    Админ-команда: показать детальный прогресс конкретной группы
+    Использование: /show_group_detailed_progress <chat_id>
+    """
+    try:
+        # Проверяем права
+        if not await is_admin_or_super_admin(message.from_user.id):
+            await message.answer("❌ Ruxsat yo'q! Bu buyruq faqat administratorlar uchun.")
+            return
+
+        # Парсим аргументы
+        args = message.text.split()
+        if len(args) != 2:
+            await message.answer(
+                "📝 **Foydalanish:**\n\n"
+                "`/show_group_detailed_progress <chat_id>`\n\n"
+                "**Masalan:**\n"
+                "`/show_group_detailed_progress -1001234567890`"
+            , parse_mode="Markdown")
+            return
+
+        try:
+            chat_id = int(args[1])
+        except ValueError:
+            await message.answer("❌ **Noto'g'ri format!** Chat ID raqam bo'lishi kerak.")
+            return
+
+        # Получаем настройки группы
+        settings = db.get_group_video_settings(chat_id)
+        if not settings:
+            await message.answer(f"❌ **Guruh topilmadi!**\n\nChat ID: `{chat_id}`", parse_mode="Markdown")
+            return
+
+        # Получаем название группы
+        try:
+            group_info = await message.bot.get_chat(chat_id)
+            group_name = group_info.title or group_info.first_name or f"Guruh {chat_id}"
+        except:
+            group_name = f"Guruh {chat_id}"
+
+        response = f"📊 **Detal progress:** {group_name}\n"
+        response += f"🆔 **Chat ID:** `{chat_id}`\n\n"
+
+        # Centris Towers детальный прогресс
+        if settings[0]:  # centris_enabled
+            centris_detailed = db.get_group_viewed_videos_detailed_by_project(chat_id, "centris")
+            response += f"🎬 **Centris Towers:**\n"
+            response += f"📊 **Jami ko'rilgan:** {len(centris_detailed)} video\n"
+            
+            if centris_detailed:
+                response += f"📋 **Barcha ko'rilgan video:**\n"
+                for i, video_key in enumerate(centris_detailed, 1):
+                    response += f"  {i}. `{video_key}`\n"
+            else:
+                response += f"🎥 Hech qanday video ko'rilmagan\n"
+        
+        # Golden Lake детальный прогресс
+        if settings[4]:  # golden_enabled
+            golden_detailed = db.get_group_viewed_videos_detailed_by_project(chat_id, "golden_lake")
+            response += f"\n🏊 **Golden Lake:**\n"
+            response += f"📊 **Jami ko'rilgan:** {len(golden_detailed)} video\n"
+            
+            if golden_detailed:
+                response += f"📋 **Barcha ko'rilgan video:**\n"
+                for i, video_key in enumerate(golden_detailed, 1):
+                    response += f"  {i}. `{video_key}`\n"
+            else:
+                response += f"🎥 Hech qanday video ko'rilmagan\n"
+
+        await message.answer(response, parse_mode="Markdown")
+            
+    except Exception as e:
+        logger.error(f"Ошибка при показе детального прогресса группы: {e}")
+        await message.answer("❌ **Xatolik yuz berdi!**\n\nIltimos, qaytadan urinib ko'ring.", parse_mode="Markdown")
+
 # Команда для показа настроек всех групп (только для админов)
 @dp.message_handler(commands=["admin_show_all_groups_settings"])
 async def admin_show_all_groups_settings(message: types.Message):
