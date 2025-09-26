@@ -1756,6 +1756,115 @@ async def force_group_video_command(message: types.Message):
         logger.error(f"Ошибка при принудительной отправке видео в группе: {e}")
         await message.answer(f"❌ Xatolik yuz berdi: {e}")
 
+# Команда: сводный прогресс по всем группам
+@dp.message_handler(commands=['all_groups_progress'])
+async def all_groups_progress_command(message: types.Message):
+    """
+    Показать прогресс по ВСЕМ группам: последний индекс видео и списки просмотренных по проектам
+    """
+    logger.info(f"🚀 all_groups_progress вызвана пользователем {message.from_user.id}")
+
+    try:
+        user_id = message.from_user.id
+
+        # Доступ только для админов
+        if user_id not in ADMINS + SUPER_ADMIN_IDS and not db.is_admin(user_id):
+            logger.warning(f"❌ Пользователь {user_id} не имеет прав")
+            await message.answer("❌ Sizda bu buyruqni bajarish uchun ruxsat yo'q!\n\nFaqat adminlar foydalana oladi.", parse_mode="Markdown")
+            return
+
+        groups = db.get_all_groups_with_settings() or []
+        if not groups:
+            await message.answer("📭 Hech qanday guruh topilmadi.")
+            return
+
+        # Формируем компактные блоки, разбивая длинный вывод на части
+        chunks = []
+        current = []
+        current_len = 0
+
+        for row in groups:
+            # Ожидаем порядок полей из get_all_groups_with_settings
+            chat_id = row[0]
+            centris_enabled = row[1]
+            centris_season_id = row[2]
+            centris_start_video = row[3]
+            golden_enabled = row[4]
+            golden_season_id = row[5]
+            golden_start_video = row[6]
+            group_name = row[9] if len(row) > 9 else str(chat_id)
+
+            # Просмотренные по проектам
+            centris_viewed = []
+            golden_viewed = []
+            try:
+                centris_viewed = db.get_group_viewed_videos_by_project(chat_id, 'centris')
+            except Exception:
+                pass
+            try:
+                golden_viewed = db.get_group_viewed_videos_by_project(chat_id, 'golden')
+            except Exception:
+                pass
+
+            # Человеческие названия сезонов
+            centris_season_name = db.get_season_name(centris_season_id) if centris_enabled and centris_season_id else None
+            golden_season_name = db.get_season_name(golden_season_id) if golden_enabled and golden_season_id else None
+
+            block_lines = []
+            block_lines.append(f"🆔 {chat_id} — {group_name}")
+
+            if centris_enabled and centris_season_id is not None:
+                block_lines.append("🏢 Centris:")
+                if centris_season_name:
+                    block_lines.append(f"   • Mavsum: {centris_season_name} (id={centris_season_id})")
+                block_lines.append(f"   • Oxirgi indeks: {centris_start_video}")
+                # Ограничим вывод длинных списков
+                if centris_viewed:
+                    preview = ", ".join(map(str, centris_viewed[:20]))
+                    suffix = " …" if len(centris_viewed) > 20 else ""
+                    block_lines.append(f"   • Ko'rilgan (pozitsiyalar): [{preview}]{suffix}")
+                else:
+                    block_lines.append("   • Ko'rilgan: []")
+
+            if golden_enabled and golden_season_id is not None:
+                block_lines.append("🏘️ Golden:")
+                if golden_season_name:
+                    block_lines.append(f"   • Mavsum: {golden_season_name} (id={golden_season_id})")
+                block_lines.append(f"   • Oxirgi indeks: {golden_start_video}")
+                if golden_viewed:
+                    preview = ", ".join(map(str, golden_viewed[:20]))
+                    suffix = " …" if len(golden_viewed) > 20 else ""
+                    block_lines.append(f"   • Ko'rilgan (pozitsiyalar): [{preview}]{suffix}")
+                else:
+                    block_lines.append("   • Ko'rilgan: []")
+
+            block = "\n".join(block_lines) + "\n\n"
+
+            if current_len + len(block) > 3500:
+                chunks.append("".join(current))
+                current = [block]
+                current_len = len(block)
+            else:
+                current.append(block)
+                current_len += len(block)
+
+        if current:
+            chunks.append("".join(current))
+
+        header = "📊 BARCHA GURUHLAR PROGRESSI:\n\n"
+        if chunks:
+            # Первый блок с заголовком
+            await message.answer(header + chunks[0])
+            # Остальные блоки без заголовка
+            for chunk in chunks[1:]:
+                await message.answer(chunk)
+        else:
+            await message.answer(header + "(bo'sh)")
+
+    except Exception as e:
+        logger.error(f"Ошибка при выводе общего прогресса групп: {e}")
+        await message.answer(f"❌ Xatolik yuz berdi: {e}")
+
 # Команда для перепланирования задач видео в группе
 @dp.message_handler(commands=['schedule_group_video'])
 async def schedule_group_video_command(message: types.Message):
