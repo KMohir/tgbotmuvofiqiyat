@@ -120,8 +120,12 @@ async def send_group_video_new(chat_id: int, project: str, season_id: int = None
 
         # Получаем стартовые значения из базы
         season_db, video_db = db.get_group_video_start(chat_id, project)
+        logger.info(f"🎯 Данные из БД для группы {chat_id}, проект {project}: season_db={season_db}, video_db={video_db}")
+        
         season_id = season_id if season_id is not None else season_db
         start_video = start_video if start_video is not None else video_db
+        
+        logger.info(f"🎯 Итоговые значения: season_id={season_id}, start_video={start_video}")
         
         # Проверяем валидность season_id
         if not season_id:
@@ -178,10 +182,14 @@ async def send_group_video_new(chat_id: int, project: str, season_id: int = None
         
         # Ищем первое непросмотренное видео в выбранном сезоне (начиная со стартового)
         logger.info(f"🎯 Начинаем поиск с позиции start_video: {start_video}")
+        logger.info(f"🎯 Список всех видео сезона: {[(position, title[:30]) for url, title, position in current_season_videos[:5]]}...")
+        
         for video_idx, (url, title, position) in enumerate(current_season_videos):
             video_key = f"{season_id}:{position}"
+            logger.info(f"🎯 Проверяем видео: position={position}, start_video={start_video}, video_key={video_key}")
             
-            if video_key not in viewed_videos_detailed:
+            # ВАЖНО: Ищем видео начиная с start_video (или больше)
+            if position >= start_video and video_key not in viewed_videos_detailed:
                 logger.info(f"🎯 Найдено непросмотренное видео: {video_key} (сезон {season_id}, позиция {position})")
                 logger.info(f"🎯 Отправляем: {title}")
                 
