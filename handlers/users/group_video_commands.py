@@ -5793,6 +5793,72 @@ async def show_group_detailed_progress_command(message: types.Message):
         logger.error(f"Ошибка при показе детального прогресса группы: {e}")
         await message.answer("❌ **Xatolik yuz berdi!**\n\nIltimos, qaytadan urinib ko'ring.", parse_mode="Markdown")
 
+# --- Команда для сброса прогресса конкретной группы ---
+@dp.message_handler(commands=["reset_group_progress"])
+async def reset_group_progress_command(message: types.Message):
+    """
+    Админ-команда: сбросить прогресс конкретной группы
+    Использование: /reset_group_progress <chat_id>
+    """
+    try:
+        # Проверяем права
+        if not await is_admin_or_super_admin(message.from_user.id):
+            await message.answer("❌ Ruxsat yo'q! Bu buyruq faqat administratorlar uchun.")
+            return
+
+        # Парсим аргументы
+        args = message.text.split()
+        if len(args) != 2:
+            await message.answer(
+                "📝 **Foydalanish:**\n\n"
+                "`/reset_group_progress <chat_id>`\n\n"
+                "**Masalan:**\n"
+                "`/reset_group_progress -1001234567890`"
+            , parse_mode="Markdown")
+            return
+
+        try:
+            chat_id = int(args[1])
+        except ValueError:
+            await message.answer("❌ **Noto'g'ri format!** Chat ID raqam bo'lishi kerak.")
+            return
+
+        # Получаем настройки группы
+        settings = db.get_group_video_settings(chat_id)
+        if not settings:
+            await message.answer(f"❌ **Guruh topilmadi!**\n\nChat ID: `{chat_id}`", parse_mode="Markdown")
+            return
+
+        # Получаем название группы
+        try:
+            group_info = await message.bot.get_chat(chat_id)
+            group_name = group_info.title or group_info.first_name or f"Guruh {chat_id}"
+        except:
+            group_name = f"Guruh {chat_id}"
+
+        # Сбрасываем прогресс
+        db.reset_group_viewed_videos(chat_id)
+        db.reset_group_viewed_videos_detailed_by_project(chat_id, "centris")
+        db.reset_group_viewed_videos_detailed_by_project(chat_id, "golden_lake")
+
+        # Перепланируем задачи для этой группы
+        schedule_single_group_jobs(chat_id)
+
+        await message.answer(
+            f"✅ **Progress reset qilindi!**\n\n"
+            f"🏢 **Guruh:** {group_name}\n"
+            f"🆔 **Chat ID:** `{chat_id}`\n\n"
+            f"🔄 **Qilingan ishlar:**\n"
+            f"• Eski progress tozalandi\n"
+            f"• Yangi tizim progress tozalandi\n"
+            f"• Vazifalar qayta rejalashtirildi\n\n"
+            f"🎯 Guruh endi birinchi videodan boshlaydi!"
+        , parse_mode="Markdown")
+            
+    except Exception as e:
+        logger.error(f"Ошибка при сбросе прогресса группы: {e}")
+        await message.answer("❌ **Xatolik yuz berdi!**\n\nIltimos, qaytadan urinib ko'ring.", parse_mode="Markdown")
+
 # Команда для показа настроек всех групп (только для админов)
 @dp.message_handler(commands=["admin_show_all_groups_settings"])
 async def admin_show_all_groups_settings(message: types.Message):
