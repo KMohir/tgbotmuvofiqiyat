@@ -337,8 +337,8 @@ async def send_group_video_by_settings(chat_id: int):
         sent = sent or res
     return sent
 
-# --- Планировщик для групп ---
-def schedule_group_jobs():
+# --- УСТАРЕВШИЙ ПЛАНИРОВЩИК: НЕ ИСПОЛЬЗУЕТСЯ ---
+# def schedule_group_jobs():
     try:
         logger.info("Начало планирования задач для групп (логика Centris/Golden)")
         jobs = scheduler.get_jobs()
@@ -623,7 +623,10 @@ def schedule_jobs_for_users():
         logger.info("Задачи на 08:00 и 20:00 для всех получателей созданы")
 
         # Планируем задачи для групп с настройками (новая логика)
-        schedule_group_jobs_v2()
+        groups_settings = db.get_all_groups_with_settings()
+        for group in groups_settings:
+            chat_id = group[0]
+            schedule_single_group_jobs(chat_id)
 
     except Exception as e:
         logger.error(f"Ошибка при планировании задач: {e}")
@@ -770,6 +773,7 @@ def update_group_video_settings_and_reset(chat_id, centris_enabled, centris_seas
     db.reset_group_viewed_videos(chat_id)
 
 def schedule_group_jobs_v2():
+    logger.warning("⚠️ УСТАРЕВШАЯ ФУНКЦИЯ schedule_group_jobs_v2() - используйте schedule_single_group_jobs()")
     logger.info("Планирование задач для групп (отдельные потоки)")
     jobs = scheduler.get_jobs()
     for job in jobs:

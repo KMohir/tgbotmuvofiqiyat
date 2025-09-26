@@ -449,8 +449,16 @@ async def restart_scheduler_command(message: types.Message):
             scheduler.shutdown()
             await message.reply('🔄 Планировщик остановлен')
         
-        # Создаем новые задачи
-        schedule_group_jobs()
+        # Создаем новые задачи для всех групп
+        from handlers.users.video_scheduler import schedule_single_group_jobs
+        try:
+            groups_settings = db.get_all_groups_with_settings()
+            for group in groups_settings:
+                chat_id = group[0]
+                schedule_single_group_jobs(chat_id)
+        except Exception as e:
+            import logging
+            logging.error(f"Ошибка при перепланировании задач: {e}")
         
         # Запускаем планировщик
         if not scheduler.running:

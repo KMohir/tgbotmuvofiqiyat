@@ -1919,7 +1919,7 @@ async def schedule_group_video_command(message: types.Message):
             logger.info(f"Удалена задача {job_id} для группы {chat_id}")
         
         # Создаем новые задачи
-        schedule_group_jobs()
+        schedule_single_group_jobs(chat_id)
         
         await message.answer("🔄 **Guruh video vazifalari qayta rejalashtirildi!**\n\n⏰ Avtomatik yuborish vaqti yangilandi.", parse_mode="Markdown")
         
@@ -2472,9 +2472,8 @@ async def cleanup_group_video_command(message: types.Message):
             response += f"   • Tozalangan: {total_cleaned} ta\n"
             response += f"   • Guruhlar: {len(groups_with_settings)} ta\n\n"
             
-            # Перепланирование задач
-            from handlers.users.video_scheduler import schedule_group_jobs
-            schedule_group_jobs()
+            # Перепланирование задач для конкретной группы
+            schedule_single_group_jobs(chat_id)
             
             response += "🔄 **QAYTA REJALASHTIRISH:** ✅ Bajarildi\n\n"
             
@@ -2680,9 +2679,8 @@ async def restore_group_video_command(message: types.Message):
             response += f"   • Muvaffaqiyatli: {restored_groups} ta\n"
             response += f"   • Xatoliklar: {len(backup_data.get('groups', [])) - restored_groups} ta\n\n"
             
-            # Перепланирование задач
-            from handlers.users.video_scheduler import schedule_group_jobs
-            schedule_group_jobs()
+            # Перепланирование задач для конкретной группы
+            schedule_single_group_jobs(chat_id)
             
             response += "🔄 **QAYTA REJALASHTIRISH:** ✅ Bajarildi\n\n"
             response += "🎯 **HOLAT:** Sistema tiklandi va ishlayapti"
@@ -3170,8 +3168,7 @@ async def reboot_group_video_command(message: types.Message):
             
             # Перезапускаем планировщик
             try:
-                from handlers.users.video_scheduler import schedule_group_jobs
-                schedule_group_jobs()
+                schedule_single_group_jobs(chat_id)
                 
                 response += "🔄 **REJALASHTIRUVCHI:** ✅ Qayta ishga tushirildi\n\n"
             except Exception as e:
@@ -5549,8 +5546,11 @@ async def set_all_groups_time_command(message: types.Message):
             await message.answer("❌ Xatolik: bazaga yozishda muammo yuz berdi")
             return
 
-        # Перепланируем все задачи
-        schedule_group_jobs_v2()
+        # Перепланируем задачи для всех групп
+        groups_settings = db.get_all_groups_with_settings()
+        for group in groups_settings:
+            chat_id = group[0]
+            schedule_single_group_jobs(chat_id)
 
         await message.answer(
             "✅ Barcha guruhlar uchun yuborish vaqti yangilandi: " + ", ".join(validated_times)

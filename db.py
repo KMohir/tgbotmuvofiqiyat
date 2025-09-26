@@ -1769,8 +1769,16 @@ class Database:
             
             # Пытаемся перепланировать задачи (если планировщик доступен)
             try:
-                from handlers.users.video_scheduler import schedule_group_jobs_v2
-                schedule_group_jobs_v2()
+                from handlers.users.video_scheduler import schedule_single_group_jobs
+                # Перепланируем задачи для всех групп
+                cursor = self.conn.cursor()
+                cursor.execute('SELECT chat_id FROM group_video_settings')
+                group_ids = cursor.fetchall()
+                cursor.close()
+                
+                for (chat_id,) in group_ids:
+                    schedule_single_group_jobs(int(chat_id))
+                    
                 logger.info("✅ Задачи перепланированы для новой системы")
             except Exception as scheduler_error:
                 logger.info(f"⚠️ Планировщик будет обновлен позже: {scheduler_error}")
