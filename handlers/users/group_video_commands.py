@@ -5293,11 +5293,8 @@ async def send_all_planned_videos_command(message: types.Message):
                                                 logger.error(f"Ошибка при отправке Centris видео {i} сезона {season_id} в группу {chat_id}: {e}")
                                                 group_failed += 1
                                         
-                                        # Если это не последний сезон, обновляем на следующий
-                                        if season_index < len(all_seasons) - 1:
-                                            next_season_id = all_seasons[season_index + 1][0]
-                                            db.set_group_video_start(int(chat_id), 'centris', next_season_id, 0)
-                                            logger.info(f"Группа {chat_id}: Centris переключена на сезон {next_season_id}")
+                                        # Больше не переключаем сезоны автоматически
+                                        logger.info(f"Группа {chat_id}: Сезон Centris завершен. Используйте /set_group_video для смены сезона")
                                     
                                     season_index += 1
                     except Exception as e:
@@ -5348,11 +5345,8 @@ async def send_all_planned_videos_command(message: types.Message):
                                                 logger.error(f"Ошибка при отправке Golden видео {i} сезона {season_id} в группу {chat_id}: {e}")
                                                 group_failed += 1
                                         
-                                        # Если это не последний сезон, обновляем на следующий
-                                        if season_index < len(all_seasons) - 1:
-                                            next_season_id = all_seasons[season_index + 1][0]
-                                            db.set_group_video_start(int(chat_id), 'golden', next_season_id, 0)
-                                            logger.info(f"Группа {chat_id}: Golden переключена на сезон {next_season_id}")
+                                        # Больше не переключаем сезоны автоматически
+                                        logger.info(f"Группа {chat_id}: Сезон Golden завершен. Используйте /set_group_video для смены сезона")
                                     
                                     season_index += 1
                     except Exception as e:
@@ -5564,50 +5558,8 @@ async def set_all_groups_time_command(message: types.Message):
     except Exception as e:
         await message.answer(f"❌ Xatolik: {e}")
 
-# --- Команда для сброса прогресса групп и перехода на новую систему чередования ---
-@dp.message_handler(commands=["reset_groups_to_alternating"])
-async def reset_groups_to_alternating_command(message: types.Message):
-    """
-    Админ-команда: сбросить прогресс всех групп и перейти на новую систему чередования сезонов
-    """
-    try:
-        # Проверяем права
-        if not await is_admin_or_super_admin(message.from_user.id):
-            await message.answer("❌ Ruxsat yo'q! Bu buyruq faqat administratorlar uchun.")
-            return
-
-        # Получаем все группы
-        groups_settings = db.get_all_groups_with_settings()
-        
-        reset_count = 0
-        for group in groups_settings:
-            chat_id = group[0]
-            
-            # Сбрасываем старые просмотренные видео
-            db.reset_group_viewed_videos(chat_id)
-            
-            # Сбрасываем детальные просмотренные видео для обоих проектов
-            db.reset_group_viewed_videos_detailed_by_project(chat_id, "centris")
-            db.reset_group_viewed_videos_detailed_by_project(chat_id, "golden_lake")
-            
-            reset_count += 1
-
-        # Перепланируем все задачи
-        schedule_group_jobs_v2()
-
-        await message.answer(
-            f"✅ Yangi tizimga o'tish yakunlandi!\n\n"
-            f"📊 Guruhlar soni: {reset_count}\n"
-            f"🔄 Barcha guruhlar uchun progress reset qilindi\n"
-            f"🎯 Yangi tizim: sezonlar navbatma-navbat yuboriladi\n\n"
-            f"📋 Misol:\n"
-            f"1-kun: 1/14 (1-sezon, 14-qism)\n"
-            f"2-kun: 2/14 (2-sezon, 14-qism)\n"
-            f"3-kun: 3/14 (3-sezon, 14-qism)\n"
-            f"va hokazo..."
-        )
-    except Exception as e:
-        await message.answer(f"❌ Xatolik: {e}")
+# --- КОМАНДА УДАЛЕНА: Больше не используем систему чередования сезонов ---
+# Все сезоны теперь работают последовательно: 1 сезон до конца, потом 2 сезон, и так далее.
 
 # --- Команда для просмотра прогресса групп ---
 @dp.message_handler(commands=["show_groups_progress"])
@@ -5660,15 +5612,9 @@ async def show_groups_progress_command(message: types.Message):
                 else:
                     response += f"    🎥 Hech qanday video ko'rilmagan\n"
                 
-                # Показываем текущую позицию в чередовании
+                # Показываем информацию о текущем сезоне (последовательная логика)
                 if centris_detailed:
-                    total_sent = len(centris_detailed)
-                    all_seasons = db.get_seasons_by_project("centris")
-                    num_seasons = len(all_seasons)
-                    if num_seasons > 0:
-                        current_episode = (total_sent // num_seasons) + 1
-                        current_season_index = total_sent % num_seasons
-                        response += f"    🎯 Joriy pozitsiya: {current_episode}-qism, {current_season_index + 1}-sezon\n"
+                    response += f"    🎯 Видео отправляются последовательно по выбранному сезону\n"
             else:
                 response += f"  🎬 **Centris Towers:** ❌ O'chirilgan\n"
             
@@ -5689,15 +5635,9 @@ async def show_groups_progress_command(message: types.Message):
                 else:
                     response += f"    🎥 Hech qanday video ko'rilmagan\n"
                 
-                # Показываем текущую позицию в чередовании
+                # Показываем информацию о текущем сезоне (последовательная логика)
                 if golden_detailed:
-                    total_sent = len(golden_detailed)
-                    all_seasons = db.get_seasons_by_project("golden")
-                    num_seasons = len(all_seasons)
-                    if num_seasons > 0:
-                        current_episode = (total_sent // num_seasons) + 1
-                        current_season_index = total_sent % num_seasons
-                        response += f"    🎯 Joriy pozitsiya: {current_episode}-qism, {current_season_index + 1}-sezon\n"
+                    response += f"    🎯 Видео отправляются последовательно по выбранному сезону\n"
             else:
                 response += f"  🏊 **Golden Lake:** ❌ O'chirilgan\n"
             

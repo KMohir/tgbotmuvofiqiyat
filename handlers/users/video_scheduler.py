@@ -160,49 +160,29 @@ async def send_group_video_new(chat_id: int, project: str, season_id: int = None
             season_id = all_seasons[0][0]
             start_video = 0
 
-        # Получаем просмотренные видео для группы по проекту
         # Унифицируем название проекта для получения просмотренных видео
         project_for_db = "golden_lake" if project == "golden" else project
-        viewed_positions = db.get_group_viewed_videos_by_project(chat_id, project_for_db)
-        logger.info(f"Просмотренные позиции для группы {chat_id}, проект {project_for_db}: {viewed_positions}")
-        # Получаем список видео текущего сезона
-        videos = db.get_videos_by_season(season_id)
-        # --- Исправление: сначала отправляем именно стартовое видео, если оно не просмотрено ---
-        if start_video not in viewed_positions:
-            logger.info(f"Сначала отправляем стартовое видео {start_video} для группы {chat_id}")
-            for url, title, position in videos:
-                if position == start_video:
-                    message_id = int(url.split("/")[-1])
-                    await bot.copy_message(
-                        chat_id=chat_id,
-                        from_chat_id=-1002550852551,
-                        message_id=message_id,
-                        protect_content=True
-                    )
-                    logger.info(f"Стартовое видео {position} сезона {season_id} отправлено в группу {chat_id} (проект {project})")
-                    db.mark_group_video_as_viewed_by_project(chat_id, position, project_for_db)
-                    logger.info(f"Видео {position} отмечено как просмотренное для группы {chat_id}, проект {project_for_db}")
-                    return True
-            # Если вдруг стартовое видео не найдено — продолжаем обычную логику
-        # --- ИСПРАВЛЕННАЯ ЛОГИКА: последовательная отправка по сезонам ---
+        # --- ИСПРАВЛЕННАЯ ЛОГИКА: последовательная отправка ТОЛЬКО по выбранному сезону ---
         
         # Получаем просмотренные видео в формате "season_id:position"
         viewed_videos_detailed = db.get_group_viewed_videos_detailed_by_project(chat_id, project_for_db)
         
         logger.info(f"🎯 Всего просмотрено видео проекта {project}: {len(viewed_videos_detailed)}")
         logger.info(f"🎯 Просмотренные видео: {viewed_videos_detailed}")
+        logger.info(f"🎯 Отправляем видео ТОЛЬКО из выбранного сезона {season_id}")
+        logger.info(f"🎯 Стартовое видео установлено: {start_video}")
         
-        # Проходим по всем сезонам и ищем следующее непросмотренное видео
-        for season_idx, (check_season_id, check_season_name) in enumerate(all_seasons):
-            season_videos = db.get_videos_by_season(check_season_id)
-            logger.info(f"🎯 Проверяем сезон {check_season_id} ({check_season_name}): {len(season_videos)} видео")
-            
-            # Ищем первое непросмотренное видео в этом сезоне
-            for video_idx, (url, title, position) in enumerate(season_videos):
-                video_key = f"{check_season_id}:{position}"
-                
-                if video_key not in viewed_videos_detailed:
-                    logger.info(f"🎯 Найдено непросмотренное видео: {video_key} (сезон {check_season_id}, позиция {position})")
+        # Работаем ТОЛЬКО с выбранным сезоном
+        current_season_videos = db.get_videos_by_season(season_id)
+        logger.info(f"🎯 Проверяем выбранный сезон {season_id}: {len(current_season_videos)} видео")
+        
+        # Специальная логика для стартового видео
+        start_video_key = f"{season_id}:{start_video}"
+        if start_video_key not in viewed_videos_detailed:
+            # Если стартовое видео еще не отправлено - отправляем его
+            for video_idx, (url, title, position) in enumerate(current_season_videos):
+                if position == start_video:
+                    logger.info(f"🎯 Отправляем СТАРТОВОЕ видео: {start_video_key}")
                     logger.info(f"🎯 Отправляем: {title}")
                     
                     message_id = int(url.split("/")[-1])
@@ -212,26 +192,21 @@ async def send_group_video_new(chat_id: int, project: str, season_id: int = None
                         message_id=message_id,
                         protect_content=True
                     )
-                    logger.info(f"✅ Видео {position} сезона {check_season_id} отправлено в группу {chat_id} (проект {project})")
+                    logger.info(f"✅ Стартовое видео {position} сезона {season_id} отправлено в группу {chat_id} (проект {project})")
                     
                     # Отмечаем как просмотренное в детальном формате
-                    db.mark_group_video_as_viewed_detailed_by_project(chat_id, check_season_id, position, project_for_db)
-                    logger.info(f"✅ Видео {video_key} отмечено как просмотренное для группы {chat_id}, проект {project_for_db}")
+                    db.mark_group_video_as_viewed_detailed_by_project(chat_id, season_id, position, project_for_db)
+                    logger.info(f"✅ Видео {start_video_key} отмечено как просмотренное для группы {chat_id}, проект {project}")
                     return True
-                else:
-                    logger.info(f"🎯 Видео {video_key} уже просмотрено, пропускаем")
-        
-        # Если все видео всех сезонов просмотрены - начинаем заново
-        logger.info(f"🔄 Все видео всех сезонов проекта {project} просмотрены, начинаем заново")
-        db.reset_group_viewed_videos_detailed_by_project(chat_id, project_for_db)
-        
-        # Отправляем первое видео первого сезона
-        if all_seasons:
-            first_season_id, first_season_name = all_seasons[0]
-            first_season_videos = db.get_videos_by_season(first_season_id)
-            if first_season_videos:
-                url, title, position = first_season_videos[0]
-                logger.info(f"🔄 Отправляем первое видео заново: {first_season_id}:{position}")
+            
+        # Если стартовое видео уже отправлено, ищем следующее непросмотренное видео
+        logger.info(f"🎯 Стартовое видео уже отправлено, ищем следующее...")
+        for video_idx, (url, title, position) in enumerate(current_season_videos):
+            video_key = f"{season_id}:{position}"
+            
+            if video_key not in viewed_videos_detailed:
+                logger.info(f"🎯 Найдено непросмотренное видео: {video_key} (сезон {season_id}, позиция {position})")
+                logger.info(f"🎯 Отправляем: {title}")
                 
                 message_id = int(url.split("/")[-1])
                 await bot.copy_message(
@@ -240,83 +215,19 @@ async def send_group_video_new(chat_id: int, project: str, season_id: int = None
                     message_id=message_id,
                     protect_content=True
                 )
-                db.mark_group_video_as_viewed_detailed_by_project(chat_id, first_season_id, position, project_for_db)
-                return True
-        
-        # --- АВТОМАТИЧЕСКИЙ ПЕРЕХОД НА СЛЕДУЮЩИЙ СЕЗОН ---
-        logger.info(f"📺 Все видео сезона {season_id} просмотрены для проекта {project}, пытаемся перейти на следующий сезон")
-        
-        # Находим следующий сезон
-        next_season_index = current_season_index + 1
-        logger.info(f"📺 Текущий индекс сезона: {current_season_index}, следующий: {next_season_index}, всего сезонов: {len(all_seasons)}")
-        
-        if next_season_index < len(all_seasons):
-            next_season_id = all_seasons[next_season_index][0]
-            next_season_name = all_seasons[next_season_index][1]
-            
-            logger.info(f"✅ Переходим на следующий сезон: {next_season_id} ({next_season_name}) для проекта {project}")
-            
-            # Обновляем настройки группы для следующего сезона
-            if project == "centris":
-                db.set_group_video_start(chat_id, 'centris', next_season_id, 0)
-            elif project == "golden_lake" or project == "golden":
-                db.set_group_video_start(chat_id, 'golden', next_season_id, 0)
-            
-            # Пытаемся отправить первое видео из следующего сезона
-            next_videos = db.get_videos_by_season(next_season_id)
-            if next_videos:
-                url, title, position = next_videos[0]  # Берем первое видео
-                message_id = int(url.split("/")[-1])
-                await bot.copy_message(
-                    chat_id=chat_id,
-                    from_chat_id=-1002550852551,
-                    message_id=message_id,
-                    protect_content=True
-                )
-                logger.info(f"Первое видео {position} нового сезона {next_season_id} отправлено в группу {chat_id} (проект {project})")
-                db.mark_group_video_as_viewed_by_project(chat_id, position, project_for_db)
+                logger.info(f"✅ Видео {position} сезона {season_id} отправлено в группу {chat_id} (проект {project})")
                 
-                # Обновляем планировщик для группы
-                schedule_single_group_jobs(chat_id)
-                
+                # Отмечаем как просмотренное в детальном формате
+                db.mark_group_video_as_viewed_detailed_by_project(chat_id, season_id, position, project_for_db)
+                logger.info(f"✅ Видео {video_key} отмечено как просмотренное для группы {chat_id}, проект {project}")
                 return True
+            else:
+                logger.info(f"🎯 Видео {video_key} уже просмотрено, пропускаем")
         
-        # --- ЦИКЛИЧЕСКОЕ ВОСПРОИЗВЕДЕНИЕ: ВОЗВРАТ К ПЕРВОМУ СЕЗОНУ ---
-        logger.info(f"🔄 Все {len(all_seasons)} сезонов проекта {project} просмотрены, начинаем с первого сезона заново")
-        logger.info(f"🔄 Завершен полный цикл: Сезон 1 → Сезон 2 → ... → Сезон {len(all_seasons)} → возврат к Сезону 1")
-        
-        # Сбрасываем просмотренные видео ТОЛЬКО для этого проекта
-        logger.info(f"🔄 Сбрасываем просмотренные видео для проекта {project_for_db}")
-        db.mark_group_video_as_viewed_by_project(chat_id, -1, project_for_db)  # Сброс через специальное значение
-        
-        # Устанавливаем первый сезон и первое видео
-        first_season_id = all_seasons[0][0]
-        if project == "centris":
-            db.set_group_video_start(chat_id, 'centris', first_season_id, 0)
-        elif project == "golden_lake" or project == "golden":
-            db.set_group_video_start(chat_id, 'golden', first_season_id, 0)
-        
-        # Отправляем первое видео первого сезона
-        first_season_id = all_seasons[0][0]
-        first_season_name = all_seasons[0][1]
-        first_videos = db.get_videos_by_season(first_season_id)
-        
-        if first_videos:
-            url, title, position = first_videos[0]  # Берем первое видео
-            message_id = int(url.split("/")[-1])
-            await bot.copy_message(
-                chat_id=chat_id,
-                from_chat_id=-1002550852551,
-                message_id=message_id,
-                protect_content=True
-            )
-            logger.info(f"🔄 ЦИКЛ: Первое видео {position} первого сезона {first_season_id} ({first_season_name}) отправлено в группу {chat_id} (проект {project})")
-            db.mark_group_video_as_viewed_by_project(chat_id, position, project_for_db)
-            
-            # Обновляем планировщик для группы
-            schedule_single_group_jobs(chat_id)
-            
-            return True
+        # Если все видео выбранного сезона просмотрены - сезон завершен
+        logger.info(f"🔄 Все видео выбранного сезона {season_id} просмотрены для проекта {project}")
+        logger.info(f"ℹ️ Чтобы начать следующий сезон, используйте команду /set_group_video")
+        return False
         
         logger.info(f"Нет видео для отправки в проекте {project}")
         return False

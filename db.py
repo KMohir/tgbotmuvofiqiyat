@@ -55,7 +55,7 @@ class Database:
             self.conn.autocommit = True
             self.create_tables()
             self.create_security_tables()  # Создать таблицы безопасности
-            self.migrate_to_alternating_system()  # Автоматический переход на новую систему
+            # self.migrate_to_alternating_system()  # ОТКЛЮЧЕНО: Больше не используем систему чередования
         except Exception as e:
             logger.error(f"Ошибка при инициализации базы данных: {e}")
             raise
