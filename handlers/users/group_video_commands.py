@@ -17,6 +17,38 @@ from handlers.users.video_scheduler import schedule_single_group_jobs, schedule_
 # Настройка логирования
 logger = logging.getLogger(__name__)
 
+# Вспомогательная функция для отправки сообщения с сохранением ID
+async def send_and_save_message(bot, chat_id: int, text: str, **kwargs):
+    """Отправляет сообщение и сохраняет его ID в базе данных"""
+    try:
+        sent_message = await bot.send_message(chat_id, text, **kwargs)
+        
+        # Сохраняем ID сообщения в базе данных (только для групп)
+        if chat_id < 0:  # Отрицательные ID означают группы/каналы
+            db.save_bot_message(chat_id, sent_message.message_id, 'text')
+            
+        return sent_message
+    except Exception as e:
+        logger.error(f"Ошибка при отправке сообщения в {chat_id}: {e}")
+        raise
+
+
+# Вспомогательная функция для копирования сообщения с сохранением ID
+async def copy_and_save_message(bot, chat_id: int, from_chat_id: int, message_id: int, **kwargs):
+    """Копирует сообщение и сохраняет его ID в базе данных"""
+    try:
+        sent_message = await bot.copy_message(chat_id, from_chat_id, message_id, **kwargs)
+        
+        # Сохраняем ID сообщения в базе данных (только для групп)
+        if chat_id < 0:  # Отрицательные ID означают группы/каналы
+            db.save_bot_message(chat_id, sent_message.message_id, 'copy')
+            
+        return sent_message
+    except Exception as e:
+        logger.error(f"Ошибка при копировании сообщения в {chat_id}: {e}")
+        raise
+
+
 # Вспомогательная функция для безопасного редактирования сообщений
 async def safe_edit_text(callback_query: types.CallbackQuery, text: str, reply_markup=None, parse_mode=None):
     """Безопасно редактирует сообщение, обрабатывая ошибку 'Message is not modified'"""
@@ -6895,69 +6927,100 @@ async def confirm_delete_messages_callback(callback_query: types.CallbackQuery, 
         bot_id = bot_user.id
         
         try:
-            # Пытаемся получить последние сообщения в группе
-            # Telegram API не позволяет получить историю сообщений напрямую
-            # Поэтому попробуем удалить сообщения по убыванию ID
+            # Подход 1: Проверяем сохраненные ID сообщений бота в базе данных
+            saved_messages = db.get_recent_bot_messages(group_id, message_count)
+            successfully_deleted_ids = []
             
-            # Начинаем с максимально возможного ID сообщения и идем назад
-            # Это не идеальное решение, но лучшее что можно сделать с ограничениями API
+            if saved_messages:
+                logger.info(f"Найдено {len(saved_messages)} сохраненных сообщений бота для группы {group_id}")
+                # Удаляем сохраненные сообщения
+                for msg_id in saved_messages:
+                    try:
+                        await bot.delete_message(group_id, msg_id)
+                        deleted_count += 1
+                        successfully_deleted_ids.append(msg_id)
+                        logger.info(f"Удалено сохраненное сообщение {msg_id} от бота в группе {group_id}")
+                        await asyncio.sleep(0.1)  # Пауза между удалениями
+                        
+                        # Обновляем прогресс
+                        if deleted_count % 5 == 0:
+                            try:
+                                await safe_edit_text(callback_query,
+                                    f"🔄 **Xabarlar o'chirilmoqda...**\n\n"
+                                    f"📱 **Guruh:** {group_name}\n"
+                                    f"🆔 **ID:** `{group_id}`\n"
+                                    f"🗑️ **O'chirildi:** {deleted_count}/{message_count}\n\n"
+                                    f"Iltimos, kuting...",
+                                    parse_mode="Markdown"
+                                )
+                            except:
+                                pass
+                                
+                    except Exception as e:
+                        logger.warning(f"Не удалось удалить сохраненное сообщение {msg_id}: {e}")
+                        errors_count += 1
+                        continue
+                
+                # Удаляем записи об успешно удаленных сообщениях из базы данных
+                if successfully_deleted_ids:
+                    db.delete_bot_messages_from_db(group_id, successfully_deleted_ids)
             
-            # Отправляем временное сообщение чтобы получить примерный текущий message_id
-            temp_msg = await bot.send_message(group_id, "🔍 Qidirilmoqda...")
-            current_message_id = temp_msg.message_id
-            await bot.delete_message(group_id, current_message_id)
-            
-            # Ищем и удаляем сообщения бота, идя назад от текущего ID
-            checked_count = 0
-            max_checks = message_count * 10  # Проверяем больше сообщений чем нужно удалить
-            
-            for message_id in range(current_message_id - 1, max(1, current_message_id - max_checks), -1):
-                if deleted_count >= message_count:
-                    break
-                    
-                try:
-                    # Пытаемся переслать сообщение самому себе чтобы проверить отправителя
-                    # Если сообщение от бота, пересылка будет содержать информацию о боте
-                    forwarded = await bot.forward_message(
-                        chat_id=callback_query.from_user.id,
-                        from_chat_id=group_id,
-                        message_id=message_id
-                    )
-                    
-                    # Удаляем переслаянное сообщение
-                    await bot.delete_message(callback_query.from_user.id, forwarded.message_id)
-                    
-                    # Если пересылка успешна, проверяем отправителя
-                    if forwarded.from_user and forwarded.from_user.id == bot_id:
-                        # Это сообщение от бота, удаляем его
+            # Подход 2: Если нет сохраненных сообщений или не хватает, пробуем простое удаление
+            if deleted_count < message_count:
+                logger.info(f"Пытаемся найти дополнительные сообщения. Удалено: {deleted_count}/{message_count}")
+                
+                # Отправляем временное сообщение чтобы получить текущий message_id
+                temp_msg = await bot.send_message(group_id, "🔍 Qidirilmoqda...")
+                current_message_id = temp_msg.message_id
+                await bot.delete_message(group_id, current_message_id)
+                
+                remaining_needed = message_count - deleted_count
+                max_checks = remaining_needed * 5  # Проверяем в 5 раз больше сообщений
+                checked_count = 0
+                
+                # Идем назад от текущего ID и просто пытаемся удалить сообщения
+                for message_id in range(current_message_id - 1, max(1, current_message_id - max_checks), -1):
+                    if deleted_count >= message_count:
+                        break
+                        
+                    try:
+                        # Просто пытаемся удалить сообщение
+                        # Если это сообщение бота, оно удалится
+                        # Если нет - получим ошибку и пропустим
                         await bot.delete_message(group_id, message_id)
                         deleted_count += 1
-                        logger.info(f"Удалено сообщение {message_id} от бота в группе {group_id}")
+                        logger.info(f"Удалено сообщение {message_id} в группе {group_id}")
                         
                         # Небольшая пауза чтобы не превысить лимиты API
-                        await asyncio.sleep(0.1)
-                
-                except Exception as delete_error:
-                    # Сообщение не найдено, недоступно или произошла другая ошибка
-                    errors_count += 1
-                    continue
-                
-                checked_count += 1
-                
-                # Обновляем прогресс каждые 10 проверенных сообщений
-                if checked_count % 10 == 0:
-                    try:
-                        await safe_edit_text(callback_query,
-                            f"🔄 **Xabarlar o'chirilmoqda...**\n\n"
-                            f"📱 **Guruh:** {group_name}\n"
-                            f"🆔 **ID:** `{group_id}`\n"
-                            f"🗑️ **O'chirildi:** {deleted_count}/{message_count}\n"
-                            f"🔍 **Tekshirildi:** {checked_count} ta xabar\n\n"
-                            f"Iltimos, kuting...",
-                            parse_mode="Markdown"
-                        )
-                    except:
-                        pass  # Игнорируем ошибки обновления прогресса
+                        await asyncio.sleep(0.2)
+                        
+                    except Exception as delete_error:
+                        # Сообщение не найдено, недоступно или не принадлежит боту
+                        error_msg = str(delete_error)
+                        if "message to delete not found" in error_msg:
+                            continue  # Сообщение не существует
+                        elif "not enough rights" in error_msg or "can't delete" in error_msg:
+                            continue  # Нет прав или не сообщение бота
+                        else:
+                            errors_count += 1
+                            continue
+                    
+                    checked_count += 1
+                    
+                    # Обновляем прогресс каждые 10 проверенных сообщений
+                    if checked_count % 10 == 0:
+                        try:
+                            await safe_edit_text(callback_query,
+                                f"🔄 **Xabarlar o'chirilmoqda...**\n\n"
+                                f"📱 **Guruh:** {group_name}\n"
+                                f"🆔 **ID:** `{group_id}`\n"
+                                f"🗑️ **O'chirildi:** {deleted_count}/{message_count}\n"
+                                f"🔍 **Tekshirildi:** {checked_count} ta xabar\n\n"
+                                f"Iltimos, kuting...",
+                                parse_mode="Markdown"
+                            )
+                        except:
+                            pass  # Игнорируем ошибки обновления прогресса
         
         except Exception as main_error:
             logger.error(f"Основная ошибка при удалении сообщений: {main_error}")
@@ -7077,3 +7140,104 @@ async def delete_msgs_pagination_callback(callback_query: types.CallbackQuery, s
     except Exception as e:
         logger.error(f"Ошибка при пагинации delete_msgs: {e}")
         await callback_query.answer(f"❌ Xatolik: {e}", show_alert=True)
+
+
+# Команда для создания тестовых сообщений (только для супер-админов)
+@dp.message_handler(commands=['create_test_messages'])
+async def create_test_messages_command(message: types.Message):
+    """Создать тестовые сообщения в группе для проверки удаления"""
+    user_id = message.from_user.id
+    
+    # Проверяем права доступа - только супер-админы
+    if user_id not in SUPER_ADMIN_IDS:
+        await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat super-adminlar foydalana oladi.", parse_mode="Markdown")
+        return
+    
+    # Парсим аргументы: /create_test_messages <group_id> [count]
+    args = message.text.split()
+    if len(args) < 2:
+        await message.answer(
+            "❌ **Noto'g'ri format!**\n\n"
+            "**Foydalanish:** `/create_test_messages <group_id> [count]`\n"
+            "**Misollar:**\n"
+            "• `/create_test_messages -1001234567890` - 5 ta test xabar\n"
+            "• `/create_test_messages -1001234567890 10` - 10 ta test xabar",
+            parse_mode="Markdown"
+        )
+        return
+    
+    try:
+        group_id = int(args[1])
+        count = int(args[2]) if len(args) > 2 else 5
+        
+        if count < 1 or count > 20:
+            await message.answer("❌ **Xabarlar soni 1 dan 20 gacha bo'lishi kerak!**")
+            return
+        
+        # Проверяем, что группа существует в базе данных
+        group_info = db.get_group_by_id(group_id)
+        if not group_info:
+            await message.answer(
+                "❌ **Guruh topilmadi!**\n\n"
+                "Kiritilgan ID bilan guruh ma'lumotlar bazasida mavjud emas."
+            )
+            return
+        
+        group_name = group_info[1] if group_info[1] else "Noma'lum guruh"
+        
+        # Создаем тестовые сообщения
+        sent_count = 0
+        failed_count = 0
+        from loader import bot
+        
+        await message.answer(
+            f"🔄 **Test xabarlar yaratilmoqda...**\n\n"
+            f"📱 **Guruh:** {group_name}\n"
+            f"🆔 **ID:** `{group_id}`\n"
+            f"📊 **Soni:** {count} ta xabar\n\n"
+            f"Iltimos, kuting...",
+            parse_mode="Markdown"
+        )
+        
+        for i in range(1, count + 1):
+            try:
+                test_message = f"🧪 **Test xabar #{i}**\n\n" \
+                              f"📅 **Sana:** {datetime.now().strftime('%d.%m.%Y %H:%M:%S')}\n" \
+                              f"🤖 **Bot:** Test rejimida\n" \
+                              f"👤 **Yuboruvchi:** Super Admin\n\n" \
+                              f"Bu xabar test maqsadida yaratilgan va keyinchalik o'chirilishi mumkin."
+                
+                sent_msg = await send_and_save_message(bot, group_id, test_message, parse_mode="Markdown")
+                sent_count += 1
+                logger.info(f"Создано тестовое сообщение {i}/{count} в группе {group_id}, ID: {sent_msg.message_id}")
+                
+                # Небольшая пауза между отправками
+                await asyncio.sleep(0.5)
+                
+            except Exception as e:
+                failed_count += 1
+                logger.error(f"Ошибка при создании тестового сообщения {i}: {e}")
+                continue
+        
+        await message.answer(
+            f"✅ **Test xabarlar yaratildi!**\n\n"
+            f"📱 **Guruh:** {group_name}\n"
+            f"🆔 **ID:** `{group_id}`\n\n"
+            f"📊 **Natijalar:**\n"
+            f"• Yaratilgan: **{sent_count}** ta\n"
+            f"• Xatolik: **{failed_count}** ta\n"
+            f"• Jami: **{count}** ta\n\n"
+            f"💡 **Eslatma:** Endi `/delete_bot_messages` buyrug'i bilan ushbu xabarlarni o'chirishni sinab ko'ring.",
+            parse_mode="Markdown"
+        )
+        
+    except ValueError:
+        await message.answer(
+            "❌ **Noto'g'ri format!**\n\n"
+            "Guruh ID va xabarlar soni raqam bo'lishi kerak.\n"
+            "Masalan: `/create_test_messages -1001234567890 5`",
+            parse_mode="Markdown"
+        )
+    except Exception as e:
+        logger.error(f"Ошибка при создании тестовых сообщений: {e}")
+        await message.answer("❌ **Xatolik yuz berdi!**")

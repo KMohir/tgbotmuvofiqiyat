@@ -55,6 +55,7 @@ class Database:
             self.conn.autocommit = True
             self.create_tables()
             self.create_security_tables()  # Создать таблицы безопасности
+            self.create_bot_messages_table()  # Создать таблицу для отслеживания сообщений бота
             # self.migrate_to_alternating_system()  # ОТКЛЮЧЕНО: Больше не используем систему чередования
         except Exception as e:
             logger.error(f"Ошибка при инициализации базы данных: {e}")
@@ -1917,6 +1918,112 @@ class Database:
             
         except Exception as e:
             logger.error(f"Ошибка при автоматическом отзыве доступа: {e}")
+            self.conn.rollback()
+            return 0
+
+    def create_bot_messages_table(self):
+        """Создать таблицу для отслеживания сообщений бота"""
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS bot_messages (
+                    id SERIAL PRIMARY KEY,
+                    chat_id BIGINT NOT NULL,
+                    message_id INTEGER NOT NULL,
+                    sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    message_type TEXT DEFAULT 'general'
+                )
+            """)
+            # Создаем индекс отдельно
+            cursor.execute("""
+                CREATE INDEX IF NOT EXISTS idx_bot_messages_chat_sent 
+                ON bot_messages (chat_id, sent_at DESC)
+            """)
+            self.conn.commit()
+            cursor.close()
+            logger.info("Таблица bot_messages создана/проверена")
+            return True
+        except Exception as e:
+            logger.error(f"Ошибка при создании таблицы bot_messages: {e}")
+            self.conn.rollback()
+            return False
+
+    def save_bot_message(self, chat_id: int, message_id: int, message_type: str = 'general'):
+        """Сохранить ID отправленного ботом сообщения"""
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute("""
+                INSERT INTO bot_messages (chat_id, message_id, message_type)
+                VALUES (%s, %s, %s)
+            """, (chat_id, message_id, message_type))
+            self.conn.commit()
+            cursor.close()
+            logger.debug(f"Сохранено сообщение бота {message_id} в группе {chat_id}")
+            return True
+        except Exception as e:
+            logger.error(f"Ошибка при сохранении сообщения бота: {e}")
+            self.conn.rollback()
+            return False
+
+    def get_recent_bot_messages(self, chat_id: int, limit: int = 10):
+        """Получить последние ID сообщений бота в группе"""
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute("""
+                SELECT message_id 
+                FROM bot_messages 
+                WHERE chat_id = %s 
+                ORDER BY sent_at DESC 
+                LIMIT %s
+            """, (chat_id, limit))
+            result = cursor.fetchall()
+            cursor.close()
+            
+            # Возвращаем список ID сообщений
+            message_ids = [row[0] for row in result]
+            logger.info(f"Получено {len(message_ids)} ID сообщений бота для группы {chat_id}")
+            return message_ids
+        except Exception as e:
+            logger.error(f"Ошибка при получении сообщений бота: {e}")
+            return []
+
+    def clean_old_bot_messages(self, days: int = 7):
+        """Очистить старые записи сообщений бота (старше указанного количества дней)"""
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute("""
+                DELETE FROM bot_messages 
+                WHERE sent_at < NOW() - INTERVAL '%s days'
+            """, (days,))
+            deleted_count = cursor.rowcount
+            self.conn.commit()
+            cursor.close()
+            logger.info(f"Удалено {deleted_count} старых записей сообщений бота")
+            return deleted_count
+        except Exception as e:
+            logger.error(f"Ошибка при очистке старых сообщений бота: {e}")
+            self.conn.rollback()
+            return 0
+
+    def delete_bot_messages_from_db(self, chat_id: int, message_ids: list):
+        """Удалить записи о сообщениях бота из базы данных после их удаления"""
+        try:
+            if not message_ids:
+                return 0
+                
+            cursor = self.conn.cursor()
+            placeholders = ','.join(['%s'] * len(message_ids))
+            cursor.execute(f"""
+                DELETE FROM bot_messages 
+                WHERE chat_id = %s AND message_id IN ({placeholders})
+            """, [chat_id] + message_ids)
+            deleted_count = cursor.rowcount
+            self.conn.commit()
+            cursor.close()
+            logger.info(f"Удалено {deleted_count} записей сообщений бота из базы данных")
+            return deleted_count
+        except Exception as e:
+            logger.error(f"Ошибка при удалении записей сообщений бота: {e}")
             self.conn.rollback()
             return 0
 
