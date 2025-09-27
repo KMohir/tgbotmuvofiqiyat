@@ -7329,3 +7329,61 @@ async def test_auto_season_switch_command(message: types.Message):
     except Exception as e:
         logger.error(f"Ошибка при тестировании автопереключения сезонов: {e}")
         await message.answer("❌ **Xatolik yuz berdi!**")
+
+
+# Команда для просмотра статистики сезонов (только для супер-админов)
+@dp.message_handler(commands=['seasons_stats'])
+async def seasons_stats_command(message: types.Message):
+    """Показать статистику сезонов для всех проектов"""
+    user_id = message.from_user.id
+    
+    # Проверяем права доступа - только супер-админы
+    if user_id not in SUPER_ADMIN_IDS:
+        await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat super-adminlar foydalana oladi.", parse_mode="Markdown")
+        return
+    
+    try:
+        # Получаем сезоны для каждого проекта
+        centris_seasons = db.get_seasons_by_project("centris")
+        golden_seasons = db.get_seasons_by_project("golden")
+        
+        response = "📊 **Loyihalar bo'yicha sezonlar statistikasi**\n\n"
+        
+        # Centris Towers
+        response += f"🏢 **Centris Towers:**\n"
+        response += f"• Jami sezonlar: **{len(centris_seasons)}** ta\n"
+        if centris_seasons:
+            response += f"• Sezonlar ro'yxati:\n"
+            for i, (season_id, season_name) in enumerate(centris_seasons, 1):
+                response += f"  {i}. ID:`{season_id}` - {season_name[:50]}{'...' if len(season_name) > 50 else ''}\n"
+        else:
+            response += f"• ❌ Hech qanday sezon topilmadi\n"
+        
+        response += f"\n"
+        
+        # Golden Lake  
+        response += f"🌊 **Golden Lake:**\n"
+        response += f"• Jami sezonlar: **{len(golden_seasons)}** ta\n"
+        if golden_seasons:
+            response += f"• Sezonlar ro'yxati:\n"
+            for i, (season_id, season_name) in enumerate(golden_seasons, 1):
+                response += f"  {i}. ID:`{season_id}` - {season_name[:50]}{'...' if len(season_name) > 50 else ''}\n"
+        else:
+            response += f"• ❌ Hech qanday sezon topilmadi\n"
+        
+        response += f"\n📋 **Avtomatik almashtirish tartibi:**\n"
+        response += f"🏢 **Centris:** Sezon 1 → 2 → 3 → 4 → 5 → 6 → 1 → ...\n"
+        response += f"🌊 **Golden:** Sezon 1 → 2 → 3 → 4 → 1 → ...\n\n"
+        response += f"💡 **Eslatma:** Agar sezonlar soni ko'rsatilganidan kam bo'lsa, yangi sezonlar qo'shish kerak."
+        
+        # Разбиваем на части если слишком длинное
+        if len(response) > 4096:
+            parts = [response[i:i+4096] for i in range(0, len(response), 4096)]
+            for i, part in enumerate(parts):
+                await message.answer(f"📊 **Qism {i+1}/{len(parts)}:**\n\n{part}", parse_mode="Markdown")
+        else:
+            await message.answer(response, parse_mode="Markdown")
+        
+    except Exception as e:
+        logger.error(f"Ошибка при получении статистики сезонов: {e}")
+        await message.answer("❌ **Xatolik yuz berdi!**")

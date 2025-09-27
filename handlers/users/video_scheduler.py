@@ -347,12 +347,60 @@ async def send_group_video_new(chat_id: int, project: str, season_id: int = None
                         new_season_id = new_settings[7]  # centris_season_id
                         if new_season_id:
                             logger.info(f"🚀 Отправляем первое видео нового сезона {new_season_id} проекта {project}")
-                            return await send_group_video_new(chat_id, project, new_season_id, 1)
+                            
+                            # Отправляем первое видео нового сезона
+                            from loader import bot
+                            new_season_videos = db.get_videos_by_season(new_season_id)
+                            if new_season_videos:
+                                first_video = new_season_videos[0]  # Первое видео
+                                url, title, position = first_video
+                                
+                                message_id = int(url.split("/")[-1])
+                                await bot.copy_message(
+                                    chat_id=chat_id,
+                                    from_chat_id=-1002550852551,
+                                    message_id=message_id,
+                                    protect_content=True
+                                )
+                                
+                                # Отмечаем как просмотренное
+                                db.mark_group_video_as_viewed_detailed_by_project(chat_id, new_season_id, position, project_for_db)
+                                
+                                # Обновляем start_video на следующую позицию
+                                db.set_group_video_start(chat_id, project_for_db, new_season_id, position + 1)
+                                
+                                logger.info(f"✅ Отправлено первое видео нового сезона {new_season_id}: {title}")
+                                return True
+                            
                     elif project_for_db == "golden" and new_settings[3]:  # golden_enabled
                         new_season_id = new_settings[8]  # golden_season_id
                         if new_season_id:
                             logger.info(f"🚀 Отправляем первое видео нового сезона {new_season_id} проекта {project}")
-                            return await send_group_video_new(chat_id, project, new_season_id, 1)
+                            
+                            # Отправляем первое видео нового сезона
+                            from loader import bot
+                            new_season_videos = db.get_videos_by_season(new_season_id)
+                            if new_season_videos:
+                                first_video = new_season_videos[0]  # Первое видео
+                                url, title, position = first_video
+                                
+                                message_id = int(url.split("/")[-1])
+                                await bot.copy_message(
+                                    chat_id=chat_id,
+                                    from_chat_id=-1002550852551,
+                                    message_id=message_id,
+                                    protect_content=True
+                                )
+                                
+                                # Отмечаем как просмотренное
+                                db.mark_group_video_as_viewed_detailed_by_project(chat_id, new_season_id, position, project_for_db)
+                                
+                                # Обновляем start_video на следующую позицию
+                                db.set_group_video_start(chat_id, project_for_db, new_season_id, position + 1)
+                                
+                                logger.info(f"✅ Отправлено первое видео нового сезона {new_season_id}: {title}")
+                                return True
+                                
             except Exception as e:
                 logger.error(f"Ошибка при отправке первого видео нового сезона: {e}")
                 
