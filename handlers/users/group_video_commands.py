@@ -7387,3 +7387,115 @@ async def seasons_stats_command(message: types.Message):
     except Exception as e:
         logger.error(f"Ошибка при получении статистики сезонов: {e}")
         await message.answer("❌ **Xatolik yuz berdi!**")
+
+
+# Команда для тестирования отправки видео (только для супер-админов)
+@dp.message_handler(commands=['test_send_video'])
+async def test_send_video_command(message: types.Message):
+    """Тестировать отправку видео в группу"""
+    user_id = message.from_user.id
+    
+    # Проверяем права доступа - только супер-админы
+    if user_id not in SUPER_ADMIN_IDS:
+        await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat super-adminlar foydalana oladi.", parse_mode="Markdown")
+        return
+    
+    # Парсим аргументы: /test_send_video <group_id>
+    args = message.text.split()
+    if len(args) < 2:
+        await message.answer(
+            "❌ **Noto'g'ri format!**\n\n"
+            "**Foydalanish:** `/test_send_video <group_id>`\n"
+            "**Misol:** `/test_send_video -1001234567890`",
+            parse_mode="Markdown"
+        )
+        return
+    
+    try:
+        group_id = int(args[1])
+        
+        # Проверяем, что группа существует в базе данных
+        group_info = db.get_group_by_id(group_id)
+        if not group_info:
+            await message.answer(
+                "❌ **Guruh topilmadi!**\n\n"
+                "Kiritilgan ID bilan guruh ma'lumotlar bazasida mavjud emas."
+            )
+            return
+        
+        group_name = group_info[1] if group_info[1] else "Noma'lum guruh"
+        
+        # Получаем настройки группы
+        settings = db.get_group_video_settings(group_id)
+        if not settings:
+            await message.answer(
+                f"❌ **Guruh sozlanmagan!**\n\n"
+                f"📱 Guruh: {group_name}\n"
+                f"🆔 ID: `{group_id}`\n\n"
+                f"Bu guruh uchun video sozlamalari topilmadi.\n"
+                f"Avval `/set_group_video` buyrug'i bilan sozlang."
+            )
+            return
+        
+        centris_enabled, centris_season_id, centris_start_video, golden_enabled, golden_season_id, golden_start_video, send_times = settings
+        
+        await message.answer(
+            f"🧪 **Video yuborish testi**\n\n"
+            f"📱 **Guruh:** {group_name}\n"
+            f"🆔 **ID:** `{group_id}`\n\n"
+            f"📊 **Sozlamalar:**\n"
+            f"🏢 **Centris:** {'✅ Yoqilgan' if centris_enabled else '❌ O\\`chirilgan'}\n"
+            f"  • Sezon ID: `{centris_season_id}`\n"
+            f"  • Start video: `{centris_start_video}`\n\n"
+            f"🌊 **Golden:** {'✅ Yoqilgan' if golden_enabled else '❌ O\\`chirilgan'}\n"
+            f"  • Sezon ID: `{golden_season_id}`\n"
+            f"  • Start video: `{golden_start_video}`\n\n"
+            f"🚀 **Video yuborishni boshlayapman...**",
+            parse_mode="Markdown"
+        )
+        
+        # Тестируем отправку видео
+        from handlers.users.video_scheduler import send_group_video_by_settings
+        
+        try:
+            result = await send_group_video_by_settings(group_id)
+            
+            if result:
+                await message.answer(
+                    f"✅ **Video muvaffaqiyatli yuborildi!**\n\n"
+                    f"📱 **Guruh:** {group_name}\n"
+                    f"🆔 **ID:** `{group_id}`\n\n"
+                    f"🎉 **Test muvaffaqiyatli tugadi!**"
+                )
+            else:
+                await message.answer(
+                    f"⚠️ **Video yuborilmadi**\n\n"
+                    f"📱 **Guruh:** {group_name}\n"
+                    f"🆔 **ID:** `{group_id}`\n\n"
+                    f"📋 **Mumkin bo'lgan sabablar:**\n"
+                    f"• Barcha videolar ko'rilgan\n"
+                    f"• Loyihalar o'chirilgan\n"
+                    f"• Sezon ID noto'g'ri\n"
+                    f"• Video ma'lumotlar bazasida yo'q\n\n"
+                    f"💡 **Tekshirib ko'ring:** loglarni va sozlamalarni"
+                )
+        except Exception as e:
+            logger.error(f"Ошибка при тестировании отправки видео: {e}")
+            await message.answer(
+                f"❌ **Xatolik yuz berdi!**\n\n"
+                f"📱 **Guruh:** {group_name}\n"
+                f"🆔 **ID:** `{group_id}`\n"
+                f"🔥 **Xatolik:** `{str(e)}`\n\n"
+                f"Loglarni tekshiring va qaytadan urinib ko'ring."
+            )
+        
+    except ValueError:
+        await message.answer(
+            "❌ **Noto'g'ri format!**\n\n"
+            "Guruh ID raqam bo'lishi kerak.\n"
+            "Masalan: `/test_send_video -1001234567890`",
+            parse_mode="Markdown"
+        )
+    except Exception as e:
+        logger.error(f"Ошибка при тестировании отправки видео: {e}")
+        await message.answer("❌ **Xatolik yuz berdi!**")

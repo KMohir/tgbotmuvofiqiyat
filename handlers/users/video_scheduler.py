@@ -176,9 +176,9 @@ async def notify_superadmins_season_auto_switched(chat_id: int, old_season_id: i
         project_for_db = "golden" if project == "golden_lake" else project
         
         if project_for_db == "centris" and settings:
-            new_season_id = settings[7]  # centris_season_id
+            new_season_id = settings[1]  # centris_season_id
         elif project_for_db == "golden" and settings:
-            new_season_id = settings[8]  # golden_season_id
+            new_season_id = settings[4]  # golden_season_id
         else:
             new_season_id = None
             
@@ -343,8 +343,8 @@ async def send_group_video_new(chat_id: int, project: str, season_id: int = None
                 # Получаем новые настройки после переключения
                 new_settings = db.get_group_video_settings(chat_id)
                 if new_settings:
-                    if project_for_db == "centris" and new_settings[1]:  # centris_enabled
-                        new_season_id = new_settings[7]  # centris_season_id
+                    if project_for_db == "centris" and new_settings[0]:  # centris_enabled
+                        new_season_id = new_settings[1]  # centris_season_id
                         if new_season_id:
                             logger.info(f"🚀 Отправляем первое видео нового сезона {new_season_id} проекта {project}")
                             
@@ -373,7 +373,7 @@ async def send_group_video_new(chat_id: int, project: str, season_id: int = None
                                 return True
                             
                     elif project_for_db == "golden" and new_settings[3]:  # golden_enabled
-                        new_season_id = new_settings[8]  # golden_season_id
+                        new_season_id = new_settings[4]  # golden_season_id
                         if new_season_id:
                             logger.info(f"🚀 Отправляем первое видео нового сезона {new_season_id} проекта {project}")
                             
@@ -404,6 +404,7 @@ async def send_group_video_new(chat_id: int, project: str, season_id: int = None
             except Exception as e:
                 logger.error(f"Ошибка при отправке первого видео нового сезона: {e}")
                 
+            # После успешной отправки первого видео нового сезона, возвращаем True
             return True
         else:
             logger.warning(f"⚠️ Не удалось автоматически переключиться на следующий сезон для группы {chat_id}")
@@ -412,9 +413,6 @@ async def send_group_video_new(chat_id: int, project: str, season_id: int = None
             await notify_superadmins_season_completed(chat_id, season_id, project)
             
             return False
-        
-        logger.info(f"Нет видео для отправки в проекте {project}")
-        return False
     except Exception as e:
         logger.error(f"Ошибка в send_group_video_new: {e}")
         return False
@@ -509,15 +507,15 @@ async def send_group_video_by_settings(chat_id: int):
     if not settings or (not settings[0] and not settings[4]):
         logger.info(f"Группа {chat_id} не настроена для рассылки видео")
         return False
-    centris_enabled, centris_season_id, centris_start_video, golden_enabled, golden_season_id, golden_start_video = settings
+    centris_enabled, centris_season_id, centris_start_video, golden_enabled, golden_season_id, golden_start_video, send_times = settings
     sent = False
     if centris_enabled and centris_season_id:
         # Отправить видео Centris
-        res = await send_group_video_new(chat_id, "centris", centris_season_id)
+        res = await send_group_video_new(chat_id, "centris", centris_season_id, centris_start_video)
         sent = sent or res
     if golden_enabled and golden_season_id:
-        # Golden Lake — всегда первый сезон (или из настроек)
-        res = await send_group_video_new(chat_id, "golden_lake", golden_season_id)
+        # Отправить видео Golden Lake
+        res = await send_group_video_new(chat_id, "golden_lake", golden_season_id, golden_start_video)
         sent = sent or res
     return sent
 
