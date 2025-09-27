@@ -2027,6 +2027,107 @@ class Database:
             self.conn.rollback()
             return 0
 
+    def get_next_season_in_project(self, current_season_id: int, project: str):
+        """Получить следующий сезон в проекте после текущего"""
+        try:
+            cursor = self.conn.cursor()
+            
+            # Получаем все сезоны проекта в порядке
+            if project == "centris":
+                cursor.execute("""
+                    SELECT id, name FROM seasons 
+                    WHERE project = %s 
+                    ORDER BY 
+                        CASE 
+                            WHEN name = 'Яқинлар I Ташриф Centris Towers' THEN 1 
+                            ELSE 0 
+                        END,
+                        id
+                """, (project,))
+            else:
+                cursor.execute("SELECT id, name FROM seasons WHERE project = %s ORDER BY id", (project,))
+            
+            all_seasons = cursor.fetchall()
+            cursor.close()
+            
+            # Находим текущий сезон и возвращаем следующий
+            for i, (season_id, season_name) in enumerate(all_seasons):
+                if season_id == current_season_id:
+                    if i + 1 < len(all_seasons):
+                        # Есть следующий сезон
+                        next_season = all_seasons[i + 1]
+                        logger.info(f"Найден следующий сезон для {project}: {current_season_id} → {next_season[0]}")
+                        return next_season
+                    else:
+                        # Это последний сезон, возвращаем первый (цикличность)
+                        first_season = all_seasons[0] if all_seasons else None
+                        if first_season:
+                            logger.info(f"Достигнут конец проекта {project}, переходим к первому сезону: {current_season_id} → {first_season[0]}")
+                        return first_season
+            
+            # Если текущий сезон не найден, возвращаем первый
+            first_season = all_seasons[0] if all_seasons else None
+            logger.warning(f"Сезон {current_season_id} не найден в проекте {project}, возвращаем первый сезон")
+            return first_season
+            
+        except Exception as e:
+            logger.error(f"Ошибка при получении следующего сезона: {e}")
+            return None
+
+    def auto_switch_to_next_season(self, chat_id: int, project: str, current_season_id: int):
+        """Автоматически переключиться на следующий сезон в проекте"""
+        try:
+            # Получаем следующий сезон
+            next_season = self.get_next_season_in_project(current_season_id, project)
+            
+            if not next_season:
+                logger.error(f"Не удалось найти следующий сезон для проекта {project}")
+                return False
+            
+            next_season_id = next_season[0]
+            next_season_name = next_season[1]
+            
+            # Обновляем настройки группы
+            cursor = self.conn.cursor()
+            
+            project_for_db = "golden" if project == "golden_lake" or project == "golden" else project
+            
+            if project_for_db == "centris":
+                cursor.execute("""
+                    UPDATE group_video_settings 
+                    SET centris_season_id = %s, centris_start_video = 1
+                    WHERE chat_id = %s
+                """, (next_season_id, str(chat_id)))
+            elif project_for_db == "golden":
+                cursor.execute("""
+                    UPDATE group_video_settings 
+                    SET golden_season_id = %s, golden_start_video = 1
+                    WHERE chat_id = %s
+                """, (next_season_id, str(chat_id)))
+            
+            self.conn.commit()
+            cursor.close()
+            
+            logger.info(f"✅ Группа {chat_id}: автоматически переключена на сезон {next_season_id} ({next_season_name}) в проекте {project}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Ошибка при автоматическом переключении сезона: {e}")
+            self.conn.rollback()
+            return False
+
+    def get_season_by_id(self, season_id: int):
+        """Получить информацию о сезоне по ID"""
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute("SELECT id, name, project FROM seasons WHERE id = %s", (season_id,))
+            result = cursor.fetchone()
+            cursor.close()
+            return result
+        except Exception as e:
+            logger.error(f"Ошибка при получении сезона {season_id}: {e}")
+            return None
+
 # create_security_tables метод уже определен в классе Database
 
 # Создание экземпляра базы данных

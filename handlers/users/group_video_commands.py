@@ -7218,3 +7218,114 @@ async def create_test_messages_command(message: types.Message):
     except Exception as e:
         logger.error(f"Ошибка при создании тестовых сообщений: {e}")
         await message.answer("❌ **Xatolik yuz berdi!**")
+
+
+# Команда для тестирования автопереключения сезонов (только для супер-админов)
+@dp.message_handler(commands=['test_auto_season_switch'])
+async def test_auto_season_switch_command(message: types.Message):
+    """Тестировать автоматическое переключение сезонов"""
+    user_id = message.from_user.id
+    
+    # Проверяем права доступа - только супер-админы
+    if user_id not in SUPER_ADMIN_IDS:
+        await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat super-adminlar foydalana oladi.", parse_mode="Markdown")
+        return
+    
+    # Парсим аргументы: /test_auto_season_switch <group_id> <project> <current_season_id>
+    args = message.text.split()
+    if len(args) < 4:
+        await message.answer(
+            "❌ **Noto'g'ri format!**\n\n"
+            "**Foydalanish:** `/test_auto_season_switch <group_id> <project> <current_season_id>`\n"
+            "**Misollar:**\n"
+            "• `/test_auto_season_switch -1001234567890 centris 1`\n"
+            "• `/test_auto_season_switch -1001234567890 golden 5`\n\n"
+            "**Loyihalar:** `centris` yoki `golden`",
+            parse_mode="Markdown"
+        )
+        return
+    
+    try:
+        group_id = int(args[1])
+        project = args[2].lower()
+        current_season_id = int(args[3])
+        
+        if project not in ['centris', 'golden']:
+            await message.answer("❌ **Loyiha noto'g'ri!**\n\nFaqat `centris` yoki `golden` bo'lishi mumkin.")
+            return
+        
+        # Проверяем, что группа существует в базе данных
+        group_info = db.get_group_by_id(group_id)
+        if not group_info:
+            await message.answer(
+                "❌ **Guruh topilmadi!**\n\n"
+                "Kiritilgan ID bilan guruh ma'lumotlar bazasida mavjud emas."
+            )
+            return
+        
+        group_name = group_info[1] if group_info[1] else "Noma'lum guruh"
+        
+        # Получаем информацию о текущем сезоне
+        current_season_info = db.get_season_by_id(current_season_id)
+        if not current_season_info:
+            await message.answer(f"❌ **Sezon topilmadi!**\n\nID {current_season_id} bilan sezon mavjud emas.")
+            return
+        
+        current_season_name = current_season_info[1]
+        
+        # Пытаемся найти следующий сезон
+        next_season = db.get_next_season_in_project(current_season_id, project)
+        
+        if not next_season:
+            await message.answer(f"❌ **Keyingi sezon topilmadi!**\n\nLoyiha {project} da sezon {current_season_id} dan keyin sezon yo'q.")
+            return
+        
+        next_season_id, next_season_name = next_season
+        
+        # Показываем предварительную информацию
+        await message.answer(
+            f"🔄 **Avtomatik sezon almashtirish testi**\n\n"
+            f"📱 **Guruh:** {group_name}\n"
+            f"🆔 **ID:** `{group_id}`\n"
+            f"🎬 **Loyiha:** {project.title()}\n\n"
+            f"📊 **Sezon almashtirish:**\n"
+            f"• Hozirgi sezon: `{current_season_id}` - {current_season_name}\n"
+            f"• Keyingi sezon: `{next_season_id}` - {next_season_name}\n\n"
+            f"🚀 **Avtomatik almashtirishni boshlayapman...**",
+            parse_mode="Markdown"
+        )
+        
+        # Выполняем автоматическое переключение
+        success = db.auto_switch_to_next_season(group_id, project, current_season_id)
+        
+        if success:
+            await message.answer(
+                f"✅ **Muvaffaqiyatli almashtirild!**\n\n"
+                f"📱 **Guruh:** {group_name}\n"
+                f"🆔 **ID:** `{group_id}`\n"
+                f"🎬 **Loyiha:** {project.title()}\n\n"
+                f"📊 **Natija:**\n"
+                f"• Sezon muvaffaqiyatli almashtirildi\n"
+                f"• Yangi sezon: `{next_season_id}` - {next_season_name}\n"
+                f"• Start video: `1` (birinchi video)\n\n"
+                f"🎉 **Test muvaffaqiyatli tugadi!**\n"
+                f"📹 **Keyingi video yuborish vaqtida yangi sezondan boshlanadi.**",
+                parse_mode="Markdown"
+            )
+        else:
+            await message.answer(
+                f"❌ **Almashtirish muvaffaqiyatsiz!**\n\n"
+                f"Ma'lumotlar bazasida xatolik yuz berdi.\n"
+                f"Loglarni tekshiring."
+            )
+        
+    except ValueError:
+        await message.answer(
+            "❌ **Noto'g'ri format!**\n\n"
+            "Guruh ID va sezon ID raqam bo'lishi kerak.\n"
+            "Masalan: `/test_auto_season_switch -1001234567890 centris 1`",
+            parse_mode="Markdown"
+        )
+    except Exception as e:
+        logger.error(f"Ошибка при тестировании автопереключения сезонов: {e}")
+        await message.answer("❌ **Xatolik yuz berdi!**")

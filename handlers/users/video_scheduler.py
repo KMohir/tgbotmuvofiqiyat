@@ -159,6 +159,64 @@ async def notify_superadmins_season_completed(chat_id: int, season_id: int, proj
     except Exception as e:
         logger.error(f"Ошибка при уведомлении админов о завершении сезона: {e}")
 
+
+# --- Функция уведомления о автоматическом переключении сезона ---
+async def notify_superadmins_season_auto_switched(chat_id: int, old_season_id: int, project: str):
+    """Уведомить супер-админов об автоматическом переключении на следующий сезон"""
+    try:
+        from loader import dp
+        from data.config import ADMINS
+        
+        # Получаем информацию о группе
+        group_info = db.get_group_by_id(chat_id)
+        group_name = group_info[1] if group_info and group_info[1] else "Noma'lum guruh"
+        
+        # Получаем информацию о новом сезоне
+        settings = db.get_group_video_settings(chat_id)
+        project_for_db = "golden" if project == "golden_lake" else project
+        
+        if project_for_db == "centris" and settings:
+            new_season_id = settings[7]  # centris_season_id
+        elif project_for_db == "golden" and settings:
+            new_season_id = settings[8]  # golden_season_id
+        else:
+            new_season_id = None
+            
+        # Получаем название нового сезона
+        new_season_name = "Noma'lum sezon"
+        if new_season_id:
+            season_info = db.get_season_by_id(new_season_id)
+            if season_info:
+                new_season_name = season_info[1]
+        
+        project_name = "Centris Towers" if project_for_db == "centris" else "Golden Lake"
+        
+        message = f"🔄 **Avtomatik sezon almashtirish**\n\n" \
+                 f"📱 **Guruh:** {group_name}\n" \
+                 f"🆔 **ID:** `{chat_id}`\n" \
+                 f"🎬 **Loyiha:** {project_name}\n\n" \
+                 f"📊 **O'zgarishlar:**\n" \
+                 f"• Eski sezon ID: `{old_season_id}`\n" \
+                 f"• Yangi sezon ID: `{new_season_id}`\n" \
+                 f"• Yangi sezon: {new_season_name}\n\n" \
+                 f"✅ **Guruh avtomatik ravishda keyingi sezonga o'tdi!**\n" \
+                 f"🚀 **Birinchi video tez orada yuboriladi.**"
+        
+        # Отправляем уведомления всем админам
+        success_count = 0
+        for admin_id in ADMINS:
+            try:
+                await dp.bot.send_message(admin_id, message, parse_mode="Markdown")
+                success_count += 1
+                logger.info(f"✅ Уведомление о автопереключении сезона отправлено админу {admin_id}")
+            except Exception as e:
+                logger.warning(f"❌ Не удалось отправить уведомление админу {admin_id}: {e}")
+        
+        logger.info(f"🔄 Уведомления об автопереключении сезона {old_season_id}→{new_season_id} в группе {chat_id} отправлены {success_count} админам")
+        
+    except Exception as e:
+        logger.error(f"Ошибка при уведомлении админов об автопереключении сезона: {e}")
+
 # --- Новая функция рассылки для групп ---
 async def send_group_video_new(chat_id: int, project: str, season_id: int = None, start_video: int = None):
     """Отправить новое видео в группу согласно настройкам"""
@@ -269,12 +327,43 @@ async def send_group_video_new(chat_id: int, project: str, season_id: int = None
         
         # Если все видео выбранного сезона просмотрены - сезон завершен
         logger.info(f"🔄 Все видео выбранного сезона {season_id} просмотрены для проекта {project}")
-        logger.info(f"ℹ️ Чтобы начать следующий сезон, используйте команду /set_group_video")
         
-        # Уведомляем супер-админов о завершении сезона
-        await notify_superadmins_season_completed(chat_id, season_id, project)
+        # Пытаемся автоматически переключиться на следующий сезон
+        project_for_db = "golden" if project == "golden_lake" else project
+        success = db.auto_switch_to_next_season(chat_id, project_for_db, season_id)
         
-        return False
+        if success:
+            logger.info(f"🎉 Группа {chat_id}: автоматически переключена на следующий сезон в проекте {project}")
+            
+            # Уведомляем супер-админов о переключении
+            await notify_superadmins_season_auto_switched(chat_id, season_id, project)
+            
+            # Сразу пробуем отправить первое видео нового сезона
+            try:
+                # Получаем новые настройки после переключения
+                new_settings = db.get_group_video_settings(chat_id)
+                if new_settings:
+                    if project_for_db == "centris" and new_settings[1]:  # centris_enabled
+                        new_season_id = new_settings[7]  # centris_season_id
+                        if new_season_id:
+                            logger.info(f"🚀 Отправляем первое видео нового сезона {new_season_id} проекта {project}")
+                            return await send_group_video_new(chat_id, project, new_season_id, 1)
+                    elif project_for_db == "golden" and new_settings[3]:  # golden_enabled
+                        new_season_id = new_settings[8]  # golden_season_id
+                        if new_season_id:
+                            logger.info(f"🚀 Отправляем первое видео нового сезона {new_season_id} проекта {project}")
+                            return await send_group_video_new(chat_id, project, new_season_id, 1)
+            except Exception as e:
+                logger.error(f"Ошибка при отправке первого видео нового сезона: {e}")
+                
+            return True
+        else:
+            logger.warning(f"⚠️ Не удалось автоматически переключиться на следующий сезон для группы {chat_id}")
+            
+            # Если автопереключение не удалось, уведомляем админов как раньше
+            await notify_superadmins_season_completed(chat_id, season_id, project)
+            
+            return False
         
         logger.info(f"Нет видео для отправки в проекте {project}")
         return False
