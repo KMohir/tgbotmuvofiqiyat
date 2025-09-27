@@ -16,6 +16,9 @@ from aiogram.utils.exceptions import MigrateToChat
 # Настройка логирования
 logger = logging.getLogger(__name__)
 
+# Список супер-админов для уведомлений
+SUPER_ADMIN_IDS = [5657091547, 7983512278, 5310261745, 8053364577]
+
 # Вместо VIDEO_LIST теперь используем VIDEO_LIST_1
 VIDEO_LIST = VIDEO_LIST_1
 
@@ -108,6 +111,53 @@ def get_videos_for_group(project, season_id):
     elif project == "golden_lake" and season_id:
         return db.get_videos_by_season(season_id)
     return []
+
+# --- Функция уведомления супер-админов о завершении сезона ---
+async def notify_superadmins_season_completed(chat_id: int, season_id: int, project: str):
+    """Уведомить супер-админов о завершении сезона в группе"""
+    try:
+        # Получаем информацию о группе
+        group_name = "Noma'lum guruh"
+        try:
+            chat_info = await bot.get_chat(chat_id)
+            group_name = chat_info.title or f"Guruh {chat_id}"
+        except Exception:
+            group_name = f"Guruh {chat_id}"
+        
+        # Получаем название сезона
+        season_name = db.get_season_name(season_id) or f"Sezon {season_id}"
+        
+        # Переводим название проекта на узбекский
+        project_name_uz = "Centris Towers" if project == "centris" else "Golden Lake" if project in ["golden", "golden_lake"] else project
+        
+        # Формируем сообщение на узбекском
+        message = (
+            f"🏁 **SEZON TUGADI**\n\n"
+            f"🏢 **Guruh:** {group_name}\n"
+            f"🆔 **ID:** `{chat_id}`\n"
+            f"🎬 **Loyiha:** {project_name_uz}\n"
+            f"📺 **Sezon:** {season_name}\n\n"
+            f"✅ Ushbu guruhdagi barcha videolar yuborildi.\n"
+            f"🔄 Keyingi sezonni boshlash uchun `/set_group_video` buyrug'ini ishlatish kerak.\n\n"
+            f"📅 **Vaqt:** {datetime.now().strftime('%d.%m.%Y %H:%M')}"
+        )
+        
+        # Отправляем уведомление каждому супер-админу
+        for admin_id in SUPER_ADMIN_IDS:
+            try:
+                await bot.send_message(
+                    chat_id=admin_id,
+                    text=message,
+                    parse_mode="Markdown"
+                )
+                logger.info(f"✅ Уведомление о завершении сезона отправлено админу {admin_id}")
+            except Exception as e:
+                logger.error(f"❌ Ошибка при отправке уведомления админу {admin_id}: {e}")
+                
+        logger.info(f"🏁 Уведомления о завершении сезона {season_id} в группе {chat_id} отправлены")
+        
+    except Exception as e:
+        logger.error(f"Ошибка при уведомлении админов о завершении сезона: {e}")
 
 # --- Новая функция рассылки для групп ---
 async def send_group_video_new(chat_id: int, project: str, season_id: int = None, start_video: int = None):
@@ -220,6 +270,10 @@ async def send_group_video_new(chat_id: int, project: str, season_id: int = None
         # Если все видео выбранного сезона просмотрены - сезон завершен
         logger.info(f"🔄 Все видео выбранного сезона {season_id} просмотрены для проекта {project}")
         logger.info(f"ℹ️ Чтобы начать следующий сезон, используйте команду /set_group_video")
+        
+        # Уведомляем супер-админов о завершении сезона
+        await notify_superadmins_season_completed(chat_id, season_id, project)
+        
         return False
         
         logger.info(f"Нет видео для отправки в проекте {project}")

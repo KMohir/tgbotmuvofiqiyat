@@ -11,8 +11,8 @@ import logging
 from datetime import datetime, timedelta
 
 # Импортируем состояния
-from handlers.users.group_video_states import GroupVideoStates
-from handlers.users.video_scheduler import schedule_single_group_jobs, schedule_group_jobs_v2
+from handlers.users.group_video_states import GroupVideoStates, DeleteBotMessagesStates
+from handlers.users.video_scheduler import schedule_single_group_jobs, schedule_group_jobs_v2, notify_superadmins_season_completed
 
 # Настройка логирования
 logger = logging.getLogger(__name__)
@@ -6637,3 +6637,443 @@ async def select_group_pagination_callback(callback_query: types.CallbackQuery, 
 async def page_info_callback(callback_query: types.CallbackQuery):
     """Обработчик для кнопки информации о странице"""
     await callback_query.answer("📄 Bu sahifa haqida ma'lumot", show_alert=False)
+
+
+# Команда для удаления последних сообщений бота в группе (только для супер-админов)
+@dp.message_handler(commands=['delete_bot_messages'])
+async def delete_bot_messages_command(message: types.Message, state: FSMContext):
+    """Удалить последние сообщения бота в группе"""
+    user_id = message.from_user.id
+    
+    # Проверяем права доступа - только супер-админы
+    if user_id not in SUPER_ADMIN_IDS:
+        await message.answer("❌ **Sizda bu buyruqni bajarish uchun ruxsat yo'q!**\n\nFaqat super-adminlar foydalana oladi.", parse_mode="Markdown")
+        return
+    
+    # Получаем список всех групп
+    groups = db.get_all_groups()
+    
+    if not groups:
+        await message.answer("❌ **Hech qanday guruh topilmadi!**\n\nAvval botni guruhlarga qo'shing.")
+        return
+    
+    # Создаем inline клавиатуру для выбора группы
+    keyboard = types.InlineKeyboardMarkup()
+    
+    # Показываем первые 10 групп на странице
+    page_size = 10
+    total_pages = (len(groups) - 1) // page_size + 1
+    current_page = 0
+    start_idx = current_page * page_size
+    end_idx = min(start_idx + page_size, len(groups))
+    
+    for i in range(start_idx, end_idx):
+        group = groups[i]
+        group_id = group[0]
+        group_name = group[1] if group[1] else "Noma'lum guruh"
+        
+        # Ограничиваем длину названия группы
+        if len(group_name) > 30:
+            group_name = group_name[:27] + "..."
+        
+        keyboard.add(types.InlineKeyboardButton(
+            text=f"📱 {group_name} (ID: {group_id})",
+            callback_data=f"delete_msgs_group_{group_id}"
+        ))
+    
+    # Добавляем кнопки навигации если нужно
+    nav_buttons = []
+    if current_page > 0:
+        nav_buttons.append(types.InlineKeyboardButton("⬅️ Oldingi", callback_data=f"delete_msgs_page_{current_page - 1}"))
+    
+    nav_buttons.append(types.InlineKeyboardButton(f"📄 {current_page + 1}/{total_pages}", callback_data="page_info"))
+    
+    if current_page < total_pages - 1:
+        nav_buttons.append(types.InlineKeyboardButton("Keyingi ➡️", callback_data=f"delete_msgs_page_{current_page + 1}"))
+    
+    if nav_buttons:
+        keyboard.row(*nav_buttons)
+    
+    # Добавляем кнопку для ввода ID вручную
+    keyboard.add(types.InlineKeyboardButton("🆔 Guruh ID ni qo'lda kiritish", callback_data="delete_msgs_manual_id"))
+    keyboard.add(types.InlineKeyboardButton("❌ Bekor qilish", callback_data="cancel_delete_msgs"))
+    
+    # Сохраняем список групп в состояние для пагинации
+    await state.update_data(groups=groups, current_page=current_page)
+    await DeleteBotMessagesStates.waiting_for_group_selection.set()
+    
+    await message.answer(
+        "🗑️ **Bot xabarlarini o'chirish**\n\n"
+        "📋 **Quyidagi guruhlardan birini tanlang:**\n\n"
+        "Yoki guruh ID sini qo'lda kiritishingiz mumkin.",
+        reply_markup=keyboard,
+        parse_mode="Markdown"
+    )
+
+
+# Обработчик выбора группы для удаления сообщений
+@dp.callback_query_handler(lambda c: c.data.startswith('delete_msgs_group_'), state=DeleteBotMessagesStates.waiting_for_group_selection)
+async def delete_msgs_select_group_callback(callback_query: types.CallbackQuery, state: FSMContext):
+    """Обработчик выбора группы для удаления сообщений"""
+    try:
+        group_id = int(callback_query.data.split('_')[-1])
+        
+        # Сохраняем выбранную группу
+        await state.update_data(selected_group_id=group_id)
+        
+        # Получаем информацию о группе
+        group_info = db.get_group_by_id(group_id)
+        group_name = group_info[1] if group_info and group_info[1] else "Noma'lum guruh"
+        
+        # Переходим к вводу количества сообщений
+        await DeleteBotMessagesStates.waiting_for_message_count.set()
+        
+        await safe_edit_text(callback_query,
+            f"🗑️ **Bot xabarlarini o'chirish**\n\n"
+            f"📱 **Tanlangan guruh:** {group_name}\n"
+            f"🆔 **Guruh ID:** `{group_id}`\n\n"
+            f"📊 **Nechta oxirgi xabarni o'chirish kerak?**\n\n"
+            f"Raqam kiriting (1-100 oralig'ida):",
+            parse_mode="Markdown"
+        )
+        
+    except Exception as e:
+        logger.error(f"Ошибка при выборе группы для удаления сообщений: {e}")
+        await callback_query.answer(f"❌ Xatolik: {e}", show_alert=True)
+
+
+# Обработчик для ручного ввода ID группы
+@dp.callback_query_handler(lambda c: c.data == 'delete_msgs_manual_id', state=DeleteBotMessagesStates.waiting_for_group_selection)
+async def delete_msgs_manual_id_callback(callback_query: types.CallbackQuery, state: FSMContext):
+    """Обработчик для ручного ввода ID группы"""
+    await safe_edit_text(callback_query,
+        "🆔 **Guruh ID ni kiriting**\n\n"
+        "Guruh ID sini kiriting (masalan: -1001234567890):\n\n"
+        "⚠️ **Diqqat:** ID aniq bo'lishi kerak!",
+        parse_mode="Markdown"
+    )
+
+
+# Обработчик ввода ID группы вручную
+@dp.message_handler(state=DeleteBotMessagesStates.waiting_for_group_selection)
+async def delete_msgs_manual_id_input(message: types.Message, state: FSMContext):
+    """Обработчик ввода ID группы вручную"""
+    try:
+        group_id = int(message.text.strip())
+        
+        # Проверяем, что группа существует в базе данных
+        group_info = db.get_group_by_id(group_id)
+        if not group_info:
+            await message.answer(
+                "❌ **Guruh topilmadi!**\n\n"
+                "Kiritilgan ID bilan guruh ma'lumotlar bazasida mavjud emas.\n"
+                "Iltimos, to'g'ri ID kiriting yoki ro'yxatdan tanlang.\n\n"
+                "Qaytadan urinish uchun /delete_bot_messages buyrug'ini ishlatng."
+            )
+            await state.finish()
+            return
+        
+        group_name = group_info[1] if group_info[1] else "Noma'lum guruh"
+        
+        # Сохраняем выбранную группу
+        await state.update_data(selected_group_id=group_id)
+        
+        # Переходим к вводу количества сообщений
+        await DeleteBotMessagesStates.waiting_for_message_count.set()
+        
+        await message.answer(
+            f"✅ **Guruh tanlandi**\n\n"
+            f"📱 **Guruh:** {group_name}\n"
+            f"🆔 **ID:** `{group_id}`\n\n"
+            f"📊 **Nechta oxirgi xabarni o'chirish kerak?**\n\n"
+            f"Raqam kiriting (1-100 oralig'ida):",
+            parse_mode="Markdown"
+        )
+        
+    except ValueError:
+        await message.answer(
+            "❌ **Noto'g'ri format!**\n\n"
+            "Iltimos, to'g'ri guruh ID sini kiriting.\n"
+            "Masalan: -1001234567890\n\n"
+            "Qaytadan urinish uchun /delete_bot_messages buyrug'ini ishlatng."
+        )
+        await state.finish()
+    except Exception as e:
+        logger.error(f"Ошибка при обработке ручного ввода ID группы: {e}")
+        await message.answer("❌ **Xatolik yuz berdi!**")
+        await state.finish()
+
+
+# Обработчик ввода количества сообщений для удаления
+@dp.message_handler(state=DeleteBotMessagesStates.waiting_for_message_count)
+async def delete_msgs_count_input(message: types.Message, state: FSMContext):
+    """Обработчик ввода количества сообщений для удаления"""
+    try:
+        message_count = int(message.text.strip())
+        
+        if message_count < 1 or message_count > 100:
+            await message.answer(
+                "❌ **Noto'g'ri son!**\n\n"
+                "Xabarlar soni 1 dan 100 gacha bo'lishi kerak.\n"
+                "Iltimos, qaytadan kiriting:"
+            )
+            return
+        
+        # Получаем данные из состояния
+        data = await state.get_data()
+        group_id = data.get('selected_group_id')
+        
+        if not group_id:
+            await message.answer("❌ **Xatolik!** Guruh ma'lumotlari topilmadi.")
+            await state.finish()
+            return
+        
+        # Получаем информацию о группе
+        group_info = db.get_group_by_id(group_id)
+        group_name = group_info[1] if group_info and group_info[1] else "Noma'lum guruh"
+        
+        # Создаем клавиатуру подтверждения
+        keyboard = types.InlineKeyboardMarkup()
+        keyboard.add(
+            types.InlineKeyboardButton("✅ Tasdiqlash", callback_data=f"confirm_delete_{group_id}_{message_count}"),
+            types.InlineKeyboardButton("❌ Bekor qilish", callback_data="cancel_delete_msgs")
+        )
+        
+        await message.answer(
+            f"⚠️ **Tasdiqlash talab qilinadi**\n\n"
+            f"📱 **Guruh:** {group_name}\n"
+            f"🆔 **ID:** `{group_id}`\n"
+            f"🗑️ **O'chiriladigan xabarlar:** {message_count} ta\n\n"
+            f"**Bu amal qaytarib bo'lmaydi!**\n"
+            f"Davom etishni istaysizmi?",
+            reply_markup=keyboard,
+            parse_mode="Markdown"
+        )
+        
+    except ValueError:
+        await message.answer(
+            "❌ **Noto'g'ri format!**\n\n"
+            "Iltimos, raqam kiriting (1-100 oralig'ida).\n"
+            "Masalan: 10"
+        )
+    except Exception as e:
+        logger.error(f"Ошибка при обработке количества сообщений: {e}")
+        await message.answer("❌ **Xatolik yuz berdi!**")
+        await state.finish()
+
+
+# Обработчик подтверждения удаления сообщений
+@dp.callback_query_handler(lambda c: c.data.startswith('confirm_delete_'), state=DeleteBotMessagesStates.waiting_for_message_count)
+async def confirm_delete_messages_callback(callback_query: types.CallbackQuery, state: FSMContext):
+    """Обработчик подтверждения удаления сообщений"""
+    try:
+        # Парсим данные
+        parts = callback_query.data.split('_')
+        group_id = int(parts[2])
+        message_count = int(parts[3])
+        
+        # Получаем информацию о группе
+        group_info = db.get_group_by_id(group_id)
+        group_name = group_info[1] if group_info and group_info[1] else "Noma'lum guruh"
+        
+        await safe_edit_text(callback_query,
+            f"🔄 **Xabarlar o'chirilmoqda...**\n\n"
+            f"📱 **Guruh:** {group_name}\n"
+            f"🆔 **ID:** `{group_id}`\n"
+            f"🗑️ **O'chiriladigan xabarlar:** {message_count} ta\n\n"
+            f"Iltimos, kuting...",
+            parse_mode="Markdown"
+        )
+        
+        # Выполняем удаление сообщений
+        from loader import bot
+        deleted_count = 0
+        errors_count = 0
+        
+        # Получаем информацию о боте для поиска его сообщений
+        bot_user = await bot.get_me()
+        bot_id = bot_user.id
+        
+        try:
+            # Пытаемся получить последние сообщения в группе
+            # Telegram API не позволяет получить историю сообщений напрямую
+            # Поэтому попробуем удалить сообщения по убыванию ID
+            
+            # Начинаем с максимально возможного ID сообщения и идем назад
+            # Это не идеальное решение, но лучшее что можно сделать с ограничениями API
+            
+            # Отправляем временное сообщение чтобы получить примерный текущий message_id
+            temp_msg = await bot.send_message(group_id, "🔍 Qidirilmoqda...")
+            current_message_id = temp_msg.message_id
+            await bot.delete_message(group_id, current_message_id)
+            
+            # Ищем и удаляем сообщения бота, идя назад от текущего ID
+            checked_count = 0
+            max_checks = message_count * 10  # Проверяем больше сообщений чем нужно удалить
+            
+            for message_id in range(current_message_id - 1, max(1, current_message_id - max_checks), -1):
+                if deleted_count >= message_count:
+                    break
+                    
+                try:
+                    # Пытаемся переслать сообщение самому себе чтобы проверить отправителя
+                    # Если сообщение от бота, пересылка будет содержать информацию о боте
+                    forwarded = await bot.forward_message(
+                        chat_id=callback_query.from_user.id,
+                        from_chat_id=group_id,
+                        message_id=message_id
+                    )
+                    
+                    # Удаляем переслаянное сообщение
+                    await bot.delete_message(callback_query.from_user.id, forwarded.message_id)
+                    
+                    # Если пересылка успешна, проверяем отправителя
+                    if forwarded.from_user and forwarded.from_user.id == bot_id:
+                        # Это сообщение от бота, удаляем его
+                        await bot.delete_message(group_id, message_id)
+                        deleted_count += 1
+                        logger.info(f"Удалено сообщение {message_id} от бота в группе {group_id}")
+                        
+                        # Небольшая пауза чтобы не превысить лимиты API
+                        await asyncio.sleep(0.1)
+                
+                except Exception as delete_error:
+                    # Сообщение не найдено, недоступно или произошла другая ошибка
+                    errors_count += 1
+                    continue
+                
+                checked_count += 1
+                
+                # Обновляем прогресс каждые 10 проверенных сообщений
+                if checked_count % 10 == 0:
+                    try:
+                        await safe_edit_text(callback_query,
+                            f"🔄 **Xabarlar o'chirilmoqda...**\n\n"
+                            f"📱 **Guruh:** {group_name}\n"
+                            f"🆔 **ID:** `{group_id}`\n"
+                            f"🗑️ **O'chirildi:** {deleted_count}/{message_count}\n"
+                            f"🔍 **Tekshirildi:** {checked_count} ta xabar\n\n"
+                            f"Iltimos, kuting...",
+                            parse_mode="Markdown"
+                        )
+                    except:
+                        pass  # Игнорируем ошибки обновления прогресса
+        
+        except Exception as main_error:
+            logger.error(f"Основная ошибка при удалении сообщений: {main_error}")
+            errors_count += 1
+        
+        # Завершаем процесс и показываем результат
+        await state.finish()
+        
+        result_text = f"✅ **Xabarlar o'chirish yakunlandi!**\n\n"
+        result_text += f"📱 **Guruh:** {group_name}\n"
+        result_text += f"🆔 **ID:** `{group_id}`\n\n"
+        result_text += f"📊 **Natijalar:**\n"
+        result_text += f"• O'chirilgan xabarlar: **{deleted_count}** ta\n"
+        result_text += f"• Maqsad: **{message_count}** ta\n"
+        
+        if deleted_count == 0:
+            result_text += f"\n⚠️ **Hech qanday xabar o'chirilmadi**\n"
+            result_text += f"Bu quyidagi sabablarga bog'liq bo'lishi mumkin:\n"
+            result_text += f"• Guruhda bot xabarlari yo'q\n"
+            result_text += f"• Xabarlar 48 soatdan eski (Telegram cheklovi)\n"
+            result_text += f"• Botda xabarlarni o'chirish huquqi yo'q"
+        elif deleted_count < message_count:
+            result_text += f"\n⚠️ **To'liq o'chirilmadi**\n"
+            result_text += f"Bu quyidagi sabablarga bog'liq bo'lishi mumkin:\n"
+            result_text += f"• Guruhda yetarli bot xabarlari yo'q\n"
+            result_text += f"• Ba'zi xabarlar 48 soatdan eski\n"
+            result_text += f"• Ba'zi xabarlarga kirish huquqi yo'q"
+        else:
+            result_text += f"\n🎉 **Muvaffaqiyatli yakunlandi!**"
+        
+        await safe_edit_text(callback_query, result_text, parse_mode="Markdown")
+        
+    except Exception as e:
+        logger.error(f"Ошибка при подтверждении удаления сообщений: {e}")
+        await callback_query.answer(f"❌ Xatolik: {e}", show_alert=True)
+        await state.finish()
+
+
+# Обработчик отмены удаления сообщений
+@dp.callback_query_handler(lambda c: c.data == 'cancel_delete_msgs', state=[DeleteBotMessagesStates.waiting_for_group_selection, DeleteBotMessagesStates.waiting_for_message_count])
+async def cancel_delete_messages_callback(callback_query: types.CallbackQuery, state: FSMContext):
+    """Обработчик отмены удаления сообщений"""
+    await state.finish()
+    await safe_edit_text(callback_query,
+        "❌ **Bekor qilindi**\n\n"
+        "Xabarlarni o'chirish bekor qilindi.",
+        parse_mode="Markdown"
+    )
+
+
+# Обработчик пагинации для выбора группы при удалении сообщений
+@dp.callback_query_handler(lambda c: c.data.startswith('delete_msgs_page_'), state=DeleteBotMessagesStates.waiting_for_group_selection)
+async def delete_msgs_pagination_callback(callback_query: types.CallbackQuery, state: FSMContext):
+    """Обработчик пагинации для выбора группы при удалении сообщений"""
+    try:
+        new_page = int(callback_query.data.split('_')[-1])
+        data = await state.get_data()
+        groups = data.get('groups', [])
+        
+        if not groups:
+            await callback_query.answer("❌ Guruhlar ro'yxati topilmadi", show_alert=True)
+            return
+        
+        # Создаем клавиатуру для новой страницы
+        keyboard = types.InlineKeyboardMarkup()
+        
+        page_size = 10
+        total_pages = (len(groups) - 1) // page_size + 1
+        
+        if new_page < 0 or new_page >= total_pages:
+            await callback_query.answer("❌ Noto'g'ri sahifa", show_alert=True)
+            return
+        
+        start_idx = new_page * page_size
+        end_idx = min(start_idx + page_size, len(groups))
+        
+        for i in range(start_idx, end_idx):
+            group = groups[i]
+            group_id = group[0]
+            group_name = group[1] if group[1] else "Noma'lum guruh"
+            
+            if len(group_name) > 30:
+                group_name = group_name[:27] + "..."
+            
+            keyboard.add(types.InlineKeyboardButton(
+                text=f"📱 {group_name} (ID: {group_id})",
+                callback_data=f"delete_msgs_group_{group_id}"
+            ))
+        
+        # Добавляем кнопки навигации
+        nav_buttons = []
+        if new_page > 0:
+            nav_buttons.append(types.InlineKeyboardButton("⬅️ Oldingi", callback_data=f"delete_msgs_page_{new_page - 1}"))
+        
+        nav_buttons.append(types.InlineKeyboardButton(f"📄 {new_page + 1}/{total_pages}", callback_data="page_info"))
+        
+        if new_page < total_pages - 1:
+            nav_buttons.append(types.InlineKeyboardButton("Keyingi ➡️", callback_data=f"delete_msgs_page_{new_page + 1}"))
+        
+        if nav_buttons:
+            keyboard.row(*nav_buttons)
+        
+        keyboard.add(types.InlineKeyboardButton("🆔 Guruh ID ni qo'lda kiritish", callback_data="delete_msgs_manual_id"))
+        keyboard.add(types.InlineKeyboardButton("❌ Bekor qilish", callback_data="cancel_delete_msgs"))
+        
+        # Обновляем состояние
+        await state.update_data(current_page=new_page)
+        
+        await safe_edit_text(callback_query,
+            "🗑️ **Bot xabarlarini o'chirish**\n\n"
+            "📋 **Quyidagi guruhlardan birini tanlang:**\n\n"
+            "Yoki guruh ID sini qo'lda kiritishingiz mumkin.",
+            reply_markup=keyboard,
+            parse_mode="Markdown"
+        )
+        
+    except Exception as e:
+        logger.error(f"Ошибка при пагинации delete_msgs: {e}")
+        await callback_query.answer(f"❌ Xatolik: {e}", show_alert=True)

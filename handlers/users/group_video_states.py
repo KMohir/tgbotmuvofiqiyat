@@ -35,3 +35,8 @@ class SendContentStates(StatesGroup):
     waiting_for_message_id = State()
 
 
+class DeleteBotMessagesStates(StatesGroup):
+    waiting_for_group_selection = State()
+    waiting_for_message_count = State()
+
+
