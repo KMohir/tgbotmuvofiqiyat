@@ -365,7 +365,12 @@ async def send_group_video_new(chat_id: int, project: str, season_id: int = None
                 
                 # ОТЛАДКА: Проверяем start_video ДО обновления
                 current_settings = db.get_group_video_settings(chat_id)
-                current_start = current_settings.get(f'{project_for_db_update}_start_video', 'N/A') if current_settings else 'N/A'
+                if current_settings:
+                    # Распаковываем tuple: (centris_enabled, centris_season_id, centris_start_video, golden_enabled, golden_season_id, golden_start_video, send_times)
+                    centris_enabled, centris_season_id, centris_start_video, golden_enabled, golden_season_id, golden_start_video, send_times = current_settings
+                    current_start = centris_start_video if project_for_db_update == "centris" else golden_start_video
+                else:
+                    current_start = 'N/A'
                 logger.info(f"🔍 ДО обновления: группа {chat_id}, проект {project_for_db_update}, start_video = {current_start}")
                 
                 update_result = db.update_group_video_start_only(chat_id, project_for_db_update, next_position)
@@ -375,7 +380,12 @@ async def send_group_video_new(chat_id: int, project: str, season_id: int = None
                     
                     # ОТЛАДКА: Проверяем start_video ПОСЛЕ обновления
                     updated_settings = db.get_group_video_settings(chat_id)
-                    updated_start = updated_settings.get(f'{project_for_db_update}_start_video', 'N/A') if updated_settings else 'N/A'
+                    if updated_settings:
+                        # Распаковываем tuple: (centris_enabled, centris_season_id, centris_start_video, golden_enabled, golden_season_id, golden_start_video, send_times)
+                        centris_enabled, centris_season_id, centris_start_video, golden_enabled, golden_season_id, golden_start_video, send_times = updated_settings
+                        updated_start = centris_start_video if project_for_db_update == "centris" else golden_start_video
+                    else:
+                        updated_start = 'N/A'
                     logger.info(f"🔍 ПОСЛЕ обновления: группа {chat_id}, проект {project_for_db_update}, start_video = {updated_start}")
                     
                     # ПРОВЕРКА: Если start_video не изменился - это ошибка!
