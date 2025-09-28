@@ -3598,6 +3598,325 @@ async def cleanup_scheduler_jobs_command(message: types.Message):
         await handle_error_with_notification(e, "cleanup_scheduler_jobs_command", message)
 
 
+# Универсальная команда для полного исправления всех проблем планировщика
+@dp.message_handler(commands=['fix_all_scheduler_problems'])
+async def fix_all_scheduler_problems_command(message: types.Message):
+    """Полное исправление всех проблем планировщика видео"""
+    from data.config import SUPER_ADMIN_IDS
+    
+    if message.from_user.id not in SUPER_ADMIN_IDS:
+        await message.answer("❌ **Sizda ushbu buyruqni ishlatish huquqi yo'q!**")
+        return
+    
+    try:
+        await message.answer("🔧 **ПОЛНОЕ ИСПРАВЛЕНИЕ ПЛАНИРОВЩИКА ВИДЕО**\n\n🔍 Начинаем диагностику...")
+        
+        from handlers.users.video_scheduler import scheduler, init_scheduler
+        import time
+        
+        problems_found = []
+        fixes_applied = []
+        
+        # ====== ЭТАП 1: ДИАГНОСТИКА ПЛАНИРОВЩИКА ======
+        await message.answer("**1/7** 📊 Проверяем планировщик...")
+        
+        scheduler_running = scheduler.running if scheduler else False
+        jobs_count = len(scheduler.get_jobs()) if scheduler else 0
+        
+        if not scheduler_running:
+            problems_found.append("Планировщик остановлен")
+        
+        if jobs_count == 0:
+            problems_found.append("Нет активных задач")
+        
+        # ====== ЭТАП 2: ПРОВЕРКА БАЗЫ ДАННЫХ ======
+        await message.answer("**2/7** 🗄️ Проверяем базу данных...")
+        
+        # Проверяем группы с настройками
+        groups = db.get_all_groups_with_settings()
+        groups_with_settings = len(groups)
+        
+        # Проверяем неправильные season_id
+        problematic_season_ids = 0
+        for group in groups:
+            centris_season_id = group[2]
+            golden_season_id = group[5]
+            
+            if centris_season_id == "centris" or golden_season_id == "golden":
+                problematic_season_ids += 1
+        
+        if groups_with_settings == 0:
+            problems_found.append("Нет групп с настройками")
+        
+        if problematic_season_ids > 0:
+            problems_found.append(f"{problematic_season_ids} групп с неправильными season_id")
+        
+        # ====== ЭТАП 3: ПРОВЕРКА WHITELIST ======
+        await message.answer("**3/7** ✅ Проверяем whitelist...")
+        
+        whitelisted_groups = 0
+        for group in groups:
+            chat_id = group[0]
+            if db.is_group_whitelisted(chat_id):
+                whitelisted_groups += 1
+        
+        not_whitelisted = groups_with_settings - whitelisted_groups
+        if not_whitelisted > 0:
+            problems_found.append(f"{not_whitelisted} групп не в whitelist")
+        
+        # ====== ЭТАП 4: ПРОВЕРКА ЗАДАЧ ======
+        await message.answer("**4/7** 📋 Проверяем задачи...")
+        
+        if scheduler and scheduler.running:
+            all_jobs = scheduler.get_jobs()
+            problematic_jobs = [job.id for job in all_jobs if job.id.startswith("group_-")]
+            
+            if len(problematic_jobs) > 0:
+                problems_found.append(f"{len(problematic_jobs)} задач с неправильными ID")
+        
+        # ====== ОТЧЕТ О ПРОБЛЕМАХ ======
+        report = f"📊 **РЕЗУЛЬТАТ ДИАГНОСТИКИ:**\n\n"
+        report += f"• Групп с настройками: {groups_with_settings}\n"
+        report += f"• В whitelist: {whitelisted_groups}/{groups_with_settings}\n"
+        report += f"• Планировщик: {'✅' if scheduler_running else '❌'}\n"
+        report += f"• Активных задач: {jobs_count}\n\n"
+        
+        if problems_found:
+            report += "❌ **НАЙДЕННЫЕ ПРОБЛЕМЫ:**\n"
+            for i, problem in enumerate(problems_found, 1):
+                report += f"{i}. {problem}\n"
+            report += "\n🔧 **Начинаем исправление...**"
+        else:
+            report += "✅ **Проблем не найдено!**"
+        
+        await message.answer(report, parse_mode="Markdown")
+        
+        if not problems_found:
+            return
+        
+        # ====== ЭТАП 5: ИСПРАВЛЕНИЯ ======
+        await message.answer("**5/7** 🔧 Исправляем season_id...")
+        
+        # Исправляем season_id
+        fixed_seasons = 0
+        for group in groups:
+            chat_id = group[0]
+            centris_enabled = group[1]
+            centris_season_id = group[2]
+            golden_enabled = group[4]
+            golden_season_id = group[5]
+            
+            fixed_this_group = False
+            
+            # Исправляем Centris
+            if centris_enabled and centris_season_id == "centris":
+                centris_seasons = db.get_seasons_by_project("centris")
+                if centris_seasons:
+                    new_season_id = centris_seasons[0][0]
+                    current_settings = db.get_group_video_settings(chat_id)
+                    if current_settings:
+                        db.set_group_video_settings(
+                            chat_id, 
+                            centris_enabled, 
+                            new_season_id,
+                            current_settings[2],
+                            current_settings[3],
+                            current_settings[4],
+                            current_settings[5]
+                        )
+                        fixed_this_group = True
+            
+            # Исправляем Golden
+            if golden_enabled and golden_season_id == "golden":
+                golden_seasons = db.get_seasons_by_project("golden")
+                if golden_seasons:
+                    new_season_id = golden_seasons[0][0]
+                    current_settings = db.get_group_video_settings(chat_id)
+                    if current_settings:
+                        db.set_group_video_settings(
+                            chat_id, 
+                            current_settings[0],
+                            current_settings[1],
+                            current_settings[2],
+                            golden_enabled, 
+                            new_season_id,
+                            current_settings[5]
+                        )
+                        fixed_this_group = True
+            
+            if fixed_this_group:
+                fixed_seasons += 1
+        
+        if fixed_seasons > 0:
+            fixes_applied.append(f"Исправлено {fixed_seasons} season_id")
+        
+        await message.answer("**6/7** 🧹 Очищаем проблемные задачи...")
+        
+        # Очищаем неправильные задачи
+        if scheduler and scheduler.running:
+            all_jobs = scheduler.get_jobs()
+            problematic_jobs = [job.id for job in all_jobs if job.id.startswith("group_-")]
+            
+            for job_id in problematic_jobs:
+                try:
+                    scheduler.remove_job(job_id)
+                except:
+                    pass
+            
+            if len(problematic_jobs) > 0:
+                fixes_applied.append(f"Удалено {len(problematic_jobs)} неправильных задач")
+        
+        await message.answer("**7/7** 🔄 Перезапускаем планировщик...")
+        
+        # Полный перезапуск планировщика
+        if scheduler.running:
+            scheduler.shutdown()
+        
+        await init_scheduler()
+        
+        # Автоматически добавляем все группы в whitelist
+        added_to_whitelist = 0
+        for group in groups:
+            chat_id = group[0]
+            if not db.is_group_whitelisted(chat_id):
+                if db.add_group_to_whitelist(chat_id):
+                    added_to_whitelist += 1
+        
+        if added_to_whitelist > 0:
+            fixes_applied.append(f"Добавлено {added_to_whitelist} групп в whitelist")
+        
+        fixes_applied.append("Планировщик перезапущен")
+        
+        # ====== ФИНАЛЬНАЯ ПРОВЕРКА ======
+        final_jobs = len(scheduler.get_jobs())
+        
+        final_report = "🎉 **ИСПРАВЛЕНИЕ ЗАВЕРШЕНО!**\n\n"
+        final_report += "✅ **ПРИМЕНЁННЫЕ ИСПРАВЛЕНИЯ:**\n"
+        for i, fix in enumerate(fixes_applied, 1):
+            final_report += f"{i}. {fix}\n"
+        
+        final_report += f"\n📊 **ИТОГОВОЕ СОСТОЯНИЕ:**\n"
+        final_report += f"• Планировщик: {'✅ Работает' if scheduler.running else '❌ Остановлен'}\n"
+        final_report += f"• Активных задач: {final_jobs}\n"
+        final_report += f"• Групп с настройками: {groups_with_settings}\n"
+        
+        if final_jobs > 0 and scheduler.running:
+            final_report += "\n🚀 **Видео должны отправляться по расписанию!**"
+        else:
+            final_report += "\n⚠️ **Требуется дополнительная диагностика**"
+        
+        await message.answer(final_report, parse_mode="Markdown")
+        
+    except Exception as e:
+        await handle_error_with_notification(e, "fix_all_scheduler_problems_command", message)
+
+
+# Команда для тестирования планировщика через 1 минуту
+@dp.message_handler(commands=['test_scheduler_now'])
+async def test_scheduler_now_command(message: types.Message):
+    """Создать тестовую задачу планировщика через 1 минуту"""
+    from data.config import SUPER_ADMIN_IDS
+    
+    if message.from_user.id not in SUPER_ADMIN_IDS:
+        await message.answer("❌ **Sizda ushbu buyruqni ishlatish huquqi yo'q!**")
+        return
+    
+    # Проверяем, что команда вызвана в группе
+    if message.chat.type not in ['group', 'supergroup']:
+        await message.answer("❌ **Bu buyruq faqat guruhda ishlatiladi!**")
+        return
+    
+    try:
+        from handlers.users.video_scheduler import scheduler, send_group_video_new
+        from datetime import datetime, timedelta
+        import pytz
+        
+        chat_id = message.chat.id
+        
+        # Получаем настройки группы
+        group_settings = db.get_group_video_settings(chat_id)
+        if not group_settings:
+            await message.answer("❌ **Группа не настроена!** Используйте `/set_group_video`")
+            return
+        
+        # Проверяем whitelist
+        if not db.is_group_whitelisted(chat_id):
+            await message.answer("❌ **Группа не в whitelist!** Используйте `/quick_whitelist`")
+            return
+        
+        # Получаем текущее время + 1 минута
+        tz = pytz.timezone("Asia/Tashkent")
+        current_time = datetime.now(tz)
+        test_time = current_time + timedelta(minutes=1)
+        
+        # Распаковываем настройки
+        centris_enabled, centris_season_id, centris_start_video, golden_enabled, golden_season_id, golden_start_video = group_settings[:6]
+        
+        project = None
+        season_id = None
+        start_video = 0
+        
+        if centris_enabled and centris_season_id:
+            project = 'centris'
+            season_id = centris_season_id
+            start_video = centris_start_video
+        elif golden_enabled and golden_season_id:
+            project = 'golden_lake'
+            season_id = golden_season_id
+            start_video = golden_start_video
+        
+        if not project:
+            await message.answer("❌ **Нет активных проектов для тестирования!**")
+            return
+        
+        # Создаем тестовую задачу
+        test_job_id = f"test_job_{abs(chat_id)}_{int(test_time.timestamp())}"
+        
+        scheduler.add_job(
+            send_group_video_new,
+            'date',
+            run_date=test_time,
+            args=[chat_id, project, season_id, start_video],
+            id=test_job_id,
+            timezone="Asia/Tashkent",
+            misfire_grace_time=300,
+            replace_existing=True
+        )
+        
+        await message.answer(
+            f"🧪 **ТЕСТОВАЯ ЗАДАЧА СОЗДАНА**\n\n"
+            f"⏰ **Время выполнения:** {test_time.strftime('%H:%M:%S')}\n"
+            f"🎬 **Проект:** {project}\n"
+            f"📺 **Сезон:** {season_id}\n"
+            f"🆔 **ID задачи:** `{test_job_id}`\n\n"
+            f"⏱️ **Видео будет отправлено через ~1 минуту!**",
+            parse_mode="Markdown"
+        )
+        
+        # Планируем удаление тестовой задачи через 10 минут (если она не выполнилась)
+        cleanup_time = test_time + timedelta(minutes=10)
+        cleanup_job_id = f"cleanup_{test_job_id}"
+        
+        def cleanup_test_job():
+            try:
+                if scheduler.get_job(test_job_id):
+                    scheduler.remove_job(test_job_id)
+                    logger.info(f"Очищена тестовая задача {test_job_id}")
+            except:
+                pass
+        
+        scheduler.add_job(
+            cleanup_test_job,
+            'date',
+            run_date=cleanup_time,
+            id=cleanup_job_id,
+            timezone="Asia/Tashkent"
+        )
+        
+    except Exception as e:
+        await handle_error_with_notification(e, "test_scheduler_now_command", message)
+
+
 # Команда для экстренных ситуаций
 @dp.message_handler(commands=['emergency_group_video'])
 async def emergency_group_video_command(message: types.Message):

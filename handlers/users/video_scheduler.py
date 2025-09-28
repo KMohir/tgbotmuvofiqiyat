@@ -23,7 +23,14 @@ SUPER_ADMIN_IDS = [5657091547, 7983512278, 5310261745, 8053364577]
 VIDEO_LIST = VIDEO_LIST_1
 
 # Инициализация планировщика
-scheduler = AsyncIOScheduler(timezone="Asia/Tashkent")
+scheduler = AsyncIOScheduler(
+    timezone="Asia/Tashkent",
+    job_defaults={
+        'coalesce': False,  # Не объединять пропущенные задачи
+        'max_instances': 1,  # Максимум одна задача одновременно
+        'misfire_grace_time': 300  # 5 минут на выполнение пропущенной задачи
+    }
+)
 
 def schedule_job_with_immediate_check(scheduler, func, hour, minute, args, job_id, timezone="Asia/Tashkent"):
     """
@@ -46,8 +53,9 @@ def schedule_job_with_immediate_check(scheduler, func, hour, minute, args, job_i
             args=args,
             id=job_id,
             timezone=timezone,
-            misfire_grace_time=None,
-            replace_existing=True
+            misfire_grace_time=300,  # 5 минут на выполнение пропущенной задачи
+            replace_existing=True,
+            max_instances=1  # Только одна задача может выполняться одновременно
         )
         
         logger.info(f"Задача {job_id} запланирована на {hour:02d}:{minute:02d}")
