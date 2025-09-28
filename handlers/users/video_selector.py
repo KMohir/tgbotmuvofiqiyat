@@ -13,7 +13,7 @@ from data.config import ADMINS
 
 # Настройка логирования
 logger = logging.getLogger(__name__)
-
+print("video_selector")
 # Список описаний для извлечения названий уроков (только для кнопок)
 CAPTION_LIST_2 = [
     "Келажакни инобатга олган қулай локатсия",
