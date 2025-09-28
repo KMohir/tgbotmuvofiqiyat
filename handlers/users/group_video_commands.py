@@ -8820,11 +8820,14 @@ async def test_position_update_command(message: types.Message):
         success_count = len([r for r in test_results if r.startswith('✅')])
         total_tests = 2
         
+        # Исправляем проблему с f-string и backslash
+        test_results_text = '\n'.join(test_results)
+        
         response = (
             f"📊 **TEST NATIJASI:**\n\n"
             f"📱 **Guruh:** {group_name}\n"
             f"🆔 **ID:** `{group_id}`\n\n"
-            f"{''.join([f'{r}\\n' for r in test_results])}\n"
+            f"{test_results_text}\n\n"
             f"📈 **Jami:** {success_count}/{total_tests} muvaffaqiyatli\n\n"
         )
         
