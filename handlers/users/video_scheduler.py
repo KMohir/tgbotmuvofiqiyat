@@ -406,8 +406,13 @@ async def send_group_video_new(chat_id: int, project: str, season_id: int = None
         if success:
             logger.info(f"🎉 Группа {chat_id}: автоматически переключена на следующий сезон в проекте {project}")
             
-            # Уведомляем супер-админов о переключении
-            await notify_superadmins_season_auto_switched(chat_id, season_id, project)
+            # ИСПРАВЛЕНИЕ: Уведомляем супер-админов о переключении только один раз
+            # Проверяем, не отправляли ли уже уведомление для этого переключения
+            try:
+                await notify_superadmins_season_auto_switched(chat_id, season_id, project)
+            except Exception as notify_error:
+                logger.warning(f"Ошибка при отправке уведомления о переключении сезона: {notify_error}")
+                # Продолжаем работу даже если уведомление не удалось отправить
             
             # Сразу пробуем отправить первое видео нового сезона
             try:
@@ -438,7 +443,7 @@ async def send_group_video_new(chat_id: int, project: str, season_id: int = None
                                 db.mark_group_video_as_viewed_detailed_by_project(chat_id, new_season_id, position, project_for_db)
                                 
                                 # Обновляем start_video на следующую позицию
-                                db.set_group_video_start(chat_id, project_for_db, new_season_id, position + 1)
+                                db.update_group_video_start_only(chat_id, project_for_db, position + 1)
                                 
                                 logger.info(f"✅ Отправлено первое видео нового сезона {new_season_id}: {title}")
                                 return True
@@ -467,7 +472,7 @@ async def send_group_video_new(chat_id: int, project: str, season_id: int = None
                                 db.mark_group_video_as_viewed_detailed_by_project(chat_id, new_season_id, position, project_for_db)
                                 
                                 # Обновляем start_video на следующую позицию
-                                db.set_group_video_start(chat_id, project_for_db, new_season_id, position + 1)
+                                db.update_group_video_start_only(chat_id, project_for_db, position + 1)
                                 
                                 logger.info(f"✅ Отправлено первое видео нового сезона {new_season_id}: {title}")
                                 return True

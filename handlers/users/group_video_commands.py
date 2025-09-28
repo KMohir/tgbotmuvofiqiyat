@@ -8847,3 +8847,81 @@ async def test_position_update_command(message: types.Message):
         )
     except Exception as e:
         await handle_error_with_notification(e, "test_position_update_command", message)
+
+
+# Команда для диагностики проблем с зацикливанием
+@dp.message_handler(commands=['diagnose_restart_loop'])
+async def diagnose_restart_loop_command(message: types.Message):
+    """Диагностировать проблемы с зацикливанием бота"""
+    from data.config import SUPER_ADMIN_IDS
+    
+    if message.from_user.id not in SUPER_ADMIN_IDS:
+        await message.answer("❌ **Sizda ushbu buyruqni ishlatish huquqi yo'q!**")
+        return
+    
+    try:
+        await message.answer("🔍 **DIAGNOSTIKA: QAYTA ISHGA TUSHISH MUAMMOLARI**\n\n⏳ Tahlil qilmoqda...")
+        
+        # Получаем статистику планировщика
+        from handlers.users.video_scheduler import scheduler
+        
+        response = f"📊 **SCHEDULER HOLATI:**\n\n"
+        
+        # Основные показатели
+        scheduler_status = '✅ Ha' if scheduler.running else '❌ Yo\'q'
+        response += f"🔄 **Scheduler ishlaydimi:** {scheduler_status}\n"
+        response += f"📋 **Jami vazifalar:** {len(scheduler.get_jobs())}\n\n"
+        
+        # Анализируем задачи по типам
+        jobs = scheduler.get_jobs()
+        group_jobs = [j for j in jobs if j.id.startswith('group_')]
+        user_jobs = [j for j in jobs if j.id.startswith('video_')]
+        
+        response += f"📈 **VAZIFALAR TAHLILI:**\n"
+        response += f"• Guruh vazifalari: {len(group_jobs)}\n"
+        response += f"• Foydalanuvchi vazifalari: {len(user_jobs)}\n"
+        response += f"• Boshqa vazifalar: {len(jobs) - len(group_jobs) - len(user_jobs)}\n\n"
+        
+        # Проверяем активные группы
+        active_groups = db.get_all_groups_with_settings()
+        response += f"📱 **AKTIV GURUHLAR:**\n"
+        response += f"• Sozlamalari bor guruhlar: {len(active_groups)}\n\n"
+        
+        # Ищем потенциальные проблемы
+        issues = []
+        
+        # Проверка 1: Слишком много задач для одной группы
+        group_job_counts = {}
+        for job in group_jobs:
+            group_id = job.id.split('_')[1] if len(job.id.split('_')) > 1 else 'unknown'
+            group_job_counts[group_id] = group_job_counts.get(group_id, 0) + 1
+        
+        for group_id, count in group_job_counts.items():
+            if count > 10:  # Больше 10 задач на группу - подозрительно
+                issues.append(f"• Guruh {group_id}: {count} ta vazifa (ko'p)")
+        
+        # Проверка 2: Ближайшие задачи
+        next_jobs = sorted(jobs, key=lambda x: x.next_run_time or 'Z')[:5]
+        response += f"🕐 **KEYINGI 5 VAZIFA:**\n"
+        for job in next_jobs:
+            next_run = job.next_run_time.strftime('%H:%M:%S') if job.next_run_time else 'N/A'
+            response += f"• {job.id}: {next_run}\n"
+        response += "\n"
+        
+        # Проблемы
+        if issues:
+            response += f"⚠️ **ANIQLANGAN MUAMMOLAR:**\n"
+            for issue in issues:
+                response += f"{issue}\n"
+        else:
+            response += f"✅ **KATTA MUAMMOLAR TOPILMADI**\n"
+        
+        response += f"\n💡 **TAVSIYALAR:**\n"
+        response += f"• Agar muammolar davom etsa: `/restart_scheduler`\n"
+        response += f"• Vazifalarni tozalash: `/cleanup_scheduler_jobs`\n"
+        response += f"• To'liq tizimni tiklash: `/fix_all_scheduler_problems`"
+        
+        await message.answer(response, parse_mode="Markdown")
+        
+    except Exception as e:
+        await handle_error_with_notification(e, "diagnose_restart_loop_command", message)
