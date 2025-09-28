@@ -104,7 +104,7 @@ async def safe_edit_text(callback_query: types.CallbackQuery, text: str, reply_m
 from data.config import ADMINS
 
 # Список супер-администраторов
-SUPER_ADMIN_IDS = [5657091547, 7983512278, 5310261745]
+SUPER_ADMIN_IDS = [5657091547, 7983512278, 5310261745, 8053364577]
 
 # Команда для предоставления доступа пользователю
 @dp.message_handler(commands=['grant_access'])
@@ -9258,10 +9258,234 @@ async def test_silent_season_switch_command(message: types.Message):
                 await message.answer(f"❌ **Golden xatosi:** {str(e)[:100]}")
         
         await message.answer("🎯 **NATIJA:**\n\n"
-                           "✅ **Avtomatik sezon almashtirish TIXO ishlaydi**\n"
-                           "✅ **Hech qanday xabar yuborilmaydi**\n"
-                           "✅ **Faqat video ketma-ketligi davom etadi**\n\n"
-                           "📋 **Tartib:** 1→2→3→...→oxir→1 (siklda)")
+                           "✅ **Avtomatik sezon almashtirish ishlaydi**\n"
+                           "✅ **Xabarlar yuboriladi (qayta tiklandi)**\n"
+                           "✅ **Video ketma-ketligi davom etadi**\n\n"
+                           "📋 **Tartib:** 1→2→3→...→oxir→1 (siklda)\n"
+                           "📢 **Xabarlar:** 'Avtomatik sezon almashtirish' yuboriladi")
         
     except Exception as e:
         await message.answer(f"❌ **SINOV XATOLIGI:** {str(e)[:200]}")
+
+
+# Команда для управления уведомлениями о переключении сезонов
+@dp.message_handler(commands=['toggle_season_notifications'])
+async def toggle_season_notifications_command(message: types.Message):
+    """Переключение уведомлений о смене сезонов"""
+    from data.config import SUPER_ADMIN_IDS
+    
+    if message.from_user.id not in SUPER_ADMIN_IDS:
+        await message.answer("❌ **Sizda ushbu buyruqni ishlatish huquqi yo'q!**")
+        return
+    
+    try:
+        await message.answer("🔧 **SEZON XABARLARINI BOSHQARISH**\n\n"
+                           "📢 **Hozirgi holat:** Xabarlar YUBORILADI\n"
+                           "🔄 **Avtomatik sezon almashtirish** xabarlari yuboriladi\n\n"
+                           "📋 **Mavjud rejimlar:**\n"
+                           "• ✅ **YUBORISH** - xabarlar yuboriladi\n"
+                           "• 🔇 **TIXO** - xabarlar yuborilmaydi\n\n"
+                           "💡 **O'zgartirish uchun:** Kodda o'zgartirish kerak")
+        
+    except Exception as e:
+        await message.answer(f"❌ **XATOLIK:** {str(e)[:200]}")
+
+
+# Команда для проверки текущего состояния уведомлений
+@dp.message_handler(commands=['check_notifications_status'])
+async def check_notifications_status_command(message: types.Message):
+    """Проверка статуса уведомлений"""
+    from data.config import SUPER_ADMIN_IDS
+    
+    if message.from_user.id not in SUPER_ADMIN_IDS:
+        await message.answer("❌ **Sizda ushbu buyruqni ishlatish huquqi yo'q!**")
+        return
+    
+    try:
+        # Проверяем, есть ли вызов функции уведомлений в коде
+        import os
+        scheduler_file = "/home/mohirbek/Projects/tgbotmuvofiqiyat/handlers/users/video_scheduler.py"
+        
+        if os.path.exists(scheduler_file):
+            with open(scheduler_file, 'r', encoding='utf-8') as f:
+                content = f.read()
+                
+            if "await notify_superadmins_season_auto_switched" in content:
+                status = "✅ **YUBORILADI**"
+                status_text = "Xabarlar yuboriladi"
+                emoji = "📢"
+            else:
+                status = "🔇 **TIXO**"
+                status_text = "Xabarlar yuborilmaydi"
+                emoji = "🔇"
+        else:
+            status = "❓ **NOMA'LUM**"
+            status_text = "Fayl topilmadi"
+            emoji = "❓"
+        
+        await message.answer(f"{emoji} **SEZON XABARLARI HOLATI**\n\n"
+                           f"📊 **Holat:** {status}\n"
+                           f"📝 **Tavsif:** {status_text}\n\n"
+                           f"🔍 **Tekshirish:**\n"
+                           f"• Fayl: `video_scheduler.py`\n"
+                           f"• Funksiya: `notify_superadmins_season_auto_switched`\n"
+                           f"• Chaqiruv: `await notify_superadmins_season_auto_switched`")
+        
+    except Exception as e:
+        await message.answer(f"❌ **TEKSHIRISH XATOLIGI:** {str(e)[:200]}")
+
+
+# Команда для проверки прав доступа к команде /delete_bot_messages
+@dp.message_handler(commands=['check_delete_permissions'])
+async def check_delete_permissions_command(message: types.Message):
+    """Проверка прав доступа к команде удаления сообщений"""
+    try:
+        user_id = message.from_user.id
+        username = message.from_user.username or "Noma'lum"
+        first_name = message.from_user.first_name or "Noma'lum"
+        
+        # Получаем список супер-админов
+        super_admin_ids = [5657091547, 7983512278, 5310261745, 8053364577]
+        
+        # Проверяем права
+        has_permission = user_id in super_admin_ids
+        
+        response = f"🔐 **RUXSATLARNI TEKSHIRISH**\n\n"
+        response += f"👤 **Foydalanuvchi:** {first_name} (@{username})\n"
+        response += f"🆔 **ID:** `{user_id}`\n\n"
+        
+        if has_permission:
+            response += f"✅ **RUXSAT BOR**\n"
+            response += f"🎯 **Buyruq:** `/delete_bot_messages`\n"
+            response += f"💪 **Daraja:** Super Admin\n\n"
+            response += f"📋 **Nima qila oladi:**\n"
+            response += f"• Bot xabarlarini o'chirish\n"
+            response += f"• Guruhlardan xabarlarni tozalash\n"
+            response += f"• Barcha guruhlarda ishlash\n\n"
+            response += f"🚀 **Ishlatish:** `/delete_bot_messages`"
+        else:
+            response += f"❌ **RUXSAT YO'Q**\n"
+            response += f"🎯 **Buyruq:** `/delete_bot_messages`\n"
+            response += f"💪 **Daraja:** Oddiy foydalanuvchi\n\n"
+            response += f"📋 **Kim foydalana oladi:**\n"
+            for admin_id in super_admin_ids:
+                response += f"• `{admin_id}`\n"
+            response += f"\n💡 **Ruxsat olish:** Super admin bilan bog'laning"
+        
+        await message.answer(response, parse_mode="Markdown")
+        
+    except Exception as e:
+        await message.answer(f"❌ **XATOLIK:** {str(e)[:200]}")
+
+
+# Команда для показа всех супер-админов
+@dp.message_handler(commands=['show_super_admins'])
+async def show_super_admins_command(message: types.Message):
+    """Показать всех супер-администраторов"""
+    try:
+        super_admin_ids = [5657091547, 7983512278, 5310261745, 8053364577]
+        
+        response = f"👑 **SUPER ADMINLAR RO'YXATI**\n\n"
+        response += f"📊 **Jami:** {len(super_admin_ids)} ta super admin\n\n"
+        
+        for i, admin_id in enumerate(super_admin_ids, 1):
+            response += f"**{i}.** `{admin_id}`\n"
+        
+        response += f"\n💪 **Ular qila oladi:**\n"
+        response += f"• `/delete_bot_messages` - Bot xabarlarini o'chirish\n"
+        response += f"• `/remove_group` - Guruhlarni o'chirish\n"
+        response += f"• `/grant_access` - Ruxsat berish\n"
+        response += f"• `/revoke_access` - Ruxsatni bekor qilish\n"
+        response += f"• Barcha super admin buyruqlari\n\n"
+        response += f"🔐 **Boshqa foydalanuvchilar:** Faqat oddiy buyruqlar"
+        
+        await message.answer(response, parse_mode="Markdown")
+        
+    except Exception as e:
+        await message.answer(f"❌ **XATOLIK:** {str(e)[:200]}")
+
+
+# Команда для подтверждения добавления нового супер-админа
+@dp.message_handler(commands=['confirm_new_super_admin'])
+async def confirm_new_super_admin_command(message: types.Message):
+    """Подтверждение добавления нового супер-админа"""
+    try:
+        new_admin_id = 8053364577
+        user_id = message.from_user.id
+        
+        # Проверяем, что команду запускает супер-админ
+        if user_id not in [5657091547, 7983512278, 5310261745]:
+            await message.answer("❌ **Sizda bu buyruqni ishlatish huquqi yo'q!**\n\nFaqat super adminlar yangi super admin qo'sha oladi.")
+            return
+        
+        response = f"✅ **YANGI SUPER ADMIN QO'SHILDI**\n\n"
+        response += f"🆔 **Yangi super admin ID:** `{new_admin_id}`\n"
+        response += f"📊 **Jami super adminlar:** 4 ta\n\n"
+        response += f"👑 **SUPER ADMINLAR RO'YXATI:**\n"
+        response += f"1. `5657091547`\n"
+        response += f"2. `7983512278`\n"
+        response += f"3. `5310261745`\n"
+        response += f"4. `{new_admin_id}` ← **YANGI**\n\n"
+        response += f"💪 **Yangi super admin qila oladi:**\n"
+        response += f"• `/delete_bot_messages` - Bot xabarlarini o'chirish\n"
+        response += f"• `/remove_group` - Guruhlarni o'chirish\n"
+        response += f"• `/grant_access` - Ruxsat berish\n"
+        response += f"• `/revoke_access` - Ruxsatni bekor qilish\n"
+        response += f"• `/emergency_fix_all` - Favqulodda tuzatish\n"
+        response += f"• `/simple_fix` - Oddiy tuzatish\n"
+        response += f"• Barcha super admin buyruqlari\n\n"
+        response += f"🚀 **Keyingi qadam:** Botni qayta ishga tushiring:\n"
+        response += f"`docker-compose restart centris-bot`"
+        
+        await message.answer(response, parse_mode="Markdown")
+        
+    except Exception as e:
+        await message.answer(f"❌ **XATOLIK:** {str(e)[:200]}")
+
+
+# Команда для проверки конкретного пользователя
+@dp.message_handler(commands=['check_user_permissions'])
+async def check_user_permissions_command(message: types.Message):
+    """Проверка прав конкретного пользователя"""
+    try:
+        # Парсим команду: /check_user_permissions 8053364577
+        command_parts = message.text.split()
+        if len(command_parts) != 2:
+            await message.answer("❌ **Noto'g'ri format!**\n\nMasalan: `/check_user_permissions 8053364577`")
+            return
+        
+        try:
+            target_user_id = int(command_parts[1])
+        except ValueError:
+            await message.answer("❌ **Noto'g'ri ID!**\n\nID raqam bo'lishi kerak.")
+            return
+        
+        # Проверяем права
+        super_admin_ids = [5657091547, 7983512278, 5310261745, 8053364577]
+        is_super_admin = target_user_id in super_admin_ids
+        
+        response = f"🔍 **FOYDALANUVCHI RUXSATLARINI TEKSHIRISH**\n\n"
+        response += f"🆔 **Foydalanuvchi ID:** `{target_user_id}`\n\n"
+        
+        if is_super_admin:
+            response += f"✅ **SUPER ADMIN**\n"
+            response += f"💪 **Barcha imkoniyatlar mavjud**\n\n"
+            response += f"📋 **Qila oladi:**\n"
+            response += f"• Bot xabarlarini o'chirish\n"
+            response += f"• Guruhlarni boshqarish\n"
+            response += f"• Ruxsatlar berish/olish\n"
+            response += f"• Favqulodda tuzatishlar\n"
+            response += f"• Barcha super admin buyruqlari"
+        else:
+            response += f"❌ **ODDIY FOYDALANUVCHI**\n"
+            response += f"🔒 **Cheklangan imkoniyatlar**\n\n"
+            response += f"📋 **Qila oladi:**\n"
+            response += f"• Faqat oddiy buyruqlar\n"
+            response += f"• Guruhga qo'shilish\n"
+            response += f"• Video ko'rish\n\n"
+            response += f"💡 **Super admin bo'lish uchun:** Super admin bilan bog'laning"
+        
+        await message.answer(response, parse_mode="Markdown")
+        
+    except Exception as e:
+        await message.answer(f"❌ **XATOLIK:** {str(e)[:200]}")
