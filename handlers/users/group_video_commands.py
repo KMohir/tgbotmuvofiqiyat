@@ -3149,6 +3149,138 @@ async def test_send_video_command(message: types.Message):
         await handle_error_with_notification(e, "test_send_video_command", message)
 
 
+# Команда для диагностики конкретной группы
+@dp.message_handler(commands=['diagnose_group'])
+async def diagnose_group_command(message: types.Message):
+    """Диагностика конкретной группы по ID"""
+    from data.config import SUPER_ADMIN_IDS
+    
+    if message.from_user.id not in SUPER_ADMIN_IDS:
+        await message.answer("❌ **Sizda ushbu buyruqni ishlatish huquqi yo'q!**")
+        return
+    
+    try:
+        # Получаем ID группы из аргументов или используем текущий чат
+        args = message.get_args().strip()
+        if args:
+            try:
+                chat_id = int(args)
+            except ValueError:
+                await message.answer("❌ **Noto'g'ri group ID format!** Misol: `/diagnose_group -4867322212`")
+                return
+        else:
+            if message.chat.type in ['group', 'supergroup']:
+                chat_id = message.chat.id
+            else:
+                await message.answer("❌ **Group ID kiriting yoki guruhda ishlatiladi!** Misol: `/diagnose_group -4867322212`")
+                return
+        
+        response = f"🔍 **GROUP DIAGNOSTICS**\n\n"
+        response += f"👥 **Group ID:** `{chat_id}`\n\n"
+        
+        # Проверяем whitelist
+        is_whitelisted = db.is_group_whitelisted(chat_id)
+        response += f"✅ **Whitelist:** {'✅ Да' if is_whitelisted else '❌ НЕТ!'}\n"
+        
+        # Проверяем настройки группы
+        group_settings = db.get_group_video_settings(chat_id)
+        if group_settings:
+            centris_enabled, centris_season_id, centris_start_video, golden_enabled, golden_season_id, golden_start_video = group_settings[:6]
+            
+            response += f"⚙️ **Настройки:**\n"
+            response += f"   • Centris: {'✅' if centris_enabled else '❌'} (сезон: {centris_season_id}, видео: {centris_start_video})\n"
+            response += f"   • Golden: {'✅' if golden_enabled else '❌'} (сезон: {golden_season_id}, видео: {golden_start_video})\n"
+            
+            # Проверяем времена отправки
+            if len(group_settings) >= 7:
+                send_times_json = group_settings[6]
+                try:
+                    if send_times_json:
+                        import json
+                        send_times = json.loads(send_times_json)
+                        response += f"⏰ **Времена:** {', '.join(send_times)}\n"
+                    else:
+                        response += f"⏰ **Времена:** По умолчанию\n"
+                except:
+                    response += f"⏰ **Времена:** Ошибка чтения\n"
+        else:
+            response += f"❌ **Настройки группы НЕ НАЙДЕНЫ!**\n"
+        
+        # Проверяем задачи планировщика
+        from handlers.users.video_scheduler import scheduler
+        group_jobs = [job for job in scheduler.get_jobs() if f"group_{chat_id}_" in job.id]
+        response += f"📋 **Задачи планировщика:** {len(group_jobs)}\n"
+        
+        for job in group_jobs[:3]:  # Показываем первые 3
+            next_run = job.next_run_time.strftime('%H:%M %d.%m') if job.next_run_time else "Never"
+            response += f"   • `{job.id}`: {next_run}\n"
+        
+        if len(group_jobs) > 3:
+            response += f"   • ... и еще {len(group_jobs) - 3}\n"
+        
+        # Рекомендации
+        response += f"\n🔧 **Рекомендации:**\n"
+        if not is_whitelisted:
+            response += f"• Добавить в whitelist: `/add_group_whitelist {chat_id}`\n"
+        if not group_settings:
+            response += f"• Настроить группу: `/set_group_video`\n"
+        if len(group_jobs) == 0:
+            response += f"• Перезапустить планировщик: `/restart_scheduler`\n"
+        
+        await message.answer(response, parse_mode="Markdown")
+        
+    except Exception as e:
+        await handle_error_with_notification(e, "diagnose_group_command", message)
+
+
+# Команда для быстрого добавления группы в whitelist
+@dp.message_handler(commands=['quick_whitelist'])
+async def quick_whitelist_command(message: types.Message):
+    """Быстро добавить группу в whitelist по ID"""
+    from data.config import SUPER_ADMIN_IDS
+    
+    if message.from_user.id not in SUPER_ADMIN_IDS:
+        await message.answer("❌ **Sizda ushbu buyruqni ishlatish huquqi yo'q!**")
+        return
+    
+    try:
+        # Получаем ID группы из аргументов или используем текущий чат
+        args = message.get_args().strip()
+        if args:
+            try:
+                chat_id = int(args)
+            except ValueError:
+                await message.answer("❌ **Noto'g'ri group ID format!** Misol: `/quick_whitelist -4867322212`")
+                return
+        else:
+            if message.chat.type in ['group', 'supergroup']:
+                chat_id = message.chat.id
+            else:
+                await message.answer("❌ **Group ID kiriting yoki guruhda ishlatiladi!** Misol: `/quick_whitelist -4867322212`")
+                return
+        
+        # Проверяем, уже ли в whitelist
+        if db.is_group_whitelisted(chat_id):
+            await message.answer(f"✅ **Группа `{chat_id}` уже в whitelist!**", parse_mode="Markdown")
+            return
+        
+        # Добавляем в whitelist
+        success = db.add_group_to_whitelist(chat_id)
+        if success:
+            await message.answer(f"✅ **Группа `{chat_id}` добавлена в whitelist!**", parse_mode="Markdown")
+            
+            # Перезапускаем планировщик для этой группы
+            from handlers.users.video_scheduler import schedule_single_group_jobs
+            result = schedule_single_group_jobs(chat_id)
+            if result:
+                await message.answer("🔄 **Задачи планировщика обновлены для группы!**")
+        else:
+            await message.answer(f"❌ **Ошибка добавления группы `{chat_id}` в whitelist!**", parse_mode="Markdown")
+        
+    except Exception as e:
+        await handle_error_with_notification(e, "quick_whitelist_command", message)
+
+
 # Команда для экстренных ситуаций
 @dp.message_handler(commands=['emergency_group_video'])
 async def emergency_group_video_command(message: types.Message):
