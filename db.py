@@ -648,20 +648,53 @@ class Database:
         """Обновляет только start_video для текущего сезона, не меняя season_id"""
         try:
             cursor = self.conn.cursor()
+            
+            # Проверяем, существует ли запись для группы
+            cursor.execute('''
+                SELECT chat_id, centris_start_video, golden_start_video 
+                FROM group_video_settings WHERE chat_id = %s
+            ''', (str(chat_id),))
+            existing = cursor.fetchone()
+            
+            if not existing:
+                logger.error(f"❌ Группа {chat_id} не найдена в group_video_settings!")
+                cursor.close()
+                return False
+            
+            # Обновляем start_video
             if project == 'centris':
                 cursor.execute('''
                     UPDATE group_video_settings SET centris_start_video = %s WHERE chat_id = %s
                 ''', (video_index, str(chat_id)))
+                logger.info(f"🔄 SQL: UPDATE centris_start_video = {video_index} WHERE chat_id = {chat_id}")
             elif project == 'golden':
                 cursor.execute('''
                     UPDATE group_video_settings SET golden_start_video = %s WHERE chat_id = %s
                 ''', (video_index, str(chat_id)))
+                logger.info(f"🔄 SQL: UPDATE golden_start_video = {video_index} WHERE chat_id = {chat_id}")
+            else:
+                logger.error(f"❌ Неизвестный проект: {project}")
+                cursor.close()
+                return False
+            
+            # Проверяем количество обновленных строк
+            rows_affected = cursor.rowcount
+            logger.info(f"📊 Обновлено строк: {rows_affected}")
+            
+            if rows_affected == 0:
+                logger.error(f"❌ НИ ОДНА СТРОКА НЕ ОБНОВЛЕНА! Группа {chat_id}, проект {project}")
+                cursor.close()
+                return False
+            
             self.conn.commit()
             cursor.close()
-            print(f"✅ Обновлен start_video для группы {chat_id}, проект {project}: {video_index}")
+            logger.info(f"✅ Обновлен start_video для группы {chat_id}, проект {project}: {video_index}")
+            return True
+            
         except Exception as e:
-            logger.error(f"Ошибка при установке стартового сезона/видео для группы {chat_id}, проект {project}: {e}")
+            logger.error(f"❌ Ошибка при обновлении start_video для группы {chat_id}, проект {project}: {e}")
             self.conn.rollback()
+            return False
 
     def get_group_video_start(self, chat_id: int, project: str):
         try:

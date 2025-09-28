@@ -8724,3 +8724,123 @@ async def reset_video_position_command(message: types.Message):
         )
     except Exception as e:
         await handle_error_with_notification(e, "reset_video_position_command", message)
+
+
+# Команда для тестирования обновления позиции
+@dp.message_handler(commands=['test_position_update'])
+async def test_position_update_command(message: types.Message):
+    """Протестировать обновление позиции видео"""
+    from data.config import SUPER_ADMIN_IDS
+    
+    if message.from_user.id not in SUPER_ADMIN_IDS:
+        await message.answer("❌ **Sizda ushbu buyruqni ishlatish huquqi yo'q!**")
+        return
+    
+    try:
+        # Получаем ID группы из сообщения
+        args = message.text.split()
+        if len(args) < 2:
+            await message.answer(
+                "❌ **Noto'g'ri format!**\n\n"
+                "**Foydalanish:** `/test_position_update [guruh_id]`\n"
+                "**Misol:** `/test_position_update -4659541321`",
+                parse_mode="Markdown"
+            )
+            return
+        
+        group_id = int(args[1])
+        
+        # Получаем текущие настройки
+        settings = db.get_group_video_settings(group_id)
+        if not settings:
+            await message.answer(f"❌ **Guruh topilmadi!** ID: `{group_id}`")
+            return
+        
+        group_name = settings.get('group_name', 'Noma\'lum')
+        centris_start = settings.get('centris_start_video', 'N/A')
+        golden_start = settings.get('golden_start_video', 'N/A')
+        
+        await message.answer(
+            f"🧪 **POZITSIYA YANGILANISHINI SINASH**\n\n"
+            f"📱 **Guruh:** {group_name}\n"
+            f"🆔 **ID:** `{group_id}`\n\n"
+            f"📋 **Hozirgi pozitsiyalar:**\n"
+            f"• Centris: {centris_start}\n"
+            f"• Golden: {golden_start}\n\n"
+            f"⏳ **Test boshlanmoqda...**"
+        )
+        
+        test_results = []
+        
+        # Тест 1: Обновление Centris позиции
+        try:
+            new_centris_pos = int(centris_start) + 10 if str(centris_start).isdigit() else 10
+            result1 = db.update_group_video_start_only(group_id, 'centris', new_centris_pos)
+            
+            # Проверяем результат
+            updated_settings = db.get_group_video_settings(group_id)
+            actual_centris = updated_settings.get('centris_start_video', 'ERROR') if updated_settings else 'ERROR'
+            
+            if result1 and str(actual_centris) == str(new_centris_pos):
+                test_results.append(f"✅ **Centris test:** {centris_start} → {actual_centris}")
+            else:
+                test_results.append(f"❌ **Centris test:** FAILED (expected {new_centris_pos}, got {actual_centris})")
+                
+        except Exception as e:
+            test_results.append(f"❌ **Centris test:** ERROR - {str(e)}")
+        
+        # Тест 2: Обновление Golden позиции
+        try:
+            new_golden_pos = int(golden_start) + 10 if str(golden_start).isdigit() else 10
+            result2 = db.update_group_video_start_only(group_id, 'golden', new_golden_pos)
+            
+            # Проверяем результат
+            updated_settings = db.get_group_video_settings(group_id)
+            actual_golden = updated_settings.get('golden_start_video', 'ERROR') if updated_settings else 'ERROR'
+            
+            if result2 and str(actual_golden) == str(new_golden_pos):
+                test_results.append(f"✅ **Golden test:** {golden_start} → {actual_golden}")
+            else:
+                test_results.append(f"❌ **Golden test:** FAILED (expected {new_golden_pos}, got {actual_golden})")
+                
+        except Exception as e:
+            test_results.append(f"❌ **Golden test:** ERROR - {str(e)}")
+        
+        # Восстанавливаем исходные позиции
+        try:
+            if str(centris_start).isdigit():
+                db.update_group_video_start_only(group_id, 'centris', int(centris_start))
+            if str(golden_start).isdigit():
+                db.update_group_video_start_only(group_id, 'golden', int(golden_start))
+            test_results.append(f"🔄 **Pozitsiyalar qayta tiklandi**")
+        except Exception as e:
+            test_results.append(f"⚠️ **Qayta tiklashda xatolik:** {str(e)}")
+        
+        # Результат теста
+        success_count = len([r for r in test_results if r.startswith('✅')])
+        total_tests = 2
+        
+        response = (
+            f"📊 **TEST NATIJASI:**\n\n"
+            f"📱 **Guruh:** {group_name}\n"
+            f"🆔 **ID:** `{group_id}`\n\n"
+            f"{''.join([f'{r}\\n' for r in test_results])}\n"
+            f"📈 **Jami:** {success_count}/{total_tests} muvaffaqiyatli\n\n"
+        )
+        
+        if success_count == total_tests:
+            response += "🎉 **Pozitsiya yangilanish tizimi ishlaydi!**"
+        else:
+            response += "⚠️ **Pozitsiya yangilanishida muammolar bor!**"
+        
+        await message.answer(response, parse_mode="Markdown")
+        
+    except ValueError:
+        await message.answer(
+            "❌ **Noto'g'ri format!**\n\n"
+            "Guruh ID raqam bo'lishi kerak.\n"
+            "Masalan: `/test_position_update -4659541321`",
+            parse_mode="Markdown"
+        )
+    except Exception as e:
+        await handle_error_with_notification(e, "test_position_update_command", message)

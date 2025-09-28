@@ -362,8 +362,35 @@ async def send_group_video_new(chat_id: int, project: str, season_id: int = None
                 
                 # Приводим название проекта к формату базы данных
                 project_for_db_update = "golden" if project == "golden_lake" else project
-                db.update_group_video_start_only(chat_id, project_for_db_update, next_position)
-                logger.info(f"🎯 Обновлен start_video для группы {chat_id}: {position} → {next_position} (следующая реальная позиция)")
+                
+                # ОТЛАДКА: Проверяем start_video ДО обновления
+                current_settings = db.get_group_video_settings(chat_id)
+                current_start = current_settings.get(f'{project_for_db_update}_start_video', 'N/A') if current_settings else 'N/A'
+                logger.info(f"🔍 ДО обновления: группа {chat_id}, проект {project_for_db_update}, start_video = {current_start}")
+                
+                update_result = db.update_group_video_start_only(chat_id, project_for_db_update, next_position)
+                
+                if update_result:
+                    logger.info(f"🎯 Обновлен start_video для группы {chat_id}: {position} → {next_position} (следующая реальная позиция)")
+                    
+                    # ОТЛАДКА: Проверяем start_video ПОСЛЕ обновления
+                    updated_settings = db.get_group_video_settings(chat_id)
+                    updated_start = updated_settings.get(f'{project_for_db_update}_start_video', 'N/A') if updated_settings else 'N/A'
+                    logger.info(f"🔍 ПОСЛЕ обновления: группа {chat_id}, проект {project_for_db_update}, start_video = {updated_start}")
+                    
+                    # ПРОВЕРКА: Если start_video не изменился - это ошибка!
+                    if str(current_start) == str(updated_start) and current_start != 'N/A':
+                        logger.error(f"🚨 КРИТИЧЕСКАЯ ОШИБКА: start_video НЕ ИЗМЕНИЛСЯ! Было: {current_start}, стало: {updated_start}")
+                        logger.error(f"🚨 Это приведет к повторной отправке того же видео!")
+                        # Попробуем альтернативный способ обновления
+                        logger.info(f"🔄 Пробуем альтернативный способ обновления через set_group_video_start...")
+                        db.set_group_video_start(chat_id, project_for_db_update, season_id, next_position)
+                    else:
+                        logger.info(f"✅ start_video успешно обновлен: {current_start} → {updated_start}")
+                else:
+                    logger.error(f"🚨 ОШИБКА ОБНОВЛЕНИЯ start_video! Пробуем альтернативный способ...")
+                    # Попробуем старую функцию
+                    db.set_group_video_start(chat_id, project_for_db_update, season_id, next_position)
                 
                 return True
             else:
