@@ -970,7 +970,7 @@ async def stop_group_video_command(message: types.Message):
         from handlers.users.video_scheduler import scheduler
         jobs_to_remove = []
         for job in scheduler.get_jobs():
-            if job.id.startswith(f"group_") and str(chat_id) in job.id:
+            if job.id.startswith(f"group_") and str(abs(chat_id)) in job.id:
                 jobs_to_remove.append(job.id)
         
         for job_id in jobs_to_remove:
@@ -1351,7 +1351,7 @@ async def reset_group_video_command(message: types.Message):
         from handlers.users.video_scheduler import scheduler
         jobs_to_remove = []
         for job in scheduler.get_jobs():
-            if job.id.startswith(f"group_") and str(chat_id) in job.id:
+            if job.id.startswith(f"group_") and str(abs(chat_id)) in job.id:
                 jobs_to_remove.append(job.id)
         
         for job_id in jobs_to_remove:
@@ -1976,7 +1976,7 @@ async def schedule_group_video_command(message: types.Message):
         from handlers.users.video_scheduler import scheduler
         jobs_to_remove = []
         for job in scheduler.get_jobs():
-            if job.id.startswith(f"group_") and str(chat_id) in job.id:
+            if job.id.startswith(f"group_") and str(abs(chat_id)) in job.id:
                 jobs_to_remove.append(job.id)
         
         for job_id in jobs_to_remove:
@@ -2056,7 +2056,7 @@ async def debug_group_video_command(message: types.Message):
         
         # Запланированные задачи
         from handlers.users.video_scheduler import scheduler
-        group_jobs = [job for job in scheduler.get_jobs() if job.id.startswith(f"group_") and str(chat_id) in job.id]
+        group_jobs = [job for job in scheduler.get_jobs() if job.id.startswith(f"group_") and str(abs(chat_id)) in job.id]
         response += f"⏰ **REJALANGAN VAZIFALAR:** {len(group_jobs)} ta\n"
         for job in group_jobs:
             response += f"   • {job.id}: {job.next_run_time}\n"
@@ -3208,7 +3208,7 @@ async def diagnose_group_command(message: types.Message):
         
         # Проверяем задачи планировщика
         from handlers.users.video_scheduler import scheduler
-        group_jobs = [job for job in scheduler.get_jobs() if f"group_{chat_id}_" in job.id]
+        group_jobs = [job for job in scheduler.get_jobs() if f"group_{abs(chat_id)}_" in job.id]
         response += f"📋 **Задачи планировщика:** {len(group_jobs)}\n"
         
         for job in group_jobs[:3]:  # Показываем первые 3
@@ -3519,6 +3519,83 @@ async def fix_season_ids_command(message: types.Message):
         
     except Exception as e:
         await handle_error_with_notification(e, "fix_season_ids_command", message)
+
+
+# Команда для очистки неправильных задач планировщика
+@dp.message_handler(commands=['cleanup_scheduler_jobs'])
+async def cleanup_scheduler_jobs_command(message: types.Message):
+    """Очистить все неправильные задачи планировщика и пересоздать"""
+    from data.config import SUPER_ADMIN_IDS
+    
+    if message.from_user.id not in SUPER_ADMIN_IDS:
+        await message.answer("❌ **Sizda ushbu buyruqni ishlatish huquqi yo'q!**")
+        return
+    
+    try:
+        await message.answer("🧹 **ОЧИСТКА ЗАДАЧ ПЛАНИРОВЩИКА**\n\n⏳ Анализируем задачи...")
+        
+        from handlers.users.video_scheduler import scheduler, init_scheduler
+        
+        # Получаем все задачи
+        all_jobs = scheduler.get_jobs()
+        
+        # Ищем проблемные задачи (с отрицательными ID в названии)
+        problematic_jobs = []
+        for job in all_jobs:
+            if job.id.startswith("group_-"):
+                problematic_jobs.append(job.id)
+        
+        response = f"📊 **АНАЛИЗ ЗАДАЧ:**\n"
+        response += f"• Всего задач: {len(all_jobs)}\n"
+        response += f"• Проблемных задач: {len(problematic_jobs)}\n\n"
+        
+        if problematic_jobs:
+            response += "❌ **Найдены проблемные задачи:**\n"
+            for job_id in problematic_jobs[:5]:  # Первые 5
+                response += f"• `{job_id}`\n"
+            
+            if len(problematic_jobs) > 5:
+                response += f"• ... и еще {len(problematic_jobs) - 5}\n"
+            
+            response += "\n🔄 **Удаляем проблемные задачи...**"
+            await message.answer(response, parse_mode="Markdown")
+            
+            # Удаляем все проблемные задачи
+            for job_id in problematic_jobs:
+                try:
+                    scheduler.remove_job(job_id)
+                except:
+                    pass
+            
+            await message.answer(f"✅ **Удалено {len(problematic_jobs)} проблемных задач**")
+        else:
+            await message.answer(response + "✅ **Проблемных задач не найдено!**", parse_mode="Markdown")
+        
+        # Перезапускаем планировщик
+        await message.answer("🔄 **Перезапускаем планировщик...**")
+        
+        if scheduler.running:
+            scheduler.shutdown()
+        
+        await init_scheduler()
+        
+        # Проверяем результат
+        new_jobs = scheduler.get_jobs()
+        new_problematic = [job.id for job in new_jobs if job.id.startswith("group_-")]
+        
+        final_response = f"✅ **РЕЗУЛЬТАТ ОЧИСТКИ:**\n\n"
+        final_response += f"• Задач после очистки: {len(new_jobs)}\n"
+        final_response += f"• Проблемных задач: {len(new_problematic)}\n"
+        
+        if len(new_problematic) == 0:
+            final_response += "\n🎉 **Все задачи теперь корректны!**"
+        else:
+            final_response += f"\n⚠️ **Все еще есть {len(new_problematic)} проблемных задач**"
+        
+        await message.answer(final_response, parse_mode="Markdown")
+        
+    except Exception as e:
+        await handle_error_with_notification(e, "cleanup_scheduler_jobs_command", message)
 
 
 # Команда для экстренных ситуаций

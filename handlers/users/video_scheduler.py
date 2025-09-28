@@ -1004,6 +1004,7 @@ def schedule_group_jobs_v2():
     groups = db.get_all_groups_with_settings()
     for group in groups:
         chat_id = group[0]
+        safe_chat_id = abs(chat_id)  # Безопасный ID для задач
         centris_enabled = bool(group[1])
         centris_season_id = group[2]  # centris_season_id
         centris_start_video = group[3]  # centris_start_video
@@ -1039,7 +1040,7 @@ def schedule_group_jobs_v2():
                         send_group_video_new,
                         hour, minute,
                         [chat_id, 'centris', centris_season_id, centris_start_video],
-                        f'group_{chat_id}_centris_{i}',
+                        f'group_{safe_chat_id}_centris_{i}',
                         "Asia/Tashkent"
                     )
                 except ValueError:
@@ -1057,7 +1058,7 @@ def schedule_group_jobs_v2():
                         send_group_video_new,
                         hour, minute,
                         [chat_id, 'golden_lake', golden_season_id, golden_start_video],
-                        f'group_{chat_id}_golden_{i}',
+                        f'group_{safe_chat_id}_golden_{i}',
                         "Asia/Tashkent"
                     )
                 except ValueError:
@@ -1091,7 +1092,7 @@ def schedule_group_jobs_v2():
                         send_group_video_new,
                         hour, minute,
                         [chat_id, project, season_id, start_video],
-                        f'group_{chat_id}_{project}_{i}',
+                        f'group_{safe_chat_id}_{project}_{i}',
                         "Asia/Tashkent"
                     )
                     
@@ -1113,10 +1114,13 @@ def schedule_single_group_jobs(chat_id: int):
     try:
         logger.info(f"Планирование задач для группы {chat_id}")
         
+        # Создаем безопасный ID для задач (убираем знак минус)
+        safe_chat_id = abs(chat_id)
+        
         # Удаляем существующие задачи для этой группы
         jobs = scheduler.get_jobs()
         for job in jobs:
-            if job.id.startswith(f"group_{chat_id}_"):
+            if job.id.startswith(f"group_{safe_chat_id}_"):
                 scheduler.remove_job(job.id)
                 logger.info(f"Удалена задача {job.id}")
         
@@ -1198,7 +1202,7 @@ def schedule_single_group_jobs(chat_id: int):
                         send_group_video_new,
                         hour, minute,
                         [chat_id, 'centris', centris_season_id, centris_start_video],
-                        f'group_{chat_id}_centris_{i}',
+                        f'group_{safe_chat_id}_centris_{i}',
                         "Asia/Tashkent"
                     )
                 except ValueError:
@@ -1216,7 +1220,7 @@ def schedule_single_group_jobs(chat_id: int):
                         send_group_video_new,
                         hour, minute,
                         [chat_id, 'golden_lake', golden_season_id, golden_start_video],
-                        f'group_{chat_id}_golden_{i}',
+                        f'group_{safe_chat_id}_golden_{i}',
                         "Asia/Tashkent"
                     )
                 except ValueError:
@@ -1250,7 +1254,7 @@ def schedule_single_group_jobs(chat_id: int):
                         send_group_video_new,
                         hour, minute,
                         [chat_id, project, season_id, start_video],
-                        f'group_{chat_id}_{project}_{i}',
+                        f'group_{safe_chat_id}_{project}_{i}',
                         "Asia/Tashkent"
                     )
                     
