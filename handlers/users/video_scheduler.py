@@ -230,6 +230,7 @@ async def notify_superadmins_season_auto_switched(chat_id: int, old_season_id: i
 async def send_group_video_new(chat_id: int, project: str, season_id: int = None, start_video: int = None):
     """Отправить новое видео в группу согласно настройкам"""
     try:
+        from loader import bot  # Импортируем bot в начале функции
         # ПРОВЕРКА БЕЗОПАСНОСТИ: Группа должна быть в whitelist
         if not db.is_group_whitelisted(chat_id):
             logger.warning(f"Guruh {chat_id} whitelist da emas, video yuborilmaydi")
@@ -826,6 +827,13 @@ def schedule_jobs_for_users():
         
         # Создаем задачи для текущих получателей
         for recipient_id, is_group in recipients:
+            # ИСПРАВЛЕНИЕ: Приводим recipient_id к int если он строка
+            try:
+                recipient_id = int(recipient_id)
+            except (ValueError, TypeError):
+                logger.error(f"Неверный recipient_id: {recipient_id} (тип: {type(recipient_id)})")
+                continue
+                
             scheduler.add_job(
                 scheduled_send_08,
                 trigger='cron',
@@ -851,6 +859,13 @@ def schedule_jobs_for_users():
         logger.info(f"Планируем задачи для {len(groups_settings)} групп с настройками")
         for group in groups_settings:
             chat_id = group[0]
+            # ИСПРАВЛЕНИЕ: Приводим к int если приходит строка
+            try:
+                chat_id = int(chat_id)
+            except (ValueError, TypeError):
+                logger.error(f"Неверный chat_id в группе: {chat_id} (тип: {type(chat_id)})")
+                continue
+            
             schedule_single_group_jobs(chat_id)
 
     except Exception as e:
@@ -1012,6 +1027,13 @@ def schedule_group_jobs_v2():
     groups = db.get_all_groups_with_settings()
     for group in groups:
         chat_id = group[0]
+        # ИСПРАВЛЕНИЕ: Приводим chat_id к int если он строка
+        try:
+            chat_id = int(chat_id)
+        except (ValueError, TypeError):
+            logger.error(f"Неверный chat_id в группе: {chat_id} (тип: {type(chat_id)})")
+            continue
+        
         safe_chat_id = abs(chat_id)  # Безопасный ID для задач
         centris_enabled = bool(group[1])
         centris_season_id = group[2]  # centris_season_id
@@ -1115,11 +1137,18 @@ def schedule_group_jobs_v2():
     logger.info(f"Всего запланировано задач: {len(scheduler.get_jobs())}")
 
 
-def schedule_single_group_jobs(chat_id: int):
+def schedule_single_group_jobs(chat_id):
     """
     Планирует задачи для конкретной группы с поддержкой пользовательского времени
     """
     try:
+        # ИСПРАВЛЕНИЕ: Приводим chat_id к int если он строка
+        try:
+            chat_id = int(chat_id)
+        except (ValueError, TypeError):
+            logger.error(f"Неверный chat_id: {chat_id} (тип: {type(chat_id)})")
+            return False
+        
         logger.info(f"Планирование задач для группы {chat_id}")
         
         # Создаем безопасный ID для задач (убираем знак минус)

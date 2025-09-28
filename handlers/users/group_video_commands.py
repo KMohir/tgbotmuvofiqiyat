@@ -8447,3 +8447,62 @@ async def test_send_video_command(message: types.Message):
     except Exception as e:
         logger.error(f"Ошибка при тестировании отправки видео: {e}")
         await message.answer("❌ **Xatolik yuz berdi!**")
+
+
+# Команда для диагностики типов данных в БД
+@dp.message_handler(commands=['check_db_types'])
+async def check_db_types_command(message: types.Message):
+    """Проверить типы данных в базе данных"""
+    from data.config import SUPER_ADMIN_IDS
+    
+    if message.from_user.id not in SUPER_ADMIN_IDS:
+        await message.answer("❌ **Sizda ushbu buyruqni ishlatish huquqi yo'q!**")
+        return
+    
+    try:
+        await message.answer("🔍 **ПРОВЕРКА ТИПОВ ДАННЫХ В БД**\n\n⏳ Сканируем...")
+        
+        # Получаем все группы с настройками
+        groups = db.get_all_groups_with_settings()
+        
+        response = f"📊 **АНАЛИЗ ТИПОВ ДАННЫХ:**\n\n"
+        response += f"• Всего групп: {len(groups)}\n\n"
+        
+        string_chat_ids = []
+        invalid_season_ids = []
+        
+        for i, group in enumerate(groups[:5]):  # Первые 5 для анализа
+            chat_id = group[0]
+            centris_season_id = group[2]
+            golden_season_id = group[5]
+            
+            # Проверяем тип chat_id
+            if isinstance(chat_id, str):
+                string_chat_ids.append(chat_id)
+            
+            # Проверяем season_id
+            if centris_season_id == "centris" or golden_season_id == "golden":
+                invalid_season_ids.append(chat_id)
+            
+            response += f"📋 **Группа {i+1}:**\n"
+            response += f"   • chat_id: `{chat_id}` ({type(chat_id).__name__})\n"
+            response += f"   • centris_season: `{centris_season_id}` ({type(centris_season_id).__name__})\n"
+            response += f"   • golden_season: `{golden_season_id}` ({type(golden_season_id).__name__})\n\n"
+        
+        if len(groups) > 5:
+            response += f"... и еще {len(groups) - 5} групп\n\n"
+        
+        # Итоговая статистика проблем
+        response += f"🚨 **ПРОБЛЕМЫ:**\n"
+        response += f"• Строковые chat_id: {len(string_chat_ids)}\n"
+        response += f"• Неправильные season_id: {len(invalid_season_ids)}\n"
+        
+        if string_chat_ids or invalid_season_ids:
+            response += f"\n🔧 **Рекомендация:** Используйте `/fix_all_scheduler_problems`"
+        else:
+            response += f"\n✅ **Проблем с типами не найдено!**"
+        
+        await message.answer(response, parse_mode="Markdown")
+        
+    except Exception as e:
+        await handle_error_with_notification(e, "check_db_types_command", message)
