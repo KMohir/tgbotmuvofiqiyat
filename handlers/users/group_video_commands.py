@@ -8556,6 +8556,7 @@ async def test_video_sequence_command(message: types.Message):
         )
         
         # Тестируем отправку видео
+        from handlers.users.video_scheduler import send_group_video_new
         success_count = 0
         total_attempts = 3
         
@@ -8606,3 +8607,120 @@ async def test_video_sequence_command(message: types.Message):
         )
     except Exception as e:
         await handle_error_with_notification(e, "test_video_sequence_command", message)
+
+
+# Команда для сброса позиции видео группы
+@dp.message_handler(commands=['reset_video_position'])
+async def reset_video_position_command(message: types.Message):
+    """Сбросить позицию видео группы на начало сезона"""
+    from data.config import SUPER_ADMIN_IDS
+    
+    if message.from_user.id not in SUPER_ADMIN_IDS:
+        await message.answer("❌ **Sizda ushbu buyruqni ishlatish huquqi yo'q!**")
+        return
+    
+    try:
+        # Получаем ID группы и проект из сообщения
+        args = message.text.split()
+        if len(args) < 3:
+            await message.answer(
+                "❌ **Noto'g'ri format!**\n\n"
+                "**Foydalanish:** `/reset_video_position [guruh_id] [loyiha]`\n"
+                "**Misollar:**\n"
+                "• `/reset_video_position -4867322212 centris`\n"
+                "• `/reset_video_position -4867322212 golden`\n"
+                "• `/reset_video_position -4867322212 both`",
+                parse_mode="Markdown"
+            )
+            return
+        
+        group_id = int(args[1])
+        project = args[2].lower()
+        
+        if project not in ['centris', 'golden', 'both']:
+            await message.answer("❌ **Loyiha noto'g'ri! Foydalaning: centris, golden yoki both**")
+            return
+        
+        # Получаем информацию о группе
+        group_settings = db.get_group_video_settings(group_id)
+        if not group_settings:
+            await message.answer(f"❌ **Guruh topilmadi!**\n\n🆔 **ID:** `{group_id}`")
+            return
+        
+        group_name = group_settings.get('group_name', 'Noma\'lum')
+        
+        await message.answer(
+            f"🔄 **VIDEO POZITSIYASINI QAYTA TIKLASH**\n\n"
+            f"📱 **Guruh:** {group_name}\n"
+            f"🆔 **ID:** `{group_id}`\n"
+            f"🎬 **Loyiha:** {project}\n\n"
+            f"⏳ **Jarayon boshlanmoqda...**"
+        )
+        
+        reset_count = 0
+        
+        # Сбрасываем позицию для указанного проекта
+        if project == 'centris' or project == 'both':
+            centris_season_id = group_settings.get('centris_season_id')
+            if centris_season_id and centris_season_id != 'centris':
+                # Получаем первое видео сезона
+                videos = db.get_videos_by_season(centris_season_id)
+                if videos:
+                    videos.sort(key=lambda x: x[2])  # Сортируем по позиции
+                    first_position = videos[0][2]  # Позиция первого видео
+                    
+                    db.update_group_video_start_only(group_id, 'centris', first_position)
+                    reset_count += 1
+                    await message.answer(f"✅ **Centris позиция сброшена на {first_position}**")
+                else:
+                    await message.answer(f"❌ **Centris сезон {centris_season_id} не содержит видео**")
+            else:
+                await message.answer(f"❌ **Centris сезон не настроен: {centris_season_id}**")
+        
+        if project == 'golden' or project == 'both':
+            golden_season_id = group_settings.get('golden_season_id')
+            if golden_season_id and golden_season_id != 'golden':
+                # Получаем первое видео сезона
+                videos = db.get_videos_by_season(golden_season_id)
+                if videos:
+                    videos.sort(key=lambda x: x[2])  # Сортируем по позиции
+                    first_position = videos[0][2]  # Позиция первого видео
+                    
+                    db.update_group_video_start_only(group_id, 'golden', first_position)
+                    reset_count += 1
+                    await message.answer(f"✅ **Golden позиция сброшена на {first_position}**")
+                else:
+                    await message.answer(f"❌ **Golden сезон {golden_season_id} не содержит видео**")
+            else:
+                await message.answer(f"❌ **Golden сезон не настроен: {golden_season_id}**")
+        
+        # Итоговый результат
+        if reset_count > 0:
+            await message.answer(
+                f"🎉 **POZITSIYA MUVAFFAQIYATLI QAYTA TIKLANDI!**\n\n"
+                f"📱 **Guruh:** {group_name}\n"
+                f"🆔 **ID:** `{group_id}`\n"
+                f"🔄 **Qayta tiklangan:** {reset_count} loyiha\n\n"
+                f"📺 **Endi video 1-pozitsiyadan boshlanadi!**\n\n"
+                f"💡 **Test qiling:** `/test_video_sequence {group_id}`"
+            )
+        else:
+            await message.answer(
+                f"❌ **HECH QANDAY POZITSIYA QAYTA TIKLANMADI!**\n\n"
+                f"📱 **Guruh:** {group_name}\n"
+                f"🆔 **ID:** `{group_id}`\n\n"
+                f"📋 **Sabablar:**\n"
+                f"• Loyihalar yoqilmagan\n"
+                f"• Sezon ID noto'g'ri\n"
+                f"• Videolar mavjud emas"
+            )
+        
+    except ValueError:
+        await message.answer(
+            "❌ **Noto'g'ri format!**\n\n"
+            "Guruh ID raqam bo'lishi kerak.\n"
+            "Masalan: `/reset_video_position -4867322212 centris`",
+            parse_mode="Markdown"
+        )
+    except Exception as e:
+        await handle_error_with_notification(e, "reset_video_position_command", message)

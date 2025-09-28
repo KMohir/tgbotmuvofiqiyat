@@ -322,6 +322,10 @@ async def send_group_video_new(chat_id: int, project: str, season_id: int = None
         logger.info(f"🎯 Начинаем поиск с позиции start_video: {start_video}")
         logger.info(f"🎯 Список всех видео сезона: {[(position, title[:30]) for url, title, position in current_season_videos[:5]]}...")
         
+        # ИСПРАВЛЕНИЕ: Сортируем видео по позиции для правильного порядка
+        current_season_videos.sort(key=lambda x: x[2])  # Сортируем по position (индекс 2)
+        logger.info(f"🎯 Отсортированные видео: {[(position, title[:30]) for url, title, position in current_season_videos[:5]]}...")
+        
         for video_idx, (url, title, position) in enumerate(current_season_videos):
             video_key = f"{season_id}:{position}"
             logger.info(f"🎯 Проверяем видео: position={position}, start_video={start_video}, video_key={video_key}")
@@ -344,12 +348,22 @@ async def send_group_video_new(chat_id: int, project: str, season_id: int = None
                 db.mark_group_video_as_viewed_detailed_by_project(chat_id, season_id, position, project_for_db)
                 logger.info(f"✅ Видео {video_key} отмечено как просмотренное для группы {chat_id}, проект {project}")
                 
-                # ВАЖНО: Обновляем start_video на следующую позицию
-                next_position = position + 1
+                # ВАЖНО: Обновляем start_video на следующую РЕАЛЬНУЮ позицию
+                # Ищем следующую позицию в отсортированном списке видео
+                next_position = None
+                for next_idx in range(video_idx + 1, len(current_season_videos)):
+                    next_position = current_season_videos[next_idx][2]  # position следующего видео
+                    break
+                
+                if next_position is None:
+                    # Если это последнее видео в сезоне, ставим позицию больше максимальной
+                    max_position = max([v[2] for v in current_season_videos]) if current_season_videos else position
+                    next_position = max_position + 1
+                
                 # Приводим название проекта к формату базы данных
                 project_for_db_update = "golden" if project == "golden_lake" else project
                 db.update_group_video_start_only(chat_id, project_for_db_update, next_position)
-                logger.info(f"🎯 Обновлен start_video для группы {chat_id}: {position} → {next_position}")
+                logger.info(f"🎯 Обновлен start_video для группы {chat_id}: {position} → {next_position} (следующая реальная позиция)")
                 
                 return True
             else:
