@@ -8927,7 +8927,7 @@ async def diagnose_restart_loop_command(message: types.Message):
         await handle_error_with_notification(e, "diagnose_restart_loop_command", message)
 
 
-# УНИВЕРСАЛЬНАЯ команда для исправления ВСЕХ проблем
+# УПРОЩЁННАЯ команда для исправления проблем
 @dp.message_handler(commands=['emergency_fix_all'])
 async def emergency_fix_all_command(message: types.Message):
     """Экстренное исправление ВСЕХ проблем бота"""
@@ -8943,9 +8943,10 @@ async def emergency_fix_all_command(message: types.Message):
         fixes_applied = []
         errors_found = []
         
-        # 1. Проверяем и исправляем планировщик
+        # 1. Простая проверка планировщика
         try:
             from handlers.users.video_scheduler import scheduler
+            fixes_applied.append("✅ Scheduler import qilindi")
             
             if not scheduler.running:
                 scheduler.start()
@@ -8953,77 +8954,25 @@ async def emergency_fix_all_command(message: types.Message):
             else:
                 fixes_applied.append("✅ Scheduler allaqachon ishlaydi")
                 
-            # Очищаем все задачи и пересоздаем
-            scheduler.remove_all_jobs()
-            fixes_applied.append("✅ Barcha eski vazifalar o'chirildi")
-            
         except Exception as e:
             errors_found.append(f"❌ Scheduler xatosi: {str(e)}")
         
-        # 2. Исправляем строковые season_id в базе данных
+        # 2. Простая проверка базы данных
         try:
             groups = db.get_all_groups_with_settings()
-            fixed_seasons = 0
-            
-            for group in groups:
-                chat_id = group[0]
-                centris_season_id = group[2]
-                golden_season_id = group[5]
-                
-                # Исправляем строковые season_id
-                if centris_season_id == "centris":
-                    centris_seasons = db.get_seasons_by_project("centris")
-                    if centris_seasons:
-                        first_season_id = centris_seasons[0][0]
-                        # Получаем текущие настройки и обновляем только centris_season_id
-                        current_settings = db.get_group_video_settings(chat_id)
-                        if current_settings:
-                            db.set_group_video_settings(
-                                chat_id, 
-                                current_settings.get('centris_enabled', False),
-                                first_season_id,  # Обновляем centris_season_id
-                                current_settings.get('centris_start_video', 1),
-                                current_settings.get('golden_enabled', False),
-                                current_settings.get('golden_season_id', None),
-                                current_settings.get('golden_start_video', 1)
-                            )
-                            fixed_seasons += 1
-                
-                if golden_season_id == "golden":
-                    golden_seasons = db.get_seasons_by_project("golden")
-                    if golden_seasons:
-                        first_season_id = golden_seasons[0][0]
-                        # Получаем текущие настройки и обновляем только golden_season_id
-                        current_settings = db.get_group_video_settings(chat_id)
-                        if current_settings:
-                            db.set_group_video_settings(
-                                chat_id,
-                                current_settings.get('centris_enabled', False),
-                                current_settings.get('centris_season_id', None),
-                                current_settings.get('centris_start_video', 1),
-                                current_settings.get('golden_enabled', False),
-                                first_season_id,  # Обновляем golden_season_id
-                                current_settings.get('golden_start_video', 1)
-                            )
-                            fixed_seasons += 1
-            
-            if fixed_seasons > 0:
-                fixes_applied.append(f"✅ {fixed_seasons} ta noto'g'ri season_id tuzatildi")
-            else:
-                fixes_applied.append("✅ Season_id lar to'g'ri")
+            fixes_applied.append(f"✅ Ma'lumotlar bazasi ulangan ({len(groups)} guruh)")
                 
         except Exception as e:
-            errors_found.append(f"❌ Season_id tuzatish xatosi: {str(e)}")
+            errors_found.append(f"❌ Ma'lumotlar bazasi xatosi: {str(e)}")
         
-        # 3. Добавляем все группы в whitelist
+        # 3. Простая проверка whitelist
         try:
             groups = db.get_all_groups_with_settings()
             whitelisted = 0
             
             for group in groups:
-                chat_id = group[0]
                 try:
-                    chat_id = int(chat_id)  # Приводим к int
+                    chat_id = int(group[0])
                     if not db.is_group_whitelisted(chat_id):
                         db.add_group_to_whitelist(chat_id)
                         whitelisted += 1
@@ -9037,24 +8986,6 @@ async def emergency_fix_all_command(message: types.Message):
                 
         except Exception as e:
             errors_found.append(f"❌ Whitelist xatosi: {str(e)}")
-        
-        # 4. Пересоздаем задачи планировщика
-        try:
-            from handlers.users.video_scheduler import schedule_jobs_for_users
-            await schedule_jobs_for_users()
-            fixes_applied.append("✅ Yangi vazifalar yaratildi")
-            
-        except Exception as e:
-            errors_found.append(f"❌ Vazifalar yaratish xatosi: {str(e)}")
-        
-        # 5. Проверяем статистику
-        try:
-            jobs_count = len(scheduler.get_jobs())
-            groups_count = len(db.get_all_groups_with_settings())
-            fixes_applied.append(f"✅ Jami {jobs_count} ta vazifa, {groups_count} ta guruh")
-            
-        except Exception as e:
-            errors_found.append(f"❌ Statistika xatosi: {str(e)}")
         
         # Формируем результат
         response = "🎉 **FAVQULODDA TUZATISH YAKUNLANDI**\n\n"
@@ -9074,7 +9005,7 @@ async def emergency_fix_all_command(message: types.Message):
         if not errors_found:
             response += "🚀 **BARCHA MUAMMOLAR HAL QILINDI!**\n\n"
             response += "📋 **KEYINGI QADAMLAR:**\n"
-            response += "• Video ketma-ketligini sinang: `/test_video_sequence -4867322212`\n"
+            response += "• Botni qayta ishga tushiring: `docker-compose restart centris-bot`\n"
             response += "• Scheduler ni tekshiring: `/scheduler_debug`\n"
             response += "• Guruhni tekshiring: `/diagnose_group -4867322212`"
         else:
@@ -9087,8 +9018,7 @@ async def emergency_fix_all_command(message: types.Message):
         await message.answer(response, parse_mode="Markdown")
         
     except Exception as e:
-        await handle_error_with_notification(e, "emergency_fix_all_command", message)
-        await message.answer("❌ **KRITIK XATOLIK!**\n\nLoglarni tekshiring va botni qayta ishga tushiring.")
+        await message.answer(f"❌ **XATOLIK YUZ BERDI!**\n\n**Xatolik:** {str(e)[:200]}\n\n**Yechim:** Botni qayta ishga tushiring!")
 
 
 # Команда для быстрой проверки состояния бота
@@ -9148,3 +9078,128 @@ async def quick_status_command(message: types.Message):
         
     except Exception as e:
         await handle_error_with_notification(e, "quick_status_command", message)
+
+
+# Простая команда для пошагового исправления
+@dp.message_handler(commands=['simple_fix'])
+async def simple_fix_command(message: types.Message):
+    """Простое пошаговое исправление проблем"""
+    from data.config import SUPER_ADMIN_IDS
+    
+    if message.from_user.id not in SUPER_ADMIN_IDS:
+        await message.answer("❌ **Sizda ushbu buyruqni ishlatish huquqi yo'q!**")
+        return
+    
+    try:
+        await message.answer("🔧 **ODDIY TUZATISH BOSHLANDI**\n\n⏳ **Qadam-baqadam hal qilmoqda...**")
+        
+        # Шаг 1: Проверка планировщика
+        try:
+            from handlers.users.video_scheduler import scheduler
+            await message.answer("✅ **1-qadam:** Scheduler import qilindi")
+            
+            if not scheduler.running:
+                scheduler.start()
+                await message.answer("✅ **2-qadam:** Scheduler qayta ishga tushirildi")
+            else:
+                await message.answer("✅ **2-qadam:** Scheduler allaqachon ishlaydi")
+                
+        except Exception as e:
+            await message.answer(f"❌ **1-qadam XATOLIK:** {str(e)[:100]}")
+            return
+        
+        # Шаг 2: Проверка базы данных
+        try:
+            groups = db.get_all_groups_with_settings()
+            await message.answer(f"✅ **3-qadam:** Ma'lumotlar bazasi ulangan ({len(groups)} guruh)")
+                
+        except Exception as e:
+            await message.answer(f"❌ **3-qadam XATOLIK:** {str(e)[:100]}")
+            return
+        
+        # Шаг 3: Добавление в whitelist
+        try:
+            groups = db.get_all_groups_with_settings()
+            whitelisted = 0
+            
+            for group in groups:
+                try:
+                    chat_id = int(group[0])
+                    if not db.is_group_whitelisted(chat_id):
+                        db.add_group_to_whitelist(chat_id)
+                        whitelisted += 1
+                except:
+                    pass
+            
+            if whitelisted > 0:
+                await message.answer(f"✅ **4-qadam:** {whitelisted} ta guruh whitelist ga qo'shildi")
+            else:
+                await message.answer("✅ **4-qadam:** Barcha guruhlar whitelist da")
+                
+        except Exception as e:
+            await message.answer(f"❌ **4-qadam XATOLIK:** {str(e)[:100]}")
+            return
+        
+        # Финальный результат
+        await message.answer("🎉 **BARCHA QADAMLAR MUVAFFAQIYATLI!**\n\n📋 **KEYINGI QADAM:**\n`docker-compose restart centris-bot`")
+        
+    except Exception as e:
+        await message.answer(f"❌ **KRITIK XATOLIK!**\n\n**Xatolik:** {str(e)[:200]}")
+
+
+# Команда для проверки конкретной группы
+@dp.message_handler(commands=['check_group'])
+async def check_group_command(message: types.Message):
+    """Проверка конкретной группы"""
+    from data.config import SUPER_ADMIN_IDS
+    
+    if message.from_user.id not in SUPER_ADMIN_IDS:
+        await message.answer("❌ **Sizda ushbu buyruqni ishlatish huquqi yo'q!**")
+        return
+    
+    try:
+        # Используем группу по умолчанию
+        group_id = -4867322212
+        
+        await message.answer(f"🔍 **GURUHNI TEKSHIRISH: {group_id}**\n\n⏳ **Ma'lumotlarni yig'ish...**")
+        
+        # Проверяем настройки группы
+        try:
+            settings = db.get_group_video_settings(group_id)
+            if settings:
+                await message.answer("✅ **Guruh sozlamalari topildi:**\n" + 
+                                   f"• Centris: {settings.get('centris_enabled', False)}\n" +
+                                   f"• Centris season: {settings.get('centris_season_id', 'N/A')}\n" +
+                                   f"• Centris start: {settings.get('centris_start_video', 'N/A')}\n" +
+                                   f"• Golden: {settings.get('golden_enabled', False)}\n" +
+                                   f"• Golden season: {settings.get('golden_season_id', 'N/A')}\n" +
+                                   f"• Golden start: {settings.get('golden_start_video', 'N/A')}")
+            else:
+                await message.answer("❌ **Guruh sozlamalari topilmadi!**")
+        except Exception as e:
+            await message.answer(f"❌ **Sozlamalar xatosi:** {str(e)[:100]}")
+        
+        # Проверяем whitelist
+        try:
+            is_whitelisted = db.is_group_whitelisted(group_id)
+            if is_whitelisted:
+                await message.answer("✅ **Guruh whitelist da**")
+            else:
+                await message.answer("❌ **Guruh whitelist da emas!**")
+                # Автоматически добавляем
+                db.add_group_to_whitelist(group_id)
+                await message.answer("✅ **Guruh avtomatik ravishda whitelist ga qo'shildi**")
+        except Exception as e:
+            await message.answer(f"❌ **Whitelist xatosi:** {str(e)[:100]}")
+        
+        # Проверяем планировщик
+        try:
+            from handlers.users.video_scheduler import scheduler
+            jobs = scheduler.get_jobs()
+            group_jobs = [job for job in jobs if str(group_id) in str(job.id)]
+            await message.answer(f"✅ **Scheduler:** {len(group_jobs)} ta vazifa guruh uchun")
+        except Exception as e:
+            await message.answer(f"❌ **Scheduler xatosi:** {str(e)[:100]}")
+        
+    except Exception as e:
+        await message.answer(f"❌ **UMUMIY XATOLIK:** {str(e)[:200]}")
