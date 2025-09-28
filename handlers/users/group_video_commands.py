@@ -3006,6 +3006,149 @@ async def monitor_group_video_command(message: types.Message):
         logger.error(f"Ошибка при мониторинге: {e}")
         await message.answer(f"❌ Xatolik yuz berdi: {e}")
 
+# Команда для диагностики планировщика
+@dp.message_handler(commands=['scheduler_debug'])
+async def scheduler_debug_command(message: types.Message):
+    """Отладка планировщика видео"""
+    from data.config import SUPER_ADMIN_IDS
+    
+    if message.from_user.id not in SUPER_ADMIN_IDS:
+        await message.answer("❌ **Sizda ushbu buyruqni ishlatish huquqi yo'q!**")
+        return
+    
+    try:
+        from handlers.users.video_scheduler import scheduler
+        
+        response = "🔧 **SCHEDULER DEBUG**\n\n"
+        
+        # Проверяем статус планировщика
+        response += f"📊 **STATUS:**\n"
+        response += f"   • Running: {'✅' if scheduler.running else '❌'}\n"
+        response += f"   • Jobs count: {len(scheduler.get_jobs())}\n\n"
+        
+        # Список всех задач
+        jobs = scheduler.get_jobs()
+        if jobs:
+            response += f"📋 **PLANNED JOBS ({len(jobs)}):**\n"
+            for job in jobs[:10]:  # Показываем первые 10
+                next_run = job.next_run_time.strftime('%H:%M %d.%m') if job.next_run_time else "Never"
+                response += f"   • `{job.id}`: {next_run}\n"
+            
+            if len(jobs) > 10:
+                response += f"   • ... и еще {len(jobs) - 10} задач\n"
+        else:
+            response += "❌ **Нет запланированных задач!**\n"
+        
+        response += "\n"
+        
+        # Проверяем активные группы
+        groups = db.get_all_groups_with_settings()
+        response += f"👥 **ACTIVE GROUPS:** {len(groups)}\n"
+        
+        for i, group in enumerate(groups[:5]):  # Первые 5 групп
+            chat_id = group[0]
+            response += f"   • Group {chat_id}\n"
+        
+        if len(groups) > 5:
+            response += f"   • ... и еще {len(groups) - 5} групп\n"
+        
+        await message.answer(response, parse_mode="Markdown")
+        
+    except Exception as e:
+        await handle_error_with_notification(e, "scheduler_debug_command", message)
+
+
+# Команда для перезапуска планировщика
+@dp.message_handler(commands=['restart_scheduler'])
+async def restart_scheduler_command(message: types.Message):
+    """Перезапуск планировщика видео"""
+    from data.config import SUPER_ADMIN_IDS
+    
+    if message.from_user.id not in SUPER_ADMIN_IDS:
+        await message.answer("❌ **Sizda ushbu buyruqni ishlatish huquqi yo'q!**")
+        return
+    
+    try:
+        from handlers.users.video_scheduler import scheduler, init_scheduler
+        
+        await message.answer("🔄 **Перезапускаем планировщик...**")
+        
+        # Останавливаем планировщик
+        if scheduler.running:
+            scheduler.shutdown()
+            await message.answer("⏹️ **Планировщик остановлен**")
+        
+        # Запускаем заново
+        await init_scheduler()
+        
+        # Проверяем результат
+        jobs_count = len(scheduler.get_jobs())
+        
+        response = "✅ **Планировщик перезапущен!**\n\n"
+        response += f"📊 **Статус:**\n"
+        response += f"   • Running: {'✅' if scheduler.running else '❌'}\n"
+        response += f"   • Jobs: {jobs_count}\n"
+        
+        await message.answer(response, parse_mode="Markdown")
+        
+    except Exception as e:
+        await handle_error_with_notification(e, "restart_scheduler_command", message)
+
+
+# Команда для тестовой отправки видео
+@dp.message_handler(commands=['test_send_video'])
+async def test_send_video_command(message: types.Message):
+    """Тестовая отправка видео в группу"""
+    from data.config import SUPER_ADMIN_IDS
+    
+    if message.from_user.id not in SUPER_ADMIN_IDS:
+        await message.answer("❌ **Sizda ushbu buyruqni ishlatish huquqi yo'q!**")
+        return
+    
+    # Проверяем, что команда вызвана в группе
+    if message.chat.type not in ['group', 'supergroup']:
+        await message.answer("❌ **Bu buyruq faqat guruhda ishlatiladi!**")
+        return
+    
+    try:
+        chat_id = message.chat.id
+        
+        await message.answer("🧪 **Тестируем отправку видео...**")
+        
+        # Получаем настройки группы
+        group_settings = db.get_group_video_settings(chat_id)
+        if not group_settings:
+            await message.answer("❌ **Группа не настроена для отправки видео!**")
+            return
+        
+        from handlers.users.video_scheduler import send_group_video_new
+        
+        # Распаковываем настройки
+        centris_enabled, centris_season_id, centris_start_video, golden_enabled, golden_season_id, golden_start_video = group_settings[:6]
+        
+        if centris_enabled and centris_season_id:
+            await message.answer("🏢 **Отправляем Centris видео...**")
+            result = await send_group_video_new(chat_id, 'centris', centris_season_id)
+            if result:
+                await message.answer("✅ **Centris видео отправлено!**")
+            else:
+                await message.answer("❌ **Ошибка отправки Centris видео**")
+        
+        if golden_enabled and golden_season_id:
+            await message.answer("🌊 **Отправляем Golden Lake видео...**")
+            result = await send_group_video_new(chat_id, 'golden_lake', golden_season_id)
+            if result:
+                await message.answer("✅ **Golden Lake видео отправлено!**")
+            else:
+                await message.answer("❌ **Ошибка отправки Golden Lake видео**")
+        
+        if not (centris_enabled or golden_enabled):
+            await message.answer("❌ **Нет активных проектов для отправки!**")
+        
+    except Exception as e:
+        await handle_error_with_notification(e, "test_send_video_command", message)
+
+
 # Команда для экстренных ситуаций
 @dp.message_handler(commands=['emergency_group_video'])
 async def emergency_group_video_command(message: types.Message):

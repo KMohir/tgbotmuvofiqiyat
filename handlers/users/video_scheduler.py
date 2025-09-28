@@ -46,7 +46,8 @@ def schedule_job_with_immediate_check(scheduler, func, hour, minute, args, job_i
             args=args,
             id=job_id,
             timezone=timezone,
-            misfire_grace_time=None
+            misfire_grace_time=None,
+            replace_existing=True
         )
         
         logger.info(f"Задача {job_id} запланирована на {hour:02d}:{minute:02d}")
@@ -776,13 +777,26 @@ async def handle_time_selection(message: types.Message) -> None:
 def schedule_jobs_for_users():
     try:
         logger.info("Начало планирования задач для пользователей и групп")
-        scheduler.remove_all_jobs()
-        logger.info("Все существующие задачи удалены")
+        
+        # Получаем активных получателей
         recipients = db.get_all_subscribers_with_type()
         logger.info(f"Найдено {len(recipients)} получателей (пользователи и группы)")
+        
         if not recipients:
             logger.warning("Нет подписчиков в базе данных, задачи не создаются")
             return
+        
+        # Удаляем только старые задачи пользователей (не групповые!)
+        current_jobs = scheduler.get_jobs()
+        for job in current_jobs:
+            if job.id.startswith("video_morning_") or job.id.startswith("video_evening_"):
+                # Проверяем, есть ли такой получатель в актуальном списке
+                recipient_id = int(job.id.split("_")[-1])
+                if not any(r[0] == recipient_id for r in recipients):
+                    scheduler.remove_job(job.id)
+                    logger.info(f"Удалена устаревшая задача: {job.id}")
+        
+        # Создаем задачи для текущих получателей
         for recipient_id, is_group in recipients:
             scheduler.add_job(
                 scheduled_send_08,
@@ -806,6 +820,7 @@ def schedule_jobs_for_users():
 
         # Планируем задачи для групп с настройками (новая логика)
         groups_settings = db.get_all_groups_with_settings()
+        logger.info(f"Планируем задачи для {len(groups_settings)} групп с настройками")
         for group in groups_settings:
             chat_id = group[0]
             schedule_single_group_jobs(chat_id)
@@ -842,7 +857,7 @@ async def update_scheduled_jobs():
             logger.info("Задачи планировщика обновлены")
         except Exception as e:
             logger.error(f"Ошибка при обновлении задач: {e}")
-        await asyncio.sleep(300)  # Обновляем каждые 5 минут
+        await asyncio.sleep(1800)  # Обновляем каждые 30 минут
 
     # Инициализация планировщика при старте
 async def init_scheduler():
