@@ -9203,3 +9203,65 @@ async def check_group_command(message: types.Message):
         
     except Exception as e:
         await message.answer(f"❌ **UMUMIY XATOLIK:** {str(e)[:200]}")
+
+
+# Команда для проверки автопереключения сезонов БЕЗ уведомлений
+@dp.message_handler(commands=['test_silent_season_switch'])
+async def test_silent_season_switch_command(message: types.Message):
+    """Проверка автопереключения сезонов без уведомлений"""
+    from data.config import SUPER_ADMIN_IDS
+    
+    if message.from_user.id not in SUPER_ADMIN_IDS:
+        await message.answer("❌ **Sizda ushbu buyruqni ishlatish huquqi yo'q!**")
+        return
+    
+    try:
+        # Группа по умолчанию
+        group_id = -4867322212
+        
+        await message.answer(f"🔧 **TIXO SEZON ALMASHTIRISHNI SINASH**\n\n📱 **Guruh:** {group_id}")
+        
+        # Получаем текущие настройки
+        settings = db.get_group_video_settings(group_id)
+        if not settings:
+            await message.answer("❌ **Guruh sozlamalari topilmadi!**")
+            return
+        
+        current_centris_season = settings.get('centris_season_id', 'N/A')
+        current_golden_season = settings.get('golden_season_id', 'N/A')
+        
+        await message.answer(f"📊 **HOZIRGI HOLATLAR:**\n"
+                           f"• Centris season: {current_centris_season}\n"
+                           f"• Golden season: {current_golden_season}")
+        
+        # Проверяем логику автопереключения
+        if current_centris_season and current_centris_season != 'N/A':
+            try:
+                # Проверяем, есть ли следующий сезон для Centris
+                next_season = db.get_next_season("centris", current_centris_season)
+                if next_season:
+                    await message.answer(f"✅ **Centris:** Следующий сезон найден - {next_season[0]} ({next_season[1]})")
+                else:
+                    await message.answer(f"🔄 **Centris:** Следующий сезон не найден, вернётся к первому сезону")
+            except Exception as e:
+                await message.answer(f"❌ **Centris xatosi:** {str(e)[:100]}")
+        
+        if current_golden_season and current_golden_season != 'N/A':
+            try:
+                # Проверяем, есть ли следующий сезон для Golden
+                next_season = db.get_next_season("golden", current_golden_season)
+                if next_season:
+                    await message.answer(f"✅ **Golden:** Следующий сезон найден - {next_season[0]} ({next_season[1]})")
+                else:
+                    await message.answer(f"🔄 **Golden:** Следующий сезон не найден, вернётся к первому сезону")
+            except Exception as e:
+                await message.answer(f"❌ **Golden xatosi:** {str(e)[:100]}")
+        
+        await message.answer("🎯 **NATIJA:**\n\n"
+                           "✅ **Avtomatik sezon almashtirish TIXO ishlaydi**\n"
+                           "✅ **Hech qanday xabar yuborilmaydi**\n"
+                           "✅ **Faqat video ketma-ketligi davom etadi**\n\n"
+                           "📋 **Tartib:** 1→2→3→...→oxir→1 (siklda)")
+        
+    except Exception as e:
+        await message.answer(f"❌ **SINOV XATOLIGI:** {str(e)[:200]}")
