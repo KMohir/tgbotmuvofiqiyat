@@ -241,6 +241,26 @@ async def send_group_video_new(chat_id: int, project: str, season_id: int = None
             logger.info(f"Не найден стартовый сезон для группы {chat_id}, проект {project}")
             return False
         
+        # ИСПРАВЛЕНИЕ: Обрабатываем случай когда season_id - строка "centris" или "golden"
+        if season_id == "centris" and project == "centris":
+            # Получаем первый сезон Centris
+            centris_seasons = db.get_seasons_by_project("centris")
+            if centris_seasons:
+                season_id = centris_seasons[0][0]
+                logger.info(f"Исправлен season_id для группы {chat_id}: 'centris' -> {season_id}")
+            else:
+                logger.error(f"Нет сезонов Centris для группы {chat_id}")
+                return False
+        elif season_id == "golden" and project in ["golden_lake", "golden"]:
+            # Получаем первый сезон Golden Lake
+            golden_seasons = db.get_seasons_by_project("golden")
+            if golden_seasons:
+                season_id = golden_seasons[0][0]
+                logger.info(f"Исправлен season_id для группы {chat_id}: 'golden' -> {season_id}")
+            else:
+                logger.error(f"Нет сезонов Golden Lake для группы {chat_id}")
+                return False
+        
         # ДОПОЛНИТЕЛЬНАЯ ПРОВЕРКА: убеждаемся что season_id - это число
         try:
             season_id = int(season_id)
@@ -1118,6 +1138,42 @@ def schedule_single_group_jobs(chat_id: int):
         centris_start_video = centris_start_video or 0
         golden_enabled = bool(golden_enabled)
         golden_start_video = golden_start_video or 0
+        
+        # ИСПРАВЛЕНИЕ: Обрабатываем случай когда season_id - строка "centris" или "golden"
+        if centris_season_id == "centris":
+            # Получаем первый сезон Centris Towers
+            centris_seasons = db.get_seasons_by_project("centris")
+            if centris_seasons:
+                centris_season_id = centris_seasons[0][0]  # Первый сезон
+                logger.info(f"Исправлен centris_season_id для группы {chat_id}: 'centris' -> {centris_season_id}")
+            else:
+                centris_season_id = None
+                logger.warning(f"Нет сезонов Centris для группы {chat_id}")
+        
+        if golden_season_id == "golden":
+            # Получаем первый сезон Golden Lake
+            golden_seasons = db.get_seasons_by_project("golden")
+            if golden_seasons:
+                golden_season_id = golden_seasons[0][0]  # Первый сезон
+                logger.info(f"Исправлен golden_season_id для группы {chat_id}: 'golden' -> {golden_season_id}")
+            else:
+                golden_season_id = None
+                logger.warning(f"Нет сезонов Golden Lake для группы {chat_id}")
+        
+        # Приводим к int если это возможно
+        try:
+            if centris_season_id:
+                centris_season_id = int(centris_season_id)
+        except (ValueError, TypeError):
+            logger.error(f"Неверный centris_season_id для группы {chat_id}: {centris_season_id}")
+            centris_season_id = None
+            
+        try:
+            if golden_season_id:
+                golden_season_id = int(golden_season_id)
+        except (ValueError, TypeError):
+            logger.error(f"Неверный golden_season_id для группы {chat_id}: {golden_season_id}")
+            golden_season_id = None
         
         # Получаем время отправки
         try:

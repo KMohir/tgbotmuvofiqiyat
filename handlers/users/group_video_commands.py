@@ -3413,6 +3413,114 @@ async def fix_video_system_command(message: types.Message):
         await handle_error_with_notification(e, "fix_video_system_command", message)
 
 
+# Команда для исправления проблем с сезонами в БД
+@dp.message_handler(commands=['fix_season_ids'])
+async def fix_season_ids_command(message: types.Message):
+    """Исправить неправильные season_id в базе данных"""
+    from data.config import SUPER_ADMIN_IDS
+    
+    if message.from_user.id not in SUPER_ADMIN_IDS:
+        await message.answer("❌ **Sizda ushbu buyruqni ishlatish huquqi yo'q!**")
+        return
+    
+    try:
+        await message.answer("🔧 **ИСПРАВЛЕНИЕ SEASON_ID В БАЗЕ ДАННЫХ**\n\n⏳ Сканируем базу данных...")
+        
+        # Получаем все группы с настройками
+        groups = db.get_all_groups_with_settings()
+        
+        fixed_count = 0
+        problems_found = []
+        
+        for group in groups:
+            chat_id = group[0]
+            centris_enabled = group[1]
+            centris_season_id = group[2]
+            golden_enabled = group[4]
+            golden_season_id = group[5]
+            
+            fixed_centris = False
+            fixed_golden = False
+            
+            # Исправляем Centris season_id
+            if centris_enabled and centris_season_id == "centris":
+                centris_seasons = db.get_seasons_by_project("centris")
+                if centris_seasons:
+                    new_season_id = centris_seasons[0][0]
+                    # Получаем текущие настройки и обновляем только centris_season_id
+                    current_settings = db.get_group_video_settings(chat_id)
+                    if current_settings:
+                        db.set_group_video_settings(
+                            chat_id, 
+                            centris_enabled, 
+                            new_season_id,  # Новый season_id
+                            current_settings[2],  # centris_start_video
+                            current_settings[3],  # golden_enabled
+                            current_settings[4],  # golden_season_id
+                            current_settings[5]   # golden_start_video
+                        )
+                        problems_found.append(f"Группа {chat_id}: centris 'centris' -> {new_season_id}")
+                        fixed_centris = True
+                        fixed_count += 1
+                else:
+                    problems_found.append(f"Группа {chat_id}: НЕТ сезонов Centris!")
+            
+            # Исправляем Golden season_id
+            if golden_enabled and golden_season_id == "golden":
+                golden_seasons = db.get_seasons_by_project("golden")
+                if golden_seasons:
+                    new_season_id = golden_seasons[0][0]
+                    # Получаем текущие настройки и обновляем только golden_season_id
+                    current_settings = db.get_group_video_settings(chat_id)
+                    if current_settings:
+                        db.set_group_video_settings(
+                            chat_id, 
+                            current_settings[0],  # centris_enabled
+                            current_settings[1],  # centris_season_id
+                            current_settings[2],  # centris_start_video
+                            golden_enabled, 
+                            new_season_id,  # Новый golden_season_id
+                            current_settings[5]   # golden_start_video
+                        )
+                        problems_found.append(f"Группа {chat_id}: golden 'golden' -> {new_season_id}")
+                        fixed_golden = True
+                        fixed_count += 1
+                else:
+                    problems_found.append(f"Группа {chat_id}: НЕТ сезонов Golden Lake!")
+        
+        # Формируем отчет
+        response = f"🔧 **РЕЗУЛЬТАТ ИСПРАВЛЕНИЯ:**\n\n"
+        response += f"✅ **Исправлено:** {fixed_count} записей\n"
+        response += f"📊 **Всего групп:** {len(groups)}\n\n"
+        
+        if problems_found:
+            response += "📋 **Исправления:**\n"
+            for problem in problems_found[:10]:  # Первые 10
+                response += f"• {problem}\n"
+            
+            if len(problems_found) > 10:
+                response += f"• ... и еще {len(problems_found) - 10}\n"
+        else:
+            response += "✅ **Проблем не найдено!**\n"
+        
+        response += f"\n🔄 **Перезапускаем планировщик...**"
+        await message.answer(response, parse_mode="Markdown")
+        
+        # Перезапускаем планировщик
+        from handlers.users.video_scheduler import scheduler, init_scheduler
+        
+        if scheduler.running:
+            scheduler.shutdown()
+        
+        await init_scheduler()
+        
+        jobs_count = len(scheduler.get_jobs())
+        await message.answer(f"✅ **Планировщик перезапущен!** Создано {jobs_count} задач.")
+        
+    except Exception as e:
+        await handle_error_with_notification(e, "fix_season_ids_command", message)
+
+
 # Команда для экстренных ситуаций
 @dp.message_handler(commands=['emergency_group_video'])
 async def emergency_group_video_command(message: types.Message):
