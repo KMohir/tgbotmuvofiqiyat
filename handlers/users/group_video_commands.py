@@ -6,9 +6,10 @@ from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters import Command
 from handlers import groups
 from db import db
-from loader import dp
+from loader import dp, bot
 import logging
 from datetime import datetime, timedelta
+from utils.safe_admin_notify import safe_send_error_notification
 
 # Импортируем состояния
 from handlers.users.group_video_states import GroupVideoStates, DeleteBotMessagesStates
@@ -16,6 +17,41 @@ from handlers.users.video_scheduler import schedule_single_group_jobs, schedule_
 
 # Настройка логирования
 logger = logging.getLogger(__name__)
+
+
+async def handle_error_with_notification(error, context, message=None):
+    """
+    Обрабатывает ошибку с отправкой уведомления администратору
+    
+    Args:
+        error: Объект исключения
+        context: Контекст ошибки (название функции)
+        message: Объект сообщения для ответа пользователю (опционально)
+    """
+    try:
+        # Логируем ошибку
+        error_msg = f"Ошибка в {context}: {str(error)}"
+        logger.error(error_msg, exc_info=True)
+        
+        # Отправляем уведомление администратору
+        try:
+            await safe_send_error_notification(
+                bot=bot,
+                error_message=error_msg,
+                error_details=str(error)[:500]
+            )
+        except Exception as notify_error:
+            logger.error(f"Не удалось отправить уведомление об ошибке: {notify_error}")
+        
+        # Отправляем ответ пользователю, если возможно
+        if message:
+            try:
+                await message.answer("❌ **Xatolik yuz berdi!**")
+            except Exception as reply_error:
+                logger.error(f"Не удалось отправить ответ пользователю: {reply_error}")
+                
+    except Exception as handler_error:
+        logger.critical(f"Критическая ошибка в обработчике ошибок: {handler_error}")
 
 # Вспомогательная функция для отправки сообщения с сохранением ID
 async def send_and_save_message(bot, chat_id: int, text: str, **kwargs):
@@ -120,8 +156,7 @@ async def grant_access_command(message: types.Message):
     except ValueError:
         await message.answer("❌ **Noto'g'ri format!** User ID va soat soni raqam bo'lishi kerak.")
     except Exception as e:
-        logger.error(f"Ошибка в grant_access_command: {e}")
-        await message.answer("❌ **Xatolik yuz berdi!**")
+        await handle_error_with_notification(e, "grant_access_command", message)
 
 # Команда для отзыва доступа
 @dp.message_handler(commands=['revoke_access'])
@@ -165,8 +200,7 @@ async def revoke_access_command(message: types.Message):
     except ValueError:
         await message.answer("❌ **Noto'g'ri format!** User ID raqam bo'lishi kerak.")
     except Exception as e:
-        logger.error(f"Ошибка в revoke_access_command: {e}")
-        await message.answer("❌ **Xatolik yuz berdi!**")
+        await handle_error_with_notification(e, "revoke_access_command", message)
 
 # Команда для проверки доступа
 @dp.message_handler(commands=['check_access'])
@@ -215,8 +249,7 @@ async def check_access_command(message: types.Message):
     except ValueError:
         await message.answer("❌ **Noto'g'ri format!** User ID raqam bo'lishi kerak.")
     except Exception as e:
-        logger.error(f"Ошибка в check_access_command: {e}")
-        await message.answer("❌ **Xatolik yuz berdi!**")
+        await handle_error_with_notification(e, "check_access_command", message)
 
 # Команда для автоматического отзыва истекшего доступа
 @dp.message_handler(commands=['auto_revoke'])
@@ -7439,15 +7472,19 @@ async def test_send_video_command(message: types.Message):
         
         centris_enabled, centris_season_id, centris_start_video, golden_enabled, golden_season_id, golden_start_video, send_times = settings
         
+        # Подготавливаем статусы для отображения
+        centris_status = '✅ Yoqilgan' if centris_enabled else '❌ O`chirilgan'
+        golden_status = '✅ Yoqilgan' if golden_enabled else '❌ O`chirilgan'
+        
         await message.answer(
             f"🧪 **Video yuborish testi**\n\n"
             f"📱 **Guruh:** {group_name}\n"
             f"🆔 **ID:** `{group_id}`\n\n"
             f"📊 **Sozlamalar:**\n"
-            f"🏢 **Centris:** {'✅ Yoqilgan' if centris_enabled else '❌ O\\`chirilgan'}\n"
+            f"🏢 **Centris:** {centris_status}\n"
             f"  • Sezon ID: `{centris_season_id}`\n"
             f"  • Start video: `{centris_start_video}`\n\n"
-            f"🌊 **Golden:** {'✅ Yoqilgan' if golden_enabled else '❌ O\\`chirilgan'}\n"
+            f"🌊 **Golden:** {golden_status}\n"
             f"  • Sezon ID: `{golden_season_id}`\n"
             f"  • Start video: `{golden_start_video}`\n\n"
             f"🚀 **Video yuborishni boshlayapman...**",

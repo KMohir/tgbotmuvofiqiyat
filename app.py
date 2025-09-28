@@ -1,5 +1,5 @@
 from aiogram import executor
-from loader import dp
+from loader import dp, bot
 import middlewares
 import filters
 import handlers
@@ -7,7 +7,9 @@ from utils.misc.set_bot_commands import set_default_commands
 from utils.notify_admins import on_startup_notify
 from handlers.users.video_scheduler import scheduler, init_scheduler
 from db import db
+from utils.safe_admin_notify import safe_send_error_notification
 import logging
+import traceback
 
 # Настройка логирования
 logging.basicConfig(
@@ -30,6 +32,51 @@ db.create_tables()  # Автоматически создать все табл�
 
 # Явно импортируем модуль команд групп для их регистрации
 import handlers.users.group_video_commands
+
+
+async def global_error_handler(update, context):
+    """
+    Глобальный обработчик ошибок для всех хендлеров
+    """
+    try:
+        # Логируем ошибку
+        error_msg = f"Глобальная ошибка: {context.error}"
+        logger.error(error_msg, exc_info=True)
+        
+        # Получаем детали ошибки
+        error_details = traceback.format_exc()
+        
+        # Отправляем уведомление об ошибке
+        try:
+            await safe_send_error_notification(
+                bot=bot,
+                error_message=error_msg,
+                error_details=error_details[:1000]  # Ограничиваем размер деталей
+            )
+        except Exception as notify_error:
+            logger.error(f"Не удалось отправить уведомление об ошибке: {notify_error}")
+        
+        # Пытаемся отправить ответ пользователю
+        try:
+            if update and hasattr(update, 'message') and update.message:
+                await update.message.answer(
+                    "❌ Произошла ошибка при обработке вашего запроса. "
+                    "Попробуйте позже или обратитесь к администратору."
+                )
+            elif update and hasattr(update, 'callback_query') and update.callback_query:
+                await update.callback_query.answer(
+                    "❌ Произошла ошибка. Попробуйте позже.",
+                    show_alert=True
+                )
+        except Exception as reply_error:
+            logger.error(f"Не удалось отправить ответ пользователю: {reply_error}")
+            
+    except Exception as handler_error:
+        logger.critical(f"Критическая ошибка в глобальном обработчике ошибок: {handler_error}")
+
+
+# Регистрируем глобальный обработчик ошибок
+dp.errors_handler()(global_error_handler)
 
 async def on_startup(dispatcher):
     # Установить команды бота
