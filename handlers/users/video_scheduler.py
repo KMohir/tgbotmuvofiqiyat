@@ -850,6 +850,7 @@ async def update_scheduler_on_time_change(user_id: int, new_time: str) -> None:
 
     # Функция для периодического обновления задач
 async def update_scheduled_jobs():
+    """Обновляет задачи планировщика каждые 30 минут"""
     while True:
         try:
             logger.info("Начало обновления задач планировщика")
@@ -857,7 +858,11 @@ async def update_scheduled_jobs():
             logger.info("Задачи планировщика обновлены")
         except Exception as e:
             logger.error(f"Ошибка при обновлении задач: {e}")
-        await asyncio.sleep(1800)  # Обновляем каждые 30 минут
+        try:
+            await asyncio.sleep(1800)  # Обновляем каждые 30 минут
+        except asyncio.CancelledError:
+            logger.info("Задача обновления планировщика отменена")
+            break
 
     # Инициализация планировщика при старте
 async def init_scheduler():

@@ -3281,6 +3281,138 @@ async def quick_whitelist_command(message: types.Message):
         await handle_error_with_notification(e, "quick_whitelist_command", message)
 
 
+# Команда для принудительной отправки видео прямо сейчас
+@dp.message_handler(commands=['force_send_now'])
+async def force_send_now_command(message: types.Message):
+    """Принудительно отправить видео прямо сейчас"""
+    from data.config import SUPER_ADMIN_IDS
+    
+    if message.from_user.id not in SUPER_ADMIN_IDS:
+        await message.answer("❌ **Sizda ushbu buyruqni ishlatish huquqi yo'q!**")
+        return
+    
+    # Проверяем, что команда вызвана в группе
+    if message.chat.type not in ['group', 'supergroup']:
+        await message.answer("❌ **Bu buyruq faqat guruhda ishlatiladi!**")
+        return
+    
+    try:
+        chat_id = message.chat.id
+        
+        await message.answer("🚀 **ПРИНУДИТЕЛЬНАЯ ОТПРАВКА ВИДЕО**\n\n⏰ Время: " + 
+                           datetime.now().strftime("%H:%M:%S") + "\n🔄 Отправляем...")
+        
+        # Получаем настройки группы
+        group_settings = db.get_group_video_settings(chat_id)
+        if not group_settings:
+            await message.answer("❌ **Группа не настроена!** Используйте `/set_group_video`")
+            return
+        
+        # Проверяем whitelist
+        if not db.is_group_whitelisted(chat_id):
+            await message.answer("❌ **Группа не в whitelist!** Используйте `/quick_whitelist`")
+            return
+        
+        from handlers.users.video_scheduler import send_group_video_new
+        
+        # Распаковываем настройки
+        centris_enabled, centris_season_id, centris_start_video, golden_enabled, golden_season_id, golden_start_video = group_settings[:6]
+        
+        success_count = 0
+        
+        if centris_enabled and centris_season_id:
+            await message.answer("🏢 **Отправляем Centris видео...**")
+            result = await send_group_video_new(chat_id, 'centris', centris_season_id, centris_start_video)
+            if result:
+                await message.answer("✅ **Centris видео отправлено!**")
+                success_count += 1
+            else:
+                await message.answer("❌ **Ошибка отправки Centris видео**")
+        
+        if golden_enabled and golden_season_id:
+            await message.answer("🌊 **Отправляем Golden Lake видео...**")
+            result = await send_group_video_new(chat_id, 'golden_lake', golden_season_id, golden_start_video)
+            if result:
+                await message.answer("✅ **Golden Lake видео отправлено!**")
+                success_count += 1
+            else:
+                await message.answer("❌ **Ошибка отправки Golden Lake видео**")
+        
+        if success_count == 0:
+            await message.answer("❌ **Ни одно видео не отправлено!** Проверьте настройки группы.")
+        else:
+            await message.answer(f"🎉 **Успешно отправлено {success_count} видео!**")
+        
+    except Exception as e:
+        await handle_error_with_notification(e, "force_send_now_command", message)
+
+
+# Команда для полного восстановления системы
+@dp.message_handler(commands=['fix_video_system'])
+async def fix_video_system_command(message: types.Message):
+    """Полное восстановление системы отправки видео"""
+    from data.config import SUPER_ADMIN_IDS
+    
+    if message.from_user.id not in SUPER_ADMIN_IDS:
+        await message.answer("❌ **Sizda ushbu buyruqni ishlatish huquqi yo'q!**")
+        return
+    
+    try:
+        await message.answer("🔧 **ПОЛНОЕ ВОССТАНОВЛЕНИЕ СИСТЕМЫ ВИДЕО**\n\n⏳ Выполняем диагностику...")
+        
+        from handlers.users.video_scheduler import scheduler, init_scheduler
+        
+        # Шаг 1: Проверяем планировщик
+        response = "📊 **ДИАГНОСТИКА:**\n"
+        response += f"• Планировщик запущен: {'✅' if scheduler.running else '❌'}\n"
+        response += f"• Количество задач: {len(scheduler.get_jobs())}\n\n"
+        
+        # Шаг 2: Останавливаем планировщик
+        if scheduler.running:
+            scheduler.shutdown()
+            response += "⏹️ **Планировщик остановлен**\n"
+        
+        # Шаг 3: Перезапускаем планировщик
+        await init_scheduler()
+        response += "🔄 **Планировщик перезапущен**\n"
+        
+        # Шаг 4: Проверяем результат
+        jobs_count = len(scheduler.get_jobs())
+        response += f"✅ **Результат:** {jobs_count} задач создано\n\n"
+        
+        # Шаг 5: Проверяем группы с настройками
+        groups = db.get_all_groups_with_settings()
+        response += f"👥 **Группы с настройками:** {len(groups)}\n"
+        
+        # Шаг 6: Проверяем whitelist
+        whitelisted_groups = 0
+        for group in groups:
+            chat_id = group[0]
+            if db.is_group_whitelisted(chat_id):
+                whitelisted_groups += 1
+        
+        response += f"✅ **В whitelist:** {whitelisted_groups}/{len(groups)}\n\n"
+        
+        # Шаг 7: Рекомендации
+        response += "🔧 **РЕКОМЕНДАЦИИ:**\n"
+        if jobs_count == 0:
+            response += "• Проблема: Нет задач планировщика\n"
+            response += "• Решение: Проверьте настройки групп\n"
+        if whitelisted_groups < len(groups):
+            response += f"• Проблема: {len(groups) - whitelisted_groups} групп не в whitelist\n"
+            response += "• Решение: Используйте /quick_whitelist для каждой группы\n"
+        
+        if jobs_count > 0 and whitelisted_groups == len(groups):
+            response += "✅ **Система восстановлена!** Видео должны отправляться по расписанию.\n"
+        else:
+            response += "⚠️ **Требуется дополнительная настройка**\n"
+        
+        await message.answer(response, parse_mode="Markdown")
+        
+    except Exception as e:
+        await handle_error_with_notification(e, "fix_video_system_command", message)
+
+
 # Команда для экстренных ситуаций
 @dp.message_handler(commands=['emergency_group_video'])
 async def emergency_group_video_command(message: types.Message):
