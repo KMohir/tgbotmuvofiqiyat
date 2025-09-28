@@ -348,7 +348,7 @@ async def send_group_video_new(chat_id: int, project: str, season_id: int = None
                 next_position = position + 1
                 # Приводим название проекта к формату базы данных
                 project_for_db_update = "golden" if project == "golden_lake" else project
-                db.set_group_video_start(chat_id, project_for_db_update, season_id, next_position)
+                db.update_group_video_start_only(chat_id, project_for_db_update, next_position)
                 logger.info(f"🎯 Обновлен start_video для группы {chat_id}: {position} → {next_position}")
                 
                 return True

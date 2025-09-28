@@ -642,6 +642,24 @@ class Database:
             self.conn.commit()
             cursor.close()
         except Exception as e:
+            print(f"Ошибка при обновлении start_video: {e}")
+    
+    def update_group_video_start_only(self, chat_id: int, project: str, video_index: int):
+        """Обновляет только start_video для текущего сезона, не меняя season_id"""
+        try:
+            cursor = self.conn.cursor()
+            if project == 'centris':
+                cursor.execute('''
+                    UPDATE group_video_settings SET centris_start_video = %s WHERE chat_id = %s
+                ''', (video_index, str(chat_id)))
+            elif project == 'golden':
+                cursor.execute('''
+                    UPDATE group_video_settings SET golden_start_video = %s WHERE chat_id = %s
+                ''', (video_index, str(chat_id)))
+            self.conn.commit()
+            cursor.close()
+            print(f"✅ Обновлен start_video для группы {chat_id}, проект {project}: {video_index}")
+        except Exception as e:
             logger.error(f"Ошибка при установке стартового сезона/видео для группы {chat_id}, проект {project}: {e}")
             self.conn.rollback()
 

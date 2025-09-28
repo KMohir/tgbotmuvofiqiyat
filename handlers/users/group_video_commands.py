@@ -8506,3 +8506,103 @@ async def check_db_types_command(message: types.Message):
         
     except Exception as e:
         await handle_error_with_notification(e, "check_db_types_command", message)
+
+
+# Команда для тестирования последовательности видео
+@dp.message_handler(commands=['test_video_sequence'])
+async def test_video_sequence_command(message: types.Message):
+    """Протестировать отправку нескольких видео подряд"""
+    from data.config import SUPER_ADMIN_IDS
+    
+    if message.from_user.id not in SUPER_ADMIN_IDS:
+        await message.answer("❌ **Sizda ushbu buyruqni ishlatish huquqi yo'q!**")
+        return
+    
+    try:
+        # Получаем ID группы из сообщения
+        args = message.text.split()
+        if len(args) < 2:
+            await message.answer(
+                "❌ **Noto'g'ri format!**\n\n"
+                "**Foydalanish:** `/test_video_sequence [guruh_id]`\n"
+                "**Misollar:**\n"
+                "• `/test_video_sequence -4867322212`\n"
+                "• `/test_video_sequence -1001234567890`",
+                parse_mode="Markdown"
+            )
+            return
+        
+        group_id = int(args[1])
+        
+        # Получаем информацию о группе
+        group_settings = db.get_group_video_settings(group_id)
+        if not group_settings:
+            await message.answer(f"❌ **Guruh topilmadi!**\n\n🆔 **ID:** `{group_id}`")
+            return
+        
+        group_name = group_settings.get('group_name', 'Noma\'lum')
+        centris_enabled = group_settings.get('centris_enabled', False)
+        golden_enabled = group_settings.get('golden_enabled', False)
+        
+        await message.answer(
+            f"🧪 **VIDEO KETMA-KETLIGINI SINASH**\n\n"
+            f"📱 **Guruh:** {group_name}\n"
+            f"🆔 **ID:** `{group_id}`\n\n"
+            f"⏳ **3 ta video yuborilmoqda...**\n\n"
+            f"📋 **Loyihalar:**\n"
+            f"• Centris: {'✅' if centris_enabled else '❌'}\n"
+            f"• Golden: {'✅' if golden_enabled else '❌'}\n\n"
+            f"⏰ **Kuting...**"
+        )
+        
+        # Тестируем отправку видео
+        success_count = 0
+        total_attempts = 3
+        
+        for i in range(total_attempts):
+            try:
+                # Пробуем отправить видео для Centris
+                if centris_enabled:
+                    centris_result = await send_group_video_new(group_id, "centris")
+                    if centris_result:
+                        success_count += 1
+                        await message.answer(f"✅ **Video {i+1}/3 (Centris) yuborildi!**")
+                    else:
+                        await message.answer(f"❌ **Video {i+1}/3 (Centris) yuborilmadi!**")
+                
+                # Пробуем отправить видео для Golden
+                if golden_enabled:
+                    golden_result = await send_group_video_new(group_id, "golden_lake")
+                    if golden_result:
+                        success_count += 1
+                        await message.answer(f"✅ **Video {i+1}/3 (Golden) yuborildi!**")
+                    else:
+                        await message.answer(f"❌ **Video {i+1}/3 (Golden) yuborilmadi!**")
+                
+                # Небольшая пауза между видео
+                if i < total_attempts - 1:
+                    await asyncio.sleep(2)
+                    
+            except Exception as e:
+                logger.error(f"Ошибка при тестировании видео {i+1}: {e}")
+                await message.answer(f"❌ **Xatolik video {i+1} da:** `{str(e)}`")
+        
+        # Итоговый результат
+        await message.answer(
+            f"📊 **SINASH NATIJASI:**\n\n"
+            f"✅ **Muvaffaqiyatli:** {success_count}/{total_attempts * 2}\n"
+            f"❌ **Muvaffaqiyatsiz:** {(total_attempts * 2) - success_count}/{total_attempts * 2}\n\n"
+            f"📱 **Guruh:** {group_name}\n"
+            f"🆔 **ID:** `{group_id}`\n\n"
+            f"💡 **Agar barcha video yuborilgan bo'lsa - ketma-ketlik ishlaydi!**"
+        )
+        
+    except ValueError:
+        await message.answer(
+            "❌ **Noto'g'ri format!**\n\n"
+            "Guruh ID raqam bo'lishi kerak.\n"
+            "Masalan: `/test_video_sequence -4867322212`",
+            parse_mode="Markdown"
+        )
+    except Exception as e:
+        await handle_error_with_notification(e, "test_video_sequence_command", message)
