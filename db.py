@@ -707,9 +707,19 @@ class Database:
                 cursor.execute('''
                     SELECT golden_season_id, golden_start_video FROM group_video_settings WHERE chat_id = %s
                 ''', (str(chat_id),))
+            else:
+                logger.warning(f"Неизвестный проект: {project}")
+                cursor.close()
+                return (None, 0)
+            
             result = cursor.fetchone()
             cursor.close()
-            return tuple(result) if result else (None, 0)
+            
+            if result is None:
+                logger.info(f"Группа {chat_id} не найдена в настройках для проекта {project}")
+                return (None, 0)
+            
+            return tuple(result)
         except Exception as e:
             logger.error(f"Ошибка при получении стартового сезона/видео для группы {chat_id}, проект {project}: {e}")
             return (None, 0)

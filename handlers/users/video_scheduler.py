@@ -170,6 +170,31 @@ async def notify_superadmins_season_completed(chat_id: int, season_id: int, proj
 
 
 # --- Функция уведомления о автоматическом переключении сезона ---
+def update_start_video_with_next_position(chat_id: int, project_for_db: str, season_videos: list, current_position: int):
+    """Обновляет start_video на следующую реальную позицию в сезоне"""
+    next_position = None
+    
+    # Ищем следующую позицию в отсортированном списке видео
+    for idx, video in enumerate(season_videos):
+        if video[2] > current_position:  # position больше текущей
+            next_position = video[2]
+            break
+    
+    if next_position is None:
+        # Если это последнее видео в сезоне, ставим позицию больше максимальной
+        max_position = max([v[2] for v in season_videos]) if season_videos else current_position
+        next_position = max_position + 1
+    
+    # Обновляем start_video на следующую реальную позицию
+    update_result = db.update_group_video_start_only(chat_id, project_for_db, next_position)
+    
+    if update_result:
+        logger.info(f"✅ Обновлен start_video для группы {chat_id}: {current_position} → {next_position} (следующая реальная позиция)")
+    else:
+        logger.error(f"❌ Ошибка при обновлении start_video для группы {chat_id}")
+    
+    return next_position
+
 async def notify_superadmins_season_auto_switched(chat_id: int, old_season_id: int, project: str):
     """Уведомить супер-админов об автоматическом переключении на следующий сезон"""
     try:
@@ -237,8 +262,12 @@ async def send_group_video_new(chat_id: int, project: str, season_id: int = None
             return False
 
         # Получаем стартовые значения из базы
-        season_db, video_db = db.get_group_video_start(chat_id, project)
-        logger.info(f"🎯 Данные из БД для группы {chat_id}, проект {project}: season_db={season_db}, video_db={video_db}")
+        try:
+            season_db, video_db = db.get_group_video_start(chat_id, project)
+            logger.info(f"🎯 Данные из БД для группы {chat_id}, проект {project}: season_db={season_db}, video_db={video_db}")
+        except Exception as e:
+            logger.error(f"Ошибка при получении стартовых данных группы {chat_id}, проект {project}: {e}")
+            return False
         
         season_id = season_id if season_id is not None else season_db
         start_video = start_video if start_video is not None else video_db
@@ -247,7 +276,7 @@ async def send_group_video_new(chat_id: int, project: str, season_id: int = None
         
         # Проверяем валидность season_id
         if not season_id:
-            logger.info(f"Не найден стартовый сезон для группы {chat_id}, проект {project}")
+            logger.warning(f"Не найден стартовый сезон для группы {chat_id}, проект {project}. Это нормально для групп без настроек.")
             return False
         
         # ИСПРАВЛЕНИЕ: Обрабатываем случай когда season_id - строка "centris" или "golden"
@@ -335,14 +364,18 @@ async def send_group_video_new(chat_id: int, project: str, season_id: int = None
                 logger.info(f"🎯 Найдено непросмотренное видео: {video_key} (сезон {season_id}, позиция {position})")
                 logger.info(f"🎯 Отправляем: {title}")
                 
-                message_id = int(url.split("/")[-1])
-                await bot.copy_message(
-                    chat_id=chat_id,
-                    from_chat_id=-1002550852551,
-                    message_id=message_id,
-                    protect_content=True
-                )
-                logger.info(f"✅ Видео {position} сезона {season_id} отправлено в группу {chat_id} (проект {project})")
+                try:
+                    message_id = int(url.split("/")[-1])
+                    await bot.copy_message(
+                        chat_id=chat_id,
+                        from_chat_id=-1002550852551,
+                        message_id=message_id,
+                        protect_content=True
+                    )
+                    logger.info(f"✅ Видео {position} сезона {season_id} отправлено в группу {chat_id} (проект {project}): {title}")
+                except Exception as send_error:
+                    logger.error(f"Ошибка при отправке видео {position} в группу {chat_id}: {send_error}")
+                    return False
                 
                 # Отмечаем как просмотренное в детальном формате
                 db.mark_group_video_as_viewed_detailed_by_project(chat_id, season_id, position, project_for_db)
@@ -365,12 +398,13 @@ async def send_group_video_new(chat_id: int, project: str, season_id: int = None
                 
                 # ОТЛАДКА: Проверяем start_video ДО обновления
                 current_settings = db.get_group_video_settings(chat_id)
-                if current_settings:
+                if current_settings and len(current_settings) >= 7:
                     # Распаковываем tuple: (centris_enabled, centris_season_id, centris_start_video, golden_enabled, golden_season_id, golden_start_video, send_times)
                     centris_enabled, centris_season_id, centris_start_video, golden_enabled, golden_season_id, golden_start_video, send_times = current_settings
                     current_start = centris_start_video if project_for_db_update == "centris" else golden_start_video
                 else:
                     current_start = 'N/A'
+                    logger.warning(f"Неправильные настройки группы {chat_id}: {current_settings}")
                 logger.info(f"🔍 ДО обновления: группа {chat_id}, проект {project_for_db_update}, start_video = {current_start}")
                 
                 update_result = db.update_group_video_start_only(chat_id, project_for_db_update, next_position)
@@ -380,12 +414,13 @@ async def send_group_video_new(chat_id: int, project: str, season_id: int = None
                     
                     # ОТЛАДКА: Проверяем start_video ПОСЛЕ обновления
                     updated_settings = db.get_group_video_settings(chat_id)
-                    if updated_settings:
+                    if updated_settings and len(updated_settings) >= 7:
                         # Распаковываем tuple: (centris_enabled, centris_season_id, centris_start_video, golden_enabled, golden_season_id, golden_start_video, send_times)
                         centris_enabled, centris_season_id, centris_start_video, golden_enabled, golden_season_id, golden_start_video, send_times = updated_settings
                         updated_start = centris_start_video if project_for_db_update == "centris" else golden_start_video
                     else:
                         updated_start = 'N/A'
+                        logger.warning(f"Неправильные настройки группы {chat_id} после обновления: {updated_settings}")
                     logger.info(f"🔍 ПОСЛЕ обновления: группа {chat_id}, проект {project_for_db_update}, start_video = {updated_start}")
                     
                     # ПРОВЕРКА: Если start_video не изменился - это ошибка!
@@ -427,7 +462,7 @@ async def send_group_video_new(chat_id: int, project: str, season_id: int = None
             try:
                 # Получаем новые настройки после переключения
                 new_settings = db.get_group_video_settings(chat_id)
-                if new_settings:
+                if new_settings and len(new_settings) >= 7:
                     if project_for_db == "centris" and new_settings[0]:  # centris_enabled
                         new_season_id = new_settings[1]  # centris_season_id
                         if new_season_id:
@@ -440,21 +475,25 @@ async def send_group_video_new(chat_id: int, project: str, season_id: int = None
                                 first_video = new_season_videos[0]  # Первое видео
                                 url, title, position = first_video
                                 
-                                message_id = int(url.split("/")[-1])
-                                await bot.copy_message(
-                                    chat_id=chat_id,
-                                    from_chat_id=-1002550852551,
-                                    message_id=message_id,
-                                    protect_content=True
-                                )
+                                try:
+                                    message_id = int(url.split("/")[-1])
+                                    await bot.copy_message(
+                                        chat_id=chat_id,
+                                        from_chat_id=-1002550852551,
+                                        message_id=message_id,
+                                        protect_content=True
+                                    )
+                                except Exception as send_error:
+                                    logger.error(f"Ошибка при отправке первого видео нового сезона {new_season_id} в группу {chat_id}: {send_error}")
+                                    return False
                                 
                                 # Отмечаем как просмотренное
                                 db.mark_group_video_as_viewed_detailed_by_project(chat_id, new_season_id, position, project_for_db)
                                 
-                                # Обновляем start_video на следующую позицию
-                                db.update_group_video_start_only(chat_id, project_for_db, position + 1)
+                                # Обновляем start_video на следующую реальную позицию
+                                next_position = update_start_video_with_next_position(chat_id, project_for_db, new_season_videos, position)
                                 
-                                logger.info(f"✅ Отправлено первое видео нового сезона {new_season_id}: {title}")
+                                logger.info(f"✅ Отправлено первое видео нового сезона {new_season_id}: {title}, следующая позиция: {next_position}")
                                 return True
                             
                     elif project_for_db == "golden" and new_settings[3]:  # golden_enabled
@@ -469,21 +508,25 @@ async def send_group_video_new(chat_id: int, project: str, season_id: int = None
                                 first_video = new_season_videos[0]  # Первое видео
                                 url, title, position = first_video
                                 
-                                message_id = int(url.split("/")[-1])
-                                await bot.copy_message(
-                                    chat_id=chat_id,
-                                    from_chat_id=-1002550852551,
-                                    message_id=message_id,
-                                    protect_content=True
-                                )
+                                try:
+                                    message_id = int(url.split("/")[-1])
+                                    await bot.copy_message(
+                                        chat_id=chat_id,
+                                        from_chat_id=-1002550852551,
+                                        message_id=message_id,
+                                        protect_content=True
+                                    )
+                                except Exception as send_error:
+                                    logger.error(f"Ошибка при отправке первого видео нового сезона {new_season_id} в группу {chat_id}: {send_error}")
+                                    return False
                                 
                                 # Отмечаем как просмотренное
                                 db.mark_group_video_as_viewed_detailed_by_project(chat_id, new_season_id, position, project_for_db)
                                 
-                                # Обновляем start_video на следующую позицию
-                                db.update_group_video_start_only(chat_id, project_for_db, position + 1)
+                                # Обновляем start_video на следующую реальную позицию
+                                next_position = update_start_video_with_next_position(chat_id, project_for_db, new_season_videos, position)
                                 
-                                logger.info(f"✅ Отправлено первое видео нового сезона {new_season_id}: {title}")
+                                logger.info(f"✅ Отправлено первое видео нового сезона {new_season_id}: {title}, следующая позиция: {next_position}")
                                 return True
                                 
             except Exception as e:
@@ -1223,11 +1266,14 @@ def schedule_single_group_jobs(chat_id):
             return False
         
         # Распаковываем tuple в переменные (теперь включает send_times)
-        if len(group_settings) >= 7:
+        if group_settings and len(group_settings) >= 7:
             centris_enabled, centris_season_id, centris_start_video, golden_enabled, golden_season_id, golden_start_video, send_times_json = group_settings
-        else:
+        elif group_settings and len(group_settings) >= 6:
             centris_enabled, centris_season_id, centris_start_video, golden_enabled, golden_season_id, golden_start_video = group_settings
             send_times_json = None
+        else:
+            logger.error(f"Неправильный формат настроек группы {chat_id}: {group_settings}")
+            return False
         
         # Приводим к правильным типам
         centris_enabled = bool(centris_enabled)
