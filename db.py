@@ -2156,13 +2156,13 @@ class Database:
             if project_for_db == "centris":
                 cursor.execute("""
                     UPDATE group_video_settings 
-                    SET centris_season_id = %s, centris_start_video = 1
+                    SET centris_season_id = %s, centris_start_video = 0
                     WHERE chat_id = %s
                 """, (next_season_id, str(chat_id)))
             elif project_for_db == "golden":
                 cursor.execute("""
                     UPDATE group_video_settings 
-                    SET golden_season_id = %s, golden_start_video = 1
+                    SET golden_season_id = %s, golden_start_video = 0
                     WHERE chat_id = %s
                 """, (next_season_id, str(chat_id)))
             

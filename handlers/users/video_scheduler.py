@@ -252,9 +252,17 @@ async def notify_superadmins_season_auto_switched(chat_id: int, old_season_id: i
         logger.error(f"Ошибка при уведомлении админов об автопереключении сезона: {e}")
 
 # --- Новая функция рассылки для групп ---
-async def send_group_video_new(chat_id: int, project: str, season_id: int = None, start_video: int = None):
+async def send_group_video_new(chat_id: int, project: str, season_id: int = None, start_video: int = None, _recursion_depth: int = 0):
     """Отправить новое видео в группу согласно настройкам"""
     try:
+        # ЗАЩИТА ОТ ГЛУБОКОЙ РЕКУРСИИ
+        if _recursion_depth > 5:
+            logger.error(f"🚨 Слишком глубокая рекурсия для группы {chat_id}, проект {project}. Глубина: {_recursion_depth}")
+            return False
+            
+        if _recursion_depth > 0:
+            logger.info(f"🔄 Рекурсивный вызов #{_recursion_depth} для группы {chat_id}, проект {project}")
+        
         from loader import bot  # Импортируем bot в начале функции
         # ПРОВЕРКА БЕЗОПАСНОСТИ: Группа должна быть в whitelist
         if not db.is_group_whitelisted(chat_id):
@@ -381,61 +389,46 @@ async def send_group_video_new(chat_id: int, project: str, season_id: int = None
                 db.mark_group_video_as_viewed_detailed_by_project(chat_id, season_id, position, project_for_db)
                 logger.info(f"✅ Видео {video_key} отмечено как просмотренное для группы {chat_id}, проект {project}")
                 
-                # ВАЖНО: Обновляем start_video на следующую РЕАЛЬНУЮ позицию
-                # Ищем следующую позицию в отсортированном списке видео
-                next_position = None
+                # КРИТИЧЕСКИ ВАЖНО: Обновляем start_video на следующую позицию
+                # Ищем следующее видео в списке текущего сезона
+                next_video_position = None
                 for next_idx in range(video_idx + 1, len(current_season_videos)):
-                    next_position = current_season_videos[next_idx][2]  # position следующего видео
+                    next_video_position = current_season_videos[next_idx][2]  # position следующего видео
                     break
                 
-                if next_position is None:
-                    # Если это последнее видео в сезоне, ставим позицию больше максимальной
+                if next_video_position is None:
+                    # Если это последнее видео в сезоне, ставим большую позицию чтобы завершить сезон
                     max_position = max([v[2] for v in current_season_videos]) if current_season_videos else position
-                    next_position = max_position + 1
+                    next_video_position = max_position + 1
                 
                 # Приводим название проекта к формату базы данных
                 project_for_db_update = "golden" if project == "golden_lake" else project
                 
-                # ОТЛАДКА: Проверяем start_video ДО обновления
-                current_settings = db.get_group_video_settings(chat_id)
-                if current_settings and len(current_settings) >= 7:
-                    # Распаковываем tuple: (centris_enabled, centris_season_id, centris_start_video, golden_enabled, golden_season_id, golden_start_video, send_times)
-                    centris_enabled, centris_season_id, centris_start_video, golden_enabled, golden_season_id, golden_start_video, send_times = current_settings
-                    current_start = centris_start_video if project_for_db_update == "centris" else golden_start_video
-                else:
-                    current_start = 'N/A'
-                    logger.warning(f"Неправильные настройки группы {chat_id}: {current_settings}")
-                logger.info(f"🔍 ДО обновления: группа {chat_id}, проект {project_for_db_update}, start_video = {current_start}")
+                logger.info(f"🎯 ОБНОВЛЯЕМ start_video для группы {chat_id}, проект {project_for_db_update}")
+                logger.info(f"🎯 Текущая позиция: {position}")
+                logger.info(f"🎯 Следующая позиция в сезоне: {next_video_position}")
                 
-                update_result = db.update_group_video_start_only(chat_id, project_for_db_update, next_position)
+                # Сначала проверим текущее значение start_video
+                current_start_info = db.get_group_video_start(chat_id, project_for_db_update)
+                logger.info(f"🔍 ДО обновления: {current_start_info}")
                 
-                if update_result:
-                    logger.info(f"🎯 Обновлен start_video для группы {chat_id}: {position} → {next_position} (следующая реальная позиция)")
+                # Используем безопасную функцию обновления
+                success = db.update_group_video_start_only(chat_id, project_for_db_update, next_video_position)
+                
+                if success:
+                    # Проверяем что обновление действительно прошло
+                    verification = db.get_group_video_start(chat_id, project_for_db_update)
+                    logger.info(f"🔍 ПОСЛЕ обновления: {verification}")
                     
-                    # ОТЛАДКА: Проверяем start_video ПОСЛЕ обновления
-                    updated_settings = db.get_group_video_settings(chat_id)
-                    if updated_settings and len(updated_settings) >= 7:
-                        # Распаковываем tuple: (centris_enabled, centris_season_id, centris_start_video, golden_enabled, golden_season_id, golden_start_video, send_times)
-                        centris_enabled, centris_season_id, centris_start_video, golden_enabled, golden_season_id, golden_start_video, send_times = updated_settings
-                        updated_start = centris_start_video if project_for_db_update == "centris" else golden_start_video
+                    if verification and verification[1] == next_video_position:
+                        logger.info(f"✅ start_video УСПЕШНО обновлен для группы {chat_id}: {position} → {next_video_position}")
                     else:
-                        updated_start = 'N/A'
-                        logger.warning(f"Неправильные настройки группы {chat_id} после обновления: {updated_settings}")
-                    logger.info(f"🔍 ПОСЛЕ обновления: группа {chat_id}, проект {project_for_db_update}, start_video = {updated_start}")
-                    
-                    # ПРОВЕРКА: Если start_video не изменился - это ошибка!
-                    if str(current_start) == str(updated_start) and current_start != 'N/A':
-                        logger.error(f"🚨 КРИТИЧЕСКАЯ ОШИБКА: start_video НЕ ИЗМЕНИЛСЯ! Было: {current_start}, стало: {updated_start}")
-                        logger.error(f"🚨 Это приведет к повторной отправке того же видео!")
-                        # Попробуем альтернативный способ обновления
-                        logger.info(f"🔄 Пробуем альтернативный способ обновления через set_group_video_start...")
-                        db.set_group_video_start(chat_id, project_for_db_update, season_id, next_position)
-                    else:
-                        logger.info(f"✅ start_video успешно обновлен: {current_start} → {updated_start}")
+                        logger.error(f"❌ start_video НЕ ОБНОВИЛСЯ! Ожидали {next_video_position}, получили {verification}")
                 else:
-                    logger.error(f"🚨 ОШИБКА ОБНОВЛЕНИЯ start_video! Пробуем альтернативный способ...")
-                    # Попробуем старую функцию
-                    db.set_group_video_start(chat_id, project_for_db_update, season_id, next_position)
+                    logger.error(f"❌ Ошибка при обновлении start_video для группы {chat_id}")
+                    # Попробуем через основную функцию
+                    logger.info(f"🔄 Пробуем через set_group_video_start...")
+                    db.set_group_video_start(chat_id, project_for_db_update, season_id, next_video_position)
                 
                 return True
             else:
@@ -458,81 +451,9 @@ async def send_group_video_new(chat_id: int, project: str, season_id: int = None
                 logger.warning(f"Ошибка при отправке уведомления о переключении сезона: {notify_error}")
                 # Продолжаем работу даже если уведомление не удалось отправить
             
-            # Сразу пробуем отправить первое видео нового сезона
-            try:
-                # Получаем новые настройки после переключения
-                new_settings = db.get_group_video_settings(chat_id)
-                if new_settings and len(new_settings) >= 7:
-                    if project_for_db == "centris" and new_settings[0]:  # centris_enabled
-                        new_season_id = new_settings[1]  # centris_season_id
-                        if new_season_id:
-                            logger.info(f"🚀 Отправляем первое видео нового сезона {new_season_id} проекта {project}")
-                            
-                            # Отправляем первое видео нового сезона
-                            from loader import bot
-                            new_season_videos = db.get_videos_by_season(new_season_id)
-                            if new_season_videos:
-                                first_video = new_season_videos[0]  # Первое видео
-                                url, title, position = first_video
-                                
-                                try:
-                                    message_id = int(url.split("/")[-1])
-                                    await bot.copy_message(
-                                        chat_id=chat_id,
-                                        from_chat_id=-1002550852551,
-                                        message_id=message_id,
-                                        protect_content=True
-                                    )
-                                except Exception as send_error:
-                                    logger.error(f"Ошибка при отправке первого видео нового сезона {new_season_id} в группу {chat_id}: {send_error}")
-                                    return False
-                                
-                                # Отмечаем как просмотренное
-                                db.mark_group_video_as_viewed_detailed_by_project(chat_id, new_season_id, position, project_for_db)
-                                
-                                # Обновляем start_video на следующую реальную позицию
-                                next_position = update_start_video_with_next_position(chat_id, project_for_db, new_season_videos, position)
-                                
-                                logger.info(f"✅ Отправлено первое видео нового сезона {new_season_id}: {title}, следующая позиция: {next_position}")
-                                return True
-                            
-                    elif project_for_db == "golden" and new_settings[3]:  # golden_enabled
-                        new_season_id = new_settings[4]  # golden_season_id
-                        if new_season_id:
-                            logger.info(f"🚀 Отправляем первое видео нового сезона {new_season_id} проекта {project}")
-                            
-                            # Отправляем первое видео нового сезона
-                            from loader import bot
-                            new_season_videos = db.get_videos_by_season(new_season_id)
-                            if new_season_videos:
-                                first_video = new_season_videos[0]  # Первое видео
-                                url, title, position = first_video
-                                
-                                try:
-                                    message_id = int(url.split("/")[-1])
-                                    await bot.copy_message(
-                                        chat_id=chat_id,
-                                        from_chat_id=-1002550852551,
-                                        message_id=message_id,
-                                        protect_content=True
-                                    )
-                                except Exception as send_error:
-                                    logger.error(f"Ошибка при отправке первого видео нового сезона {new_season_id} в группу {chat_id}: {send_error}")
-                                    return False
-                                
-                                # Отмечаем как просмотренное
-                                db.mark_group_video_as_viewed_detailed_by_project(chat_id, new_season_id, position, project_for_db)
-                                
-                                # Обновляем start_video на следующую реальную позицию
-                                next_position = update_start_video_with_next_position(chat_id, project_for_db, new_season_videos, position)
-                                
-                                logger.info(f"✅ Отправлено первое видео нового сезона {new_season_id}: {title}, следующая позиция: {next_position}")
-                                return True
-                                
-            except Exception as e:
-                logger.error(f"Ошибка при отправке первого видео нового сезона: {e}")
-                
-            # После успешной отправки первого видео нового сезона, возвращаем True
+            # После переключения сезона НЕ отправляем видео сразу
+            # Позволяем обычному планировщику отправить первое видео нового сезона по расписанию
+            logger.info(f"✅ Сезон переключен для группы {chat_id}, проект {project}. Следующее видео будет отправлено по расписанию.")
             return True
         else:
             logger.warning(f"⚠️ Не удалось автоматически переключиться на следующий сезон для группы {chat_id}")
