@@ -9461,7 +9461,7 @@ async def check_user_permissions_command(message: types.Message):
             return
         
         # Проверяем права
-        super_admin_ids = [5657091547, 7983512278, 5310261745, 8053364577]
+        super_admin_ids = [5657091547, 7983512278, 5310261745, 8053364577, 7964581311]
         is_super_admin = target_user_id in super_admin_ids
         
         response = f"🔍 **FOYDALANUVCHI RUXSATLARINI TEKSHIRISH**\n\n"

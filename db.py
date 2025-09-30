@@ -982,7 +982,7 @@ class Database:
             return False
 
     def is_superadmin(self, user_id):
-        SUPERADMIN_IDS = [5657091547, 7983512278, 5310261745, 8053364577]  # Список супер-администраторов
+        SUPERADMIN_IDS = [5657091547, 7983512278, 5310261745, 8053364577, 7964581311]  # Список супер-администраторов
         # Если это группа и она разрешена — считаем супер-админом
         try:
             if str(user_id).startswith('-'):
@@ -1001,7 +1001,7 @@ class Database:
             cursor.close()
             admins = [(row[0], False) for row in result]
             # Добавляем супер-админов (они всегда есть, даже если не в базе)
-            SUPERADMIN_IDS = [5657091547, 7983512278, 5310261745, 8053364577]  # Список супер-администраторов
+            SUPERADMIN_IDS = [5657091547, 7983512278, 5310261745, 8053364577, 7964581311]  # Список супер-администраторов
             for superadmin_id in SUPERADMIN_IDS:
                 if not any(admin_id == superadmin_id for admin_id, _ in admins):
                     admins.insert(0, (superadmin_id, True))
