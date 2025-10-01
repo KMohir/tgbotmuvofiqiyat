@@ -342,8 +342,8 @@ async def send_group_video_new(chat_id: int, project: str, season_id: int = None
             season_id = all_seasons[0][0]
             start_video = 0
 
-        # Унифицируем название проекта для получения просмотренных видео
-        project_for_db = "golden_lake" if project == "golden" else project
+        # Унифицируем название проекта для БД (используем то же, что при чтении)
+        project_for_db = "golden" if project in ["golden_lake", "golden"] else "centris"
         # --- ИСПРАВЛЕННАЯ ЛОГИКА: последовательная отправка ТОЛЬКО по выбранному сезону ---
         
         logger.info(f"🎯 Отправляем видео ТОЛЬКО из выбранного сезона {season_id}")
@@ -396,8 +396,8 @@ async def send_group_video_new(chat_id: int, project: str, season_id: int = None
                     max_position = max([v[2] for v in current_season_videos]) if current_season_videos else position
                     next_video_position = max_position + 1
                 
-                # Приводим название проекта к формату базы данных
-                project_for_db_update = "golden" if project == "golden_lake" else project
+                # Используем ТО ЖЕ нормализованное имя проекта, что и при чтении
+                project_for_db_update = "golden" if project in ["golden_lake", "golden"] else "centris"
                 
                 logger.info(f"🎯 ОБНОВЛЯЕМ start_video для группы {chat_id}, проект {project_for_db_update}")
                 logger.info(f"🎯 Текущая позиция: {position}")
@@ -431,8 +431,8 @@ async def send_group_video_new(chat_id: int, project: str, season_id: int = None
         logger.info(f"🔄 Все видео выбранного сезона {season_id} отправлены для проекта {project}")
         
         # Пытаемся автоматически переключиться на следующий сезон
-        project_for_db = "golden" if project == "golden_lake" else project
-        success = db.auto_switch_to_next_season(chat_id, project_for_db, season_id)
+        project_for_db_switch = "golden" if project in ["golden_lake", "golden"] else "centris"
+        success = db.auto_switch_to_next_season(chat_id, project_for_db_switch, season_id)
         
         if success:
             logger.info(f"🎉 Группа {chat_id}: автоматически переключена на следующий сезон в проекте {project}")
