@@ -272,8 +272,10 @@ async def send_group_video_new(chat_id: int, project: str, season_id: int = None
 
         # Получаем стартовые значения из базы
         try:
-            season_db, video_db = db.get_group_video_start(chat_id, project)
-            logger.info(f"🎯 Данные из БД для группы {chat_id}, проект {project}: season_db={season_db}, video_db={video_db}")
+            # Нормализуем имя проекта для БД: 'golden_lake' → 'golden'
+            project_for_db_read = "golden" if project in ["golden_lake", "golden"] else "centris"
+            season_db, video_db = db.get_group_video_start(chat_id, project_for_db_read)
+            logger.info(f"🎯 Данные из БД для группы {chat_id}, проект {project_for_db_read}: season_db={season_db}, video_db={video_db}")
         except Exception as e:
             logger.error(f"Ошибка при получении стартовых данных группы {chat_id}, проект {project}: {e}")
             return False
