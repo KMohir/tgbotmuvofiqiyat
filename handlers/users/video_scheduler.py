@@ -439,38 +439,83 @@ async def send_group_video_new(chat_id: int, project: str, season_id: int = None
         
         # Если все видео выбранного сезона отправлены - сезон завершен
         logger.info(f"🔄 Все видео выбранного сезона {season_id} отправлены для проекта {project}")
-        
-        # Пытаемся автоматически переключиться на следующий сезон
+
+        # Проходим остальные сезоны по кругу за один запуск (без рекурсии)
         project_for_db = "golden" if project == "golden_lake" else project
-        success = db.auto_switch_to_next_season(chat_id, project_for_db, season_id)
-        
-        if success:
-            logger.info(f"🎉 Группа {chat_id}: автоматически переключена на следующий сезон в проекте {project}")
-            
-            # ОТКЛЮЧЕНО: Уведомления об автоматическом переключении сезонов по просьбе пользователя
-            # try:
-            #     await notify_superadmins_season_auto_switched(chat_id, season_id, project)
-            # except Exception as notify_error:
-            #     logger.warning(f"Ошибка при отправке уведомления о переключении сезона: {notify_error}")
-            #     # Продолжаем работу даже если уведомление не удалось отправить
-            logger.info(f"🔇 Уведомления об автопереключении сезона отключены для группы {chat_id}")
-            
-            # ВАЖНО: После переключения сезона сразу отправляем первое видео нового сезона
-            logger.info(f"🚀 Сезон переключен для группы {chat_id}, проект {project}. Отправляем первое видео нового сезона.")
-            
-            # Рекурсивно вызываем функцию для отправки первого видео нового сезона
+
+        try:
+            if project_for_db == "centris":
+                all_seasons_loop = db.get_seasons_by_project("centris")
+            elif project_for_db in ["golden", "golden_lake"]:
+                all_seasons_loop = db.get_seasons_by_project("golden")
+            else:
+                all_seasons_loop = []
+        except Exception as seasons_err:
+            logger.error(f"Не удалось получить сезоны для проекта {project_for_db}: {seasons_err}")
+            all_seasons_loop = []
+
+        if not all_seasons_loop:
+            logger.warning(f"Нет сезонов для проекта {project_for_db}, завершаем отправку")
+            return True
+
+        # Чтобы не уйти в бесконечный цикл, проходим максимум один полный круг по сезонам
+        visited_seasons = set()
+        current_season_id = season_id
+
+        while True:
+            next_season = db.get_next_season_in_project(current_season_id, project_for_db)
+            if not next_season:
+                logger.warning(f"Не удалось вычислить следующий сезон после {current_season_id} в проекте {project_for_db}")
+                break
+
+            next_season_id = next_season[0]
+
+            if next_season_id in visited_seasons:
+                logger.info(f"Завершен полный цикл по сезонам для проекта {project_for_db}")
+                break
+
+            visited_seasons.add(next_season_id)
+
+            # Переключаемся на следующий сезон и сбрасываем позицию видео
+            switched = db.auto_switch_to_next_season(chat_id, project_for_db, current_season_id)
+            if not switched:
+                logger.warning(f"⚠️ Не удалось автоматически переключиться на следующий сезон для группы {chat_id}")
+                break
+
+            logger.info(f"🚀 Отправляем все видео сезона {next_season_id} (проект {project_for_db}) для группы {chat_id}")
+
+            # Обнуляем старт и отправляем все видео нового сезона
+            start_video = 0
+            current_season_id = next_season_id
+
+            current_season_videos = db.get_videos_by_season(current_season_id)
+            current_season_videos.sort(key=lambda x: x[2])
+
+            season_videos_sent = 0
+            for url, title, position in current_season_videos:
+                try:
+                    message_id = int(url.split("/")[-1])
+                    await bot.copy_message(
+                        chat_id=chat_id,
+                        from_chat_id=-1002550852551,
+                        message_id=message_id,
+                        protect_content=True
+                    )
+                    season_videos_sent += 1
+                    logger.info(f"✅ Видео {position} сезона {current_season_id} отправлено в группу {chat_id}")
+                except Exception as send_error:
+                    logger.error(f"Ошибка при отправке видео {position} в группу {chat_id}: {send_error}")
+                    continue
+
+            # Обновляем start_video на позицию после последнего отправленного
             try:
-                return await send_group_video_new(chat_id, project, _recursion_depth=_recursion_depth + 1)
-            except Exception as e:
-                logger.error(f"Ошибка при рекурсивном вызове после переключения сезона: {e}")
-                return False
-        else:
-            logger.warning(f"⚠️ Не удалось автоматически переключиться на следующий сезон для группы {chat_id}")
-            
-            # Если автопереключение не удалось, уведомляем админов как раньше
-            await notify_superadmins_season_completed(chat_id, season_id, project)
-            
-            return False
+                max_pos = max([v[2] for v in current_season_videos], default=-1)
+                next_pos_after_season = (max_pos + 1) if max_pos >= 0 else 0
+                db.update_group_video_start_only(chat_id, project_for_db, next_pos_after_season)
+            except Exception as upd_err:
+                logger.warning(f"Не удалось обновить start_video после сезона {current_season_id}: {upd_err}")
+
+        return True
     except Exception as e:
         logger.error(f"Ошибка в send_group_video_new: {e}")
         return False
