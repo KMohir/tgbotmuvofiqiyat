@@ -553,12 +553,12 @@ async def send_group_video_by_settings(chat_id: int):
     centris_enabled, centris_season_id, centris_start_video, golden_enabled, golden_season_id, golden_start_video, send_times = settings
     sent = False
     if centris_enabled and centris_season_id:
-        # Отправить видео Centris
-        res = await send_group_video_new(chat_id, "centris", centris_season_id, centris_start_video)
+        # Отправить видео Centris (start_video читается из БД)
+        res = await send_group_video_new(chat_id, "centris", None, None)
         sent = sent or res
     if golden_enabled and golden_season_id:
-        # Отправить видео Golden Lake
-        res = await send_group_video_new(chat_id, "golden_lake", golden_season_id, golden_start_video)
+        # Отправить видео Golden Lake (start_video читается из БД)
+        res = await send_group_video_new(chat_id, "golden_lake", None, None)
         sent = sent or res
     return sent
 
@@ -1080,7 +1080,7 @@ def schedule_group_jobs_v2():
                         scheduler,
                         send_group_video_new,
                         hour, minute,
-                        [chat_id, 'centris', centris_season_id, centris_start_video],
+                        [chat_id, 'centris', None, None],  # Не передаем start_video - читаем из БД
                         f'group_{safe_chat_id}_centris_{i}',
                         "Asia/Tashkent"
                     )
@@ -1098,7 +1098,7 @@ def schedule_group_jobs_v2():
                         scheduler,
                         send_group_video_new,
                         hour, minute,
-                        [chat_id, 'golden_lake', golden_season_id, golden_start_video],
+                        [chat_id, 'golden_lake', None, None],  # Не передаем start_video - читаем из БД
                         f'group_{safe_chat_id}_golden_{i}',
                         "Asia/Tashkent"
                     )
@@ -1132,7 +1132,7 @@ def schedule_group_jobs_v2():
                         scheduler,
                         send_group_video_new,
                         hour, minute,
-                        [chat_id, project, season_id, start_video],
+                        [chat_id, project, None, None],  # Не передаем start_video - читаем из БД
                         f'group_{safe_chat_id}_{project}_{i}',
                         "Asia/Tashkent"
                     )
@@ -1252,7 +1252,7 @@ def schedule_single_group_jobs(chat_id):
                         scheduler,
                         send_group_video_new,
                         hour, minute,
-                        [chat_id, 'centris', centris_season_id, centris_start_video],
+                        [chat_id, 'centris', None, None],  # Не передаем start_video - читаем из БД
                         f'group_{safe_chat_id}_centris_{i}',
                         "Asia/Tashkent"
                     )
@@ -1270,7 +1270,7 @@ def schedule_single_group_jobs(chat_id):
                         scheduler,
                         send_group_video_new,
                         hour, minute,
-                        [chat_id, 'golden_lake', golden_season_id, golden_start_video],
+                        [chat_id, 'golden_lake', None, None],  # Не передаем start_video - читаем из БД
                         f'group_{safe_chat_id}_golden_{i}',
                         "Asia/Tashkent"
                     )
@@ -1304,7 +1304,7 @@ def schedule_single_group_jobs(chat_id):
                         scheduler,
                         send_group_video_new,
                         hour, minute,
-                        [chat_id, project, season_id, start_video],
+                        [chat_id, project, None, None],  # Не передаем start_video - читаем из БД
                         f'group_{safe_chat_id}_{project}_{i}',
                         "Asia/Tashkent"
                     )
