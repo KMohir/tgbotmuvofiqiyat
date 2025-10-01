@@ -92,11 +92,10 @@ def get_all_group_videos(project):
 async def send_group_video(chat_id: int, project: str, season: str, video_index: int):
     try:
         all_videos = get_all_group_videos(project)
-        viewed = db.get_group_viewed_videos(chat_id)
-        # Найти следующее непросмотренное видео
-        next_idx = db.get_next_unwatched_group_video_index(chat_id, len(all_videos))
+        # Получить следующий индекс видео для отправки
+        next_idx = db.get_next_group_video_index(chat_id, len(all_videos))
         if next_idx == -1:
-            logger.info(f"Группа {chat_id} просмотрела все видео ({project})")
+            logger.info(f"Группа {chat_id} получила все видео ({project})")
             return False
         video_url = all_videos[next_idx]
         message_id = int(video_url.split("/")[-1])
@@ -107,6 +106,8 @@ async def send_group_video(chat_id: int, project: str, season: str, video_index:
             protect_content=True
         )
         db.mark_group_video_as_viewed(chat_id, next_idx)
+        # Обновляем индекс для следующей отправки
+        db.update_group_video_index(chat_id, next_idx + 1)
         logger.info(f"Видео {next_idx} отправлено в группу {chat_id} (проект {project})")
         return True
     except Exception as e:
@@ -343,11 +344,6 @@ async def send_group_video_new(chat_id: int, project: str, season_id: int = None
         project_for_db = "golden_lake" if project == "golden" else project
         # --- ИСПРАВЛЕННАЯ ЛОГИКА: последовательная отправка ТОЛЬКО по выбранному сезону ---
         
-        # Получаем просмотренные видео в формате "season_id:position"
-        viewed_videos_detailed = db.get_group_viewed_videos_detailed_by_project(chat_id, project_for_db)
-        
-        logger.info(f"🎯 Всего просмотрено видео проекта {project}: {len(viewed_videos_detailed)}")
-        logger.info(f"🎯 Просмотренные видео: {viewed_videos_detailed}")
         logger.info(f"🎯 Отправляем видео ТОЛЬКО из выбранного сезона {season_id}")
         logger.info(f"🎯 Стартовое видео установлено: {start_video}")
         
@@ -355,7 +351,7 @@ async def send_group_video_new(chat_id: int, project: str, season_id: int = None
         current_season_videos = db.get_videos_by_season(season_id)
         logger.info(f"🎯 Проверяем выбранный сезон {season_id}: {len(current_season_videos)} видео")
         
-        # Ищем первое непросмотренное видео в выбранном сезоне (начиная со стартового)
+        # Ищем первое видео в выбранном сезоне (начиная со стартового)
         logger.info(f"🎯 Начинаем поиск с позиции start_video: {start_video}")
         logger.info(f"🎯 Список всех видео сезона: {[(position, title[:30]) for url, title, position in current_season_videos[:5]]}...")
         
@@ -367,9 +363,9 @@ async def send_group_video_new(chat_id: int, project: str, season_id: int = None
             video_key = f"{season_id}:{position}"
             logger.info(f"🎯 Проверяем видео: position={position}, start_video={start_video}, video_key={video_key}")
             
-            # ВАЖНО: Ищем видео начиная с start_video (или больше)
-            if position >= start_video and video_key not in viewed_videos_detailed:
-                logger.info(f"🎯 Найдено непросмотренное видео: {video_key} (сезон {season_id}, позиция {position})")
+            # ВАЖНО: Ищем видео начиная с start_video (или больше) - БЕЗ ПРОВЕРКИ ПРОСМОТРА
+            if position >= start_video:
+                logger.info(f"🎯 Найдено видео для отправки: {video_key} (сезон {season_id}, позиция {position})")
                 logger.info(f"🎯 Отправляем: {title}")
                 
                 try:
@@ -384,10 +380,6 @@ async def send_group_video_new(chat_id: int, project: str, season_id: int = None
                 except Exception as send_error:
                     logger.error(f"Ошибка при отправке видео {position} в группу {chat_id}: {send_error}")
                     return False
-                
-                # Отмечаем как просмотренное в детальном формате
-                db.mark_group_video_as_viewed_detailed_by_project(chat_id, season_id, position, project_for_db)
-                logger.info(f"✅ Видео {video_key} отмечено как просмотренное для группы {chat_id}, проект {project}")
                 
                 # КРИТИЧЕСКИ ВАЖНО: Обновляем start_video на следующую позицию
                 # Ищем следующее видео в списке текущего сезона
@@ -431,11 +423,9 @@ async def send_group_video_new(chat_id: int, project: str, season_id: int = None
                     db.set_group_video_start(chat_id, project_for_db_update, season_id, next_video_position)
                 
                 return True
-            else:
-                logger.info(f"🎯 Видео {video_key} уже просмотрено, пропускаем")
         
-        # Если все видео выбранного сезона просмотрены - сезон завершен
-        logger.info(f"🔄 Все видео выбранного сезона {season_id} просмотрены для проекта {project}")
+        # Если все видео выбранного сезона отправлены - сезон завершен
+        logger.info(f"🔄 Все видео выбранного сезона {season_id} отправлены для проекта {project}")
         
         # Пытаемся автоматически переключиться на следующий сезон
         project_for_db = "golden" if project == "golden_lake" else project
@@ -696,22 +686,20 @@ async def send_group_video_by_settings(chat_id: int):
         logger.error(f"Ошибка при планировании задач для групп: {e}")
 
 def get_next_video_index(user_id: int) -> int:
-    """Получить следующий непросмотренный индекс видео"""
-    viewed_videos = db.get_viewed_videos(user_id)
+    """Получить следующий индекс видео для отправки"""
     current_index = db.get_video_index(user_id)
 
-    # Если пользователь еще не просматривал видео, начинаем с сохраненного начального индекса
-    if not viewed_videos and current_index == 0:
+    # Если пользователь еще не получал видео, начинаем с сохраненного начального индекса
+    if current_index == 0:
         start_index = db.get_start_video_index()
         if start_index < len(VIDEO_LIST):
             return start_index
 
-    # Находим следующий непросмотренный индекс
-    for i in range(current_index, len(VIDEO_LIST)):
-        if i not in viewed_videos:
-            return i
+    # Возвращаем следующий индекс по порядку
+    if current_index < len(VIDEO_LIST):
+        return current_index
 
-    # Если все видео просмотрены, возвращаем -1
+    # Если все видео отправлены, возвращаем -1
     return -1
 
 # Функция для отправки видео
@@ -999,33 +987,32 @@ async def handle_video_command(message: types.Message) -> None:
     dp.register_message_handler(handle_time_selection, lambda message: message.text in ["09:00", "12:00", "15:00", "18:00", "21:00"])
 
 async def send_next_unwatched_video(user_id, video_list, viewed_key):
-    viewed = db.get_viewed_videos(user_id)
+    # Отправляем первое доступное видео без проверки просмотра
     for idx, _ in enumerate(video_list):
-        if idx not in viewed:
-            try:
-                await bot.copy_message(
-                    chat_id=user_id,
-                    from_chat_id=-1002550852551,
-                    message_id=int(video_list[idx].split("/")[-1]),
-                    protect_content=True
-                )
-                db.mark_video_as_viewed(user_id, idx)
-                return True
-            except MigrateToChat as e:
-                new_chat_id = e.migrate_to_chat_id
-                db.update_group_chat_id(user_id, new_chat_id)
-                await bot.copy_message(
-                    chat_id=new_chat_id,
-                    from_chat_id=-1002550852551,
-                    message_id=int(video_list[idx].split("/")[-1]),
-                    protect_content=True
-                )
-                db.mark_video_as_viewed(new_chat_id, idx)
-                return True
-            except Exception as e:
-                logger.error(f"Ошибка при отправке видео {idx} пользователю {user_id}: {e}")
-                return False
-    return False  # Все просмотрены
+        try:
+            await bot.copy_message(
+                chat_id=user_id,
+                from_chat_id=-1002550852551,
+                message_id=int(video_list[idx].split("/")[-1]),
+                protect_content=True
+            )
+            db.mark_video_as_viewed(user_id, idx)
+            return True
+        except MigrateToChat as e:
+            new_chat_id = e.migrate_to_chat_id
+            db.update_group_chat_id(user_id, new_chat_id)
+            await bot.copy_message(
+                chat_id=new_chat_id,
+                from_chat_id=-1002550852551,
+                message_id=int(video_list[idx].split("/")[-1]),
+                protect_content=True
+            )
+            db.mark_video_as_viewed(new_chat_id, idx)
+            return True
+        except Exception as e:
+            logger.error(f"Ошибка при отправке видео {idx} пользователю {user_id}: {e}")
+            return False
+    return False  # Все видео отправлены
 
 async def scheduled_send_08(user_id):
     await send_next_unwatched_video(user_id, VIDEO_LIST_1, 'v1')

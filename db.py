@@ -601,6 +601,46 @@ class Database:
             logger.error(f"Ошибка при получении следующего непросмотренного видео для группы {chat_id}: {e}")
             return 0
 
+    def get_next_group_video_index(self, chat_id, all_videos_count):
+        """Получить следующий индекс видео для отправки группе (без проверки просмотра)"""
+        try:
+            # Получаем текущий индекс группы
+            cursor = self.conn.cursor()
+            cursor.execute(
+                "SELECT video_index FROM group_video_settings WHERE chat_id = %s",
+                (str(chat_id),)
+            )
+            result = cursor.fetchone()
+            
+            if result:
+                current_index = result[0] or 0
+            else:
+                current_index = 0
+            
+            # Возвращаем следующий индекс по порядку
+            if current_index < all_videos_count:
+                return current_index
+            else:
+                return 0  # Начинаем сначала, если достигли конца
+                
+        except Exception as e:
+            logger.error(f"Ошибка при получении следующего индекса видео для группы {chat_id}: {e}")
+            return 0
+
+    def update_group_video_index(self, chat_id, new_index):
+        """Обновить индекс видео для группы"""
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute(
+                "UPDATE group_video_settings SET video_index = %s WHERE chat_id = %s",
+                (new_index, str(chat_id))
+            )
+            self.conn.commit()
+            logger.info(f"Индекс видео для группы {chat_id} обновлен на {new_index}")
+        except Exception as e:
+            logger.error(f"Ошибка при обновлении индекса видео для группы {chat_id}: {e}")
+            self.conn.rollback()
+
     def set_group_video_index_and_viewed(self, chat_id, project, season, video_index, viewed_videos):
         try:
             cursor = self.conn.cursor()
