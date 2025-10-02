@@ -7,14 +7,13 @@ from aiogram import types
 from aiogram.dispatcher.filters import Command
 from loader import dp
 from db import db
-from data.config import ADMINS, SUPER_ADMIN_ID
+from data.config import ADMINS, SUPER_ADMIN_ID, SUPER_ADMIN_IDS
 from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
 def is_super_admin(user_id: int) -> bool:
     """Проверить является ли пользователь супер-админом"""
-    SUPER_ADMIN_IDS = [5657091547, 7983512278, 5310261745]  # Список супер-администраторов
     admin_ids = SUPER_ADMIN_IDS.copy()
     for admin in ADMINS:
         try:

@@ -5,6 +5,7 @@ import asyncio
 from datetime import datetime, timedelta, time
 from db import db
 from loader import dp, bot
+from data.config import SUPER_ADMIN_IDS
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 import pytz
 import logging
@@ -16,8 +17,7 @@ from aiogram.utils.exceptions import MigrateToChat
 # Настройка логирования
 logger = logging.getLogger(__name__)
 
-# Список супер-админов для уведомлений
-SUPER_ADMIN_IDS = [5657091547, 7983512278, 5310261745, 8053364577]
+# Список супер-админов для уведомлений берём из общей конфигурации
 
 # Вместо VIDEO_LIST теперь используем VIDEO_LIST_1
 VIDEO_LIST = VIDEO_LIST_1
