@@ -101,10 +101,7 @@ async def safe_edit_text(callback_query: types.CallbackQuery, text: str, reply_m
             await callback_query.answer()
 
 # Импортируем необходимые переменные
-from data.config import ADMINS
-
-# Список супер-администраторов
-SUPER_ADMIN_IDS = [5657091547, 7983512278, 5310261745, 8053364577]
+from data.config import ADMINS, SUPER_ADMIN_IDS
 
 # Команда для предоставления доступа пользователю
 @dp.message_handler(commands=['grant_access'])
